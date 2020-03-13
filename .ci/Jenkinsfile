@@ -1,0 +1,7 @@
+@Library("jenlib") _
+
+wafDefaultPipeline(projects: ["pynn-brainscales"],
+                   container: [app: "visionary-dls"],
+                   testSlurmResource: [partition: "cube", wafer: 62, "fpga-without-aout": 3],
+                   testOptions: "-j1 --test-execall",
+                   notificationChannel: "#dls-software")

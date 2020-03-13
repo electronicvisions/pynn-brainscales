@@ -1,0 +1,47 @@
+#!/usr/bin/env python
+
+from os.path import join
+from waflib.extras.test_base import summary
+from waflib.extras.symwaf2ic import get_toplevel_path
+
+
+def depends(ctx):
+    ctx('haldls')
+    ctx('code-format')
+
+
+def options(opt):
+    opt.load('pytest')
+    opt.load('pylint')
+    opt.load('pycodestyle')
+
+
+def configure(cfg):
+    cfg.load('python')
+    cfg.check_python_version()
+    cfg.load('pytest')
+    cfg.load('pylint')
+    cfg.load('pycodestyle')
+
+
+def build(bld):
+    bld(name = 'pynn_brainscales2',
+        features = 'use py pylint pycodestyle',
+        source = bld.path.ant_glob('pynn_brainscales/**/*.py'),
+        relative_trick = True,
+        use = ['dlens_vx'],
+        install_path = '${PREFIX}/lib',
+        pylint_config = join(get_toplevel_path(), "code-format", "pylintrc"),
+        pycodestyle_config = join(get_toplevel_path(), "code-format", "pycodestyle"),
+    )
+
+    bld(name = 'pynn_brainscales2_swtest',
+        tests = bld.path.ant_glob('test/sw/*.py'),
+        features = 'use pytest pylint pycodestyle',
+        use = ['pynn_brainscales2'],
+        install_path = '${PREFIX}/bin',
+        pylint_config = join(get_toplevel_path(), "code-format", "pylintrc"),
+        pycodestyle_config = join(get_toplevel_path(), "code-format", "pycodestyle"),
+    )
+
+    bld.add_post_fun(summary)
