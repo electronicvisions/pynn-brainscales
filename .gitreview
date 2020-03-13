@@ -1,0 +1,7 @@
+[gerrit]
+host=gerrit.bioai.eu
+port=29418
+project=pynn-brainscales
+defaultbranch=master
+defaultremote=review
+defaultrebase=0
