@@ -5,3 +5,7 @@ wafDefaultPipeline(projects: ["pynn-brainscales"],
                    testSlurmResource: [partition: "cube", wafer: 62, "fpga-without-aout": 3],
                    testOptions: "-j1 --test-execall",
                    notificationChannel: "#dls-software")
+
+runOnSlave(label: "frontend") {
+    archiveArtifacts "pynn-brainscales/brainscales2/plot_isi_calib.pdf"
+}
