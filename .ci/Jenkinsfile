@@ -8,5 +8,6 @@ wafDefaultPipeline(projects: ["pynn-brainscales"],
                    notificationChannel: "#dls-software")
 
 runOnSlave(label: "frontend") {
-    archiveArtifacts "pynn-brainscales/brainscales2/plot_isi_calib.pdf"
+    archiveArtifacts(artifacts: "pynn-brainscales/brainscales2/plot_isi_calib.pdf",
+                     allowEmptyArchive: true)
 }
