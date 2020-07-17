@@ -28,7 +28,7 @@ To build this project from public resources, adhere to the following guide:
 # 1) Most of the following steps will be executed within a singularity container
 #    To keep the steps clutter-free, we start by defining an alias
 shopt -s expand_aliases
-alias c="singularity exec --app dls-core /containers/stable/latest"
+alias c="singularity exec --app dls /containers/stable/latest"
 
 # 2) Prepare a fresh workspace and change directory into it
 mkdir workspace && cd workspace
