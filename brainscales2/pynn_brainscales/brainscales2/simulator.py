@@ -1,8 +1,8 @@
 import numpy as np
-from pyNN.common import IDMixin, Population
+from pyNN.common import IDMixin, Population, Connection
 from pyNN.common.control import BaseState
 from pynn_brainscales.brainscales2.standardmodels.cells import HXNeuron
-from dlens_vx_v1 import hal, halco, sta, hxcomm
+from dlens_vx_v1 import hal, halco, sta, hxcomm, lola
 
 
 name = "HX"  # for use in annotating output data
@@ -16,6 +16,195 @@ class ID(int, IDMixin):
 
         int.__init__(n)
         IDMixin.__init__(self)
+
+
+class ConnectionConfigurationBuilder:
+    """
+    Builder Pattern to generate coord-config pairs for the synapse drivers
+    and the synapse matrices.
+    """
+
+    def __init__(self):
+        # lists of coord-config pairs
+        self.synapse_drivers = np.ndarray(shape=(0, 2))
+        self.synapse_matrices = np.ndarray(shape=(0, 2))
+
+        # list of allocated synapse drivers
+        self._used_syndrv = np.zeros(0, dtype={
+            "names": ("synapse_driver", "row", "pre_population",
+                      "receptor_type"),
+            "formats": (halco.SynapseDriverOnDLS, "i1", "i2", "U10")})
+
+        # list of PADI busses with number of used input rows
+        self._used_padi_rows = np.ndarray(shape=(0, 2))
+
+    def generate(self) -> (sta.PlaybackProgramBuilder, None):
+        builder = sta.PlaybackProgramBuilder()
+        for coord, config in self.synapse_drivers:
+            builder.write(coord, config)
+        for coord, config in self.synapse_matrices:
+            builder.write(coord, config)
+
+        return builder, None
+
+    def add(self, connection: Connection):
+        # check if there is already a synapse driver config for this coord
+        syndrv_coord = self._synapse_driver_coord(connection)
+        synapse_drivers_coords = self.synapse_drivers[:, 0]
+        coord_index = np.where(
+            synapse_drivers_coords == syndrv_coord["synapse_driver"])
+        coord_index = coord_index[0]
+        # if not a new one is created
+        if len(coord_index) == 0:
+            config = hal.SynapseDriverConfig()
+            config.enable_receiver = True
+            config.enable_address_out = True
+            config.row_address_compare_mask = 0b00000
+        # if there is, it is used and extended
+        else:
+            assert len(coord_index) == 1
+            config = self.synapse_drivers[int(coord_index)][1]
+        syndrv_config = self._synapse_driver_config(config, syndrv_coord)
+        # if a new config was created, it is appended to the list of pairs
+        if len(coord_index) == 0:
+            self.synapse_drivers = \
+                np.append(self.synapse_drivers,
+                          [[syndrv_coord["synapse_driver"][0], syndrv_config]],
+                          axis=0)
+        # otherwise the entry is overwritten
+        else:
+            if isinstance(syndrv_coord["synapse_driver"], np.ndarray):
+                syndrv = syndrv_coord["synapse_driver"][0]
+            elif isinstance(syndrv_coord["synapse_driver"],
+                            halco.SynapseDriverOnDLS):
+                syndrv = syndrv_coord["synapse_driver"]
+            else:
+                raise NotImplementedError
+            self.synapse_drivers[int(coord_index)] = \
+                [syndrv, syndrv_config]
+
+        # same for the synapse matrix
+        synmtx_coord = self._synapse_matrix_coord(connection)
+        coord_index, _ = np.where(self.synapse_matrices == synmtx_coord)
+        if len(coord_index) == 0:
+            config = lola.SynapseMatrix()
+        else:
+            assert len(coord_index) == 1
+            config = self.synapse_matrices[int(coord_index)][1]
+        synmtx_config = self._synapse_matrix_config(config,
+                                                    connection,
+                                                    syndrv_coord)
+        if len(coord_index) == 0:
+            self.synapse_matrices = np.append(self.synapse_matrices,
+                                              [[synmtx_coord, synmtx_config]],
+                                              axis=0)
+        else:
+            self.synapse_matrices[int(coord_index)] = \
+                [synmtx_coord, synmtx_config]
+
+    def _synapse_driver_coord(self, connection: Connection) -> np.ndarray:
+        pre = state.neuron_placement[connection.presynaptic_cell]
+        receptor_type = connection.projection.receptor_type
+
+        # check if a synapse driver for the presynaptic neuron with given
+        # receptor type was already allocated
+        coord_index = np.where(self._used_syndrv["pre_population"] == pre)
+        coord_index = coord_index[0]
+        if len(coord_index) != 0:
+            assert len(coord_index) <= 2
+            for coord in coord_index:
+                if self._used_syndrv[coord]["receptor_type"] == receptor_type:
+                    return self._used_syndrv[coord]
+
+        # calculate crossbar output, PADI bus
+        # neurons per crossbar input channel
+        neurons = int(halco.NeuronColumnOnDLS.size
+                      / halco.NeuronEventOutputOnDLS.size)
+        crossbar_output = halco.CrossbarOutputOnDLS(
+            pre // neurons
+            - (pre // (halco.NeuronEventOutputOnNeuronBackendBlock.size
+                       * neurons)) * halco.PADIBusOnPADIBusBlock.size
+            + (pre // (halco.PADIBusOnDLS.size * neurons))
+            * halco.PADIBusOnPADIBusBlock.size)
+        padi_bus = crossbar_output.toPADIBusOnDLS()
+
+        # set synapse driver
+        padibus_index, _ = np.where(self._used_padi_rows == padi_bus)
+        if len(padibus_index) == 0:
+            padi_row_index = 0
+            self._used_padi_rows = np.append(self._used_padi_rows,
+                                             [[padi_bus, 0]], axis=0)
+        elif self._used_padi_rows[int(padibus_index)][1] >= 63:
+            raise RuntimeError("""Too many connections. Try decreasing the
+                               number of projections with the same presynaptic
+                               population, but different receptor types.""")
+        else:
+            padi_row_index = self._used_padi_rows[int(padibus_index)][1] + 1
+            self._used_padi_rows[padi_bus][1] = padi_row_index
+
+        syndrv = halco.SynapseDriverOnSynapseDriverBlock(
+            int(halco.SynapseDriverOnPADIBus(padi_row_index // 2))
+            * halco.PADIBusOnPADIBusBlock.size
+            + int(padi_bus.toPADIBusOnPADIBusBlock()))
+        global_syndrv = halco.SynapseDriverOnDLS(
+            syndrv, padi_bus.toPADIBusBlockOnDLS().toSynapseDriverBlockOnDLS())
+
+        used_syndrv = np.array([(global_syndrv, padi_row_index % 2,
+                                 pre, receptor_type)],
+                               dtype=self._used_syndrv.dtype)
+        self._used_syndrv = np.append(self._used_syndrv, used_syndrv)
+
+        return used_syndrv
+
+    @staticmethod
+    def _synapse_driver_config(drv_config: hal.SynapseDriverConfig,
+                               drv_coord: np.ndarray) \
+            -> hal.SynapseDriverConfig:
+        receptor_type = drv_coord["receptor_type"]
+        row = drv_coord["row"]
+        assert receptor_type in ["excitatory", "inhibitory"]
+        assert row in [0, 1]
+
+        if row == 0 and receptor_type == "inhibitory":
+            drv_config.row_mode_bottom = drv_config.RowMode.inhibitory
+
+        elif row == 0 and receptor_type == "excitatory":
+            drv_config.row_mode_bottom = drv_config.RowMode.excitatory
+
+        elif row == 1 and receptor_type == "inhibitory":
+            drv_config.row_mode_top = drv_config.RowMode.inhibitory
+
+        else:
+            drv_config.row_mode_top = drv_config.RowMode.excitatory
+
+        return drv_config
+
+    @staticmethod
+    def _synapse_matrix_coord(connection: Connection) -> halco.SynramOnDLS:
+        post = state.neuron_placement[connection.postsynaptic_cell]
+        nrn = halco.AtomicNeuronOnDLS(halco.Enum(post))
+        return nrn.toNeuronRowOnDLS().toSynramOnDLS()
+
+    @staticmethod
+    def _synapse_matrix_config(synapse_matrix: lola.SynapseMatrix,
+                               connection: Connection,
+                               syndrv_coord: np.ndarray) -> lola.SynapseMatrix:
+        pre = int(state.neuron_placement[connection.presynaptic_cell])
+        pre = halco.AtomicNeuronOnDLS(halco.Enum(pre))
+        post = int(state.neuron_placement[connection.postsynaptic_cell])
+        # neurons per crossbar input channel
+        neurons = int(halco.NeuronColumnOnDLS.size
+                      / halco.NeuronEventOutputOnDLS.size)
+        addr = (pre.toNeuronColumnOnDLS().toEnum() % neurons) \
+            + (pre.toNeuronRowOnDLS().toEnum() * neurons)
+        pre_coord = halco.SynapseRowOnSynapseDriver.size * \
+            int(syndrv_coord["synapse_driver"][0].
+                toSynapseDriverOnSynapseDriverBlock().toEnum()) \
+            + syndrv_coord["row"]
+        pre_coord = int(pre_coord[0])
+        synapse_matrix.labels[pre_coord][post] = int(addr)
+        synapse_matrix.weights[pre_coord][post] = int(connection.weight)
+        return synapse_matrix
 
 
 class _State(BaseState):
@@ -34,8 +223,12 @@ class _State(BaseState):
         self.t = 0
         # TODO: replace by calculation (cf. feature #3594)
         self.dt = 3.4e-05        # average time between two MADC samples
+        self.min_delay = 0
+        self.max_delay = 0
+        self.neuron_placement = []
         self.populations = []
         self.recorders = set([])
+        self.connections = []
         self.clear()
 
     def run_until(self, tstop):
@@ -100,13 +293,17 @@ class _State(BaseState):
     def configure_common(builder: sta.PlaybackProgramBuilder) \
             -> sta.PlaybackProgramBuilder:
 
-        # set i_bias_threshold_comparator for all CapMemBlock
-        for coord in halco.iter_all(halco.CapMemBlockOnDLS):
-            builder.write(coord, hal.CapMemBlock())
-            conf = halco.CapMemCellOnDLS(halco.CapMemCellOnCapMemBlock.
-                                         neuron_i_bias_threshold_comparator,
-                                         block=coord)
-            builder.write(conf, hal.CapMemCell(500))
+        # set global cells
+        neuron_params = {
+            halco.CapMemCellOnCapMemBlock.neuron_i_bias_synin_sd_exc: 1008,
+            halco.CapMemCellOnCapMemBlock.neuron_i_bias_synin_sd_inh: 1008,
+            halco.CapMemCellOnCapMemBlock.neuron_i_bias_threshold_comparator:
+            500}
+
+        for block in halco.iter_all(halco.CapMemBlockOnDLS):
+            for key, value in neuron_params.items():
+                builder.write(halco.CapMemCellOnDLS(key, block),
+                              hal.CapMemCell(value))
 
         # disables event recording during configuration time
         rec_config = hal.EventRecordingConfig()
@@ -193,10 +390,16 @@ class _State(BaseState):
 
             # configure spike recording
             if enable_spike_recording:
+                # neurons per crossbar input channel
+                neurons = int(halco.NeuronColumnOnDLS.size
+                              / halco.NeuronEventOutputOnDLS.size)
+                # arbitrary shift to leave 0 open
+                offset = 64
+                addr = (coord.toNeuronColumnOnDLS().toEnum() % neurons) \
+                    + (coord.toNeuronRowOnDLS().toEnum() * neurons) + offset
+
                 atomic_neuron.event_routing.enable_analog = True
                 atomic_neuron.event_routing.enable_digital = True
-                addr = (coord.toNeuronColumnOnDLS().toEnum() % 32) \
-                    + (coord.toNeuronRowOnDLS().toEnum() * 32) + 64
                 atomic_neuron.event_routing.address = int(addr)
                 atomic_neuron.leak_reset.i_bias_source_follower = 280
 
@@ -213,6 +416,33 @@ class _State(BaseState):
             builder.write(coord, atomic_neuron)
 
         return builder
+
+    @staticmethod
+    def configure_recorders_populations(builder: sta.PlaybackProgramBuilder) \
+            -> (sta.PlaybackProgramBuilder, bool):
+
+        configured = []
+        v_recording = False
+        for recorder in state.recorders:
+            population = recorder.population
+            configured.append(population)
+            enable_spike_recording = False
+            enable_v_recording = False
+            for variable in recorder.recorded:
+                if variable == "spikes":
+                    enable_spike_recording = True
+                elif variable == "v":
+                    enable_v_recording = True
+                    v_recording = True
+                else:
+                    raise NotImplementedError
+            builder = state.configure_population(
+                builder,
+                population,
+                enable_spike_recording=enable_spike_recording,
+                enable_v_recording=enable_v_recording)
+
+        return builder, v_recording
 
     @staticmethod
     def madc_configuration(builder: sta.PlaybackProgramBuilder,
@@ -246,6 +476,97 @@ class _State(BaseState):
         config.wake_up = False
         config.enable_pre_amplifier = True
         builder.write(halco.MADCControlOnDLS(), config)
+        return builder
+
+    @staticmethod
+    def configure_crossbar(builder: sta.PlaybackProgramBuilder) \
+            -> sta.PlaybackProgramBuilder:
+
+        # The used numbers can easily be understood looking at a figure of the
+        # crossbar (cf. https://github.com/electronicvisions/halco/blob/master
+        # /include/halco/hicann-dls/vx/routing_crossbar.h#L77)
+
+        active_crossbar_node = hal.CrossbarNode()
+        silent_crossbar_node = hal.CrossbarNode().drop_all
+
+        # enable recurrent connections within top half
+        for cinput in range(8):
+            builder.write(
+                halco.CrossbarNodeOnDLS(halco.CrossbarOutputOnDLS(cinput % 4),
+                                        halco.CrossbarInputOnDLS(cinput)),
+                active_crossbar_node)
+
+        # enable L2 output
+        for cinput in range(8):
+            builder.write(
+                halco.CrossbarNodeOnDLS(
+                    halco.CrossbarOutputOnDLS(8 + cinput % 4),
+                    halco.CrossbarInputOnDLS(cinput)),
+                active_crossbar_node)
+
+        # clear all inputs
+        for coutput in range(8):
+            for cinput in range(8, 12):
+                builder.write(
+                    halco.CrossbarNodeOnDLS(halco.CrossbarOutputOnDLS(coutput),
+                                            halco.CrossbarInputOnDLS(cinput)),
+                    silent_crossbar_node)
+
+        # enable loopback
+        for cinput in range(4):
+            builder.write(
+                halco.CrossbarNodeOnDLS(halco.CrossbarOutputOnDLS(8 + cinput),
+                                        halco.CrossbarInputOnDLS(8 + cinput)),
+                active_crossbar_node)
+
+        # TODO: enable input from L2 to top and bottom half (cf. CS #11978)
+        # TODO: Incorporate background spike sources (cf. feature #3648)
+
+        return builder
+
+    @staticmethod
+    def configure_routing(builder: sta.PlaybackProgramBuilder) \
+            -> sta.PlaybackProgramBuilder:
+        """Does some general configurations if projections are used."""
+
+        # set all synapse drivers to default
+        synapse_driver_default = hal.SynapseDriverConfig()
+        for syndrv in halco.iter_all(halco.SynapseDriverOnDLS):
+            builder.write(syndrv, synapse_driver_default)
+
+        # configure PADI bus
+        padi_config = hal.CommonPADIBusConfig()
+        for block in halco.iter_all(halco.PADIBusOnPADIBusBlock):
+            padi_config.enable_spl1[block] = True
+        for padibus in halco.iter_all(halco.CommonPADIBusConfigOnDLS):
+            builder.write(padibus, padi_config)
+
+        # configure switches
+        current_switch_quad = hal.ColumnCurrentQuad()
+        switch = current_switch_quad.ColumnCurrentSwitch()
+        switch.enable_synaptic_current_excitatory = True
+        switch.enable_synaptic_current_inhibitory = True
+
+        for s in halco.iter_all(halco.EntryOnQuad):
+            current_switch_quad.set_switch(s, switch)
+
+        for sq in halco.iter_all(halco.ColumnCurrentQuadOnDLS):
+            builder.write(sq, current_switch_quad)
+
+        builder = state.configure_crossbar(builder)
+
+        # set synapse capmem cells
+        synapse_params = {
+            halco.CapMemCellOnCapMemBlock.syn_i_bias_dac: 300,
+            halco.CapMemCellOnCapMemBlock.syn_i_bias_ramp: 1010,
+            halco.CapMemCellOnCapMemBlock.syn_i_bias_store: 1010,
+            halco.CapMemCellOnCapMemBlock.syn_i_bias_corout: 1010}
+
+        for block in halco.iter_all(halco.CapMemBlockOnDLS):
+            for k, v in synapse_params.items():
+                builder.write(halco.CapMemCellOnDLS(k, block),
+                              hal.CapMemCell(v))
+
         return builder
 
     @staticmethod
@@ -293,30 +614,19 @@ class _State(BaseState):
         # common configuration
         builder1 = self.configure_common(builder1)
 
-        # configure populations
-        configured = []
-        v_recording = False
-        for recorder in self.recorders:
-            population = recorder.population
-            configured.append(population)
-            enable_spike_recording = False
-            enable_v_recording = False
-            for variable in recorder.recorded:
-                if variable == "spikes":
-                    enable_spike_recording = True
-                elif variable == "v":
-                    enable_v_recording = True
-                    v_recording = True
-                else:
-                    raise NotImplementedError
-            builder1 = self.configure_population(
-                builder1,
-                population,
-                enable_spike_recording=enable_spike_recording,
-                enable_v_recording=enable_v_recording)
+        # configure populations and recorders
+        builder1, v_recording = self.configure_recorders_populations(builder1)
 
         if v_recording:
             builder1 = self.madc_configuration(builder1, runtime)
+
+        if len(self.connections) != 0:
+            builder1 = self.configure_routing(builder1)
+            connection_builder = ConnectionConfigurationBuilder()
+            for connection in self.connections:
+                connection_builder.add(connection)
+            connection_builder_return, _ = connection_builder.generate()
+            builder1.merge_back(connection_builder_return)
 
         # wait 20000 us for capmem voltages to stabilize
         initial_wait = 20000  # us

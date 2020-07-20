@@ -1,17 +1,23 @@
 from pyNN import common, space
 from pyNN.recording import get_io
 from pyNN.common.control import DEFAULT_MAX_DELAY, DEFAULT_MIN_DELAY
+from pyNN.connectors import AllToAllConnector, OneToOneConnector, \
+    FixedProbabilityConnector, DistanceDependentProbabilityConnector, \
+    DisplacementDependentProbabilityConnector, \
+    IndexBasedProbabilityConnector, FromListConnector, FromFileConnector, \
+    FixedNumberPreConnector, FixedNumberPostConnector, SmallWorldConnector, \
+    CSAConnector, CloneConnector, ArrayConnector, FixedTotalNumberConnector
 from pynn_brainscales.brainscales2 import simulator
-from pynn_brainscales.brainscales2.standardmodels import cells
+from pynn_brainscales.brainscales2.standardmodels import cells, synapses
 from pynn_brainscales.brainscales2.populations import Population, \
     PopulationView, Assembly
+from pynn_brainscales.brainscales2.projections import Projection
 from dlens_vx_v1 import halco
 
-# To be added: connect
 
 __all__ = ["list_standard_models", "setup", "end", "run", "run_until",
            "run_for", "reset", "initialize", "get_current_time", "create",
-           "record"]
+           "connect", "set", "record"]
 
 
 def list_standard_models():
@@ -22,6 +28,7 @@ def list_standard_models():
     return [cells.HXNeuron]
 
 
+# TODO: handle the delays (cf. feature #3657)
 def setup(timestep=simulator.state.dt, min_delay=DEFAULT_MIN_DELAY,
           **extra_params):
     """
@@ -68,6 +75,9 @@ get_current_time, get_time_step, get_min_delay, get_max_delay, \
     num_processes, rank = common.build_state_queries(simulator)
 
 create = common.build_create(Population)
+
+connect = common.build_connect(Projection, FixedProbabilityConnector,
+                               synapses.StaticSynapse)
 
 # pylint: disable=redefined-builtin
 set = common.set

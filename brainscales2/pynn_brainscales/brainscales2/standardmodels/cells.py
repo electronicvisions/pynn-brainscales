@@ -8,7 +8,7 @@ from dlens_vx_v1 import lola, hal
 class HXNeuron(BaseCellType):
 
     recordable: ClassVar[List[str]] = ["spikes", "v"]
-    # TODO: find out what this is for, then implement/drop/read-only
+    receptor_types: ClassVar[List[str]] = ["excitatory", "inhibitory"]
     conductance_based: ClassVar[bool] = False
     injectable: ClassVar[bool] = True
     default_initial_values: ClassVar[dict]
