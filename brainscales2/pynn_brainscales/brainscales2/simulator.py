@@ -14,14 +14,8 @@ class ID(int, IDMixin):
     def __init__(self, n):
         """Create an ID object with numerical value `n`."""
 
-        cell_id_size = halco.AtomicNeuronOnDLS.size  # 512
-        assert isinstance(cell_id_size, int)
-        if n < cell_id_size:
-            int.__init__(n)
-            IDMixin.__init__(self)
-        else:
-            raise ValueError("Maximal number of neurons is {}.".format(
-                cell_id_size))
+        int.__init__(n)
+        IDMixin.__init__(self)
 
 
 class _State(BaseState):
@@ -60,6 +54,22 @@ class _State(BaseState):
         self.t = 0
         self.t_start = 0
         self.segment_counter += 1
+
+    @staticmethod
+    def check_neuron_placement_lut(id_list: list) -> list:
+        # TODO: support multi chip
+        cell_id_size = halco.AtomicNeuronOnDLS.size
+        if len(id_list) > cell_id_size:
+            raise ValueError("Too many elements in HW LUT.")
+        if len(id_list) > len(set(id_list)):
+            raise ValueError("Non unique entries in HW LUT.")
+        for index in id_list:
+            if not 0 <= index < cell_id_size:
+                raise ValueError(
+                    "NeuronPermutation list entry out of range."
+                    + f"0 < {index} < {cell_id_size}"
+                )
+        return id_list
 
     @staticmethod
     def get_spikes(spikes: np.ndarray, runtime: int) -> np.ndarray:
@@ -177,6 +187,7 @@ class _State(BaseState):
 
         # places the neurons from pop on chip
         for coord in population.all_cells:
+            coord = state.neuron_placement[coord]
             coord = halco.AtomicNeuronOnDLS(
                 halco.AtomicNeuronOnDLS.enum_type(coord))
 

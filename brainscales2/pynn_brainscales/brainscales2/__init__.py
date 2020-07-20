@@ -5,6 +5,7 @@ from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.standardmodels import cells
 from pynn_brainscales.brainscales2.populations import Population, \
     PopulationView, Assembly
+from dlens_vx import halco
 
 # To be added: connect
 
@@ -25,9 +26,19 @@ def setup(timestep=simulator.state.dt, min_delay=DEFAULT_MIN_DELAY,
           **extra_params):
     """
     Should be called at the very beginning of a script.
-    'extra_params': TODO if it occures.
+    :param extra_params:
+        most params come from pynn.common.setup
+        neuronPermutation: List providing lookup for custom pyNN neuron to
+                           hardware neuron. Can be shorter than total HW neuron
+                           count.
     """
+
     max_delay = extra_params.get('max_delay', DEFAULT_MAX_DELAY)
+    simulator.state.neuron_placement = simulator.\
+        state.check_neuron_placement_lut(
+            extra_params.get("neuronPermutation", range(
+                halco.AtomicNeuronOnDLS.size))
+        )
     common.setup(timestep, min_delay, **extra_params)
     simulator.state.clear()
     if min_delay == "auto":
