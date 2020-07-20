@@ -4,6 +4,7 @@ import os
 from os.path import join
 from waflib.extras.test_base import summary
 from waflib.extras.symwaf2ic import get_toplevel_path
+from waflib import Utils
 
 
 def depends(ctx):
@@ -45,6 +46,7 @@ def build(bld):
         use = ['pynn_brainscales2'],
         install_from = 'examples',
         install_path = '${PREFIX}/bin',
+        chmod=Utils.O755,
         pylint_config = join(get_toplevel_path(), "code-format", "pylintrc"),
         pycodestyle_config = join(get_toplevel_path(), "code-format", "pycodestyle"),
     )
@@ -54,6 +56,7 @@ def build(bld):
         features = 'use pytest pylint pycodestyle',
         use = ['pynn_brainscales2'],
         install_path = '${PREFIX}/bin',
+        chmod=Utils.O755,
         pylint_config = join(get_toplevel_path(), "code-format", "pylintrc"),
         pycodestyle_config = join(get_toplevel_path(), "code-format", "pycodestyle"),
     )
@@ -64,6 +67,7 @@ def build(bld):
         features = 'use pytest',
         use = ['pynn_brainscales2_examples'],
         install_path = '${PREFIX}/bin',
+        chmod=Utils.O755,
         skip_run = not bld.env.DLSvx_HARDWARE_AVAILABLE
     )
 

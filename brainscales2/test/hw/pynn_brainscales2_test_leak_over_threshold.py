@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import unittest
 from examples.leak_over_threshold import main
 

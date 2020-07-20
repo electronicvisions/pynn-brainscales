@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 from copy import deepcopy
 import matplotlib.pyplot as plt
 import pynn_brainscales.brainscales2 as pynn

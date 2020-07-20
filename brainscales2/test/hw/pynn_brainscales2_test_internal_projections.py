@@ -1,12 +1,14 @@
+#!/usr/bin/env python
+
 import unittest
-from examples.external_input import main, cell_params
+from examples.internal_projections import main
 
 
-class TestExternalInput(unittest.TestCase):
+class TestTryProjections(unittest.TestCase):
     @staticmethod
     def test_main():
         # Simply tests if program runs
-        main(cell_params)
+        main()
 
 
 if __name__ == "__main__":
