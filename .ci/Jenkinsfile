@@ -1,11 +1,20 @@
 @Library("jenlib") _
 
-wafDefaultPipeline(projects: ["pynn-brainscales"],
-                   container: [app: "visionary-dls"],
-                   testSlurmResource: [partition: "cube", wafer: 62, "fpga-without-aout": 3],
-                   preTestHook: { configureHxCubeBitfile() },
-                   testOptions: "-j1 --test-execall",
-                   notificationChannel: "#dls-software")
+Map<String, Object> pipelineOptions = [
+		projects: ["pynn-brainscales"],
+		container: [app: "dls"],
+		notificationChannel: "#dls-software"
+]
+
+if (!isTriggeredByGerrit()) {
+	pipelineOptions << [
+			testSlurmResource: [partition: "cube", wafer: 62, "fpga-without-aout": 3],
+			preTestHook: { configureHxCubeBitfile() },
+			testOptions: "--test-execall -j1"
+	]
+}
+
+wafDefaultPipeline(pipelineOptions)
 
 runOnSlave(label: "frontend") {
     archiveArtifacts(artifacts: "pynn-brainscales/brainscales2/plot_isi_calib.pdf",
