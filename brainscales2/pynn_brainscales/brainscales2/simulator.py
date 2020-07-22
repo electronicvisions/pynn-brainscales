@@ -250,7 +250,7 @@ class _State(BaseState):
         # afterwards and sync time
         initial_wait = 100  # us
         builder.write(halco.TimerOnDLS(), hal.Timer())
-        builder.wait_until(halco.TimerOnDLS(), int(
+        builder.block_until(halco.TimerOnDLS(), int(
             initial_wait * int(hal.Timer.Value.fpga_clock_cycles_per_us)))
         builder.write(halco.SystimeSyncOnFPGA(), hal.SystimeSync())
 
@@ -258,7 +258,7 @@ class _State(BaseState):
             builder = state.madc_stop_recording(builder)
 
         # record for time 'runtime'
-        builder.wait_until(halco.TimerOnDLS(), hal.Timer.Value(
+        builder.block_until(halco.TimerOnDLS(), hal.Timer.Value(
             int(int(hal.Timer.Value.fpga_clock_cycles_per_us)
                 * ((runtime * 1000) + initial_wait))))
 
@@ -302,7 +302,7 @@ class _State(BaseState):
         # wait 20000 us for capmem voltages to stabilize
         initial_wait = 20000  # us
         builder1.write(halco.TimerOnDLS(), hal.Timer())
-        builder1.wait_until(halco.TimerOnDLS(), int(
+        builder1.block_until(halco.TimerOnDLS(), int(
             initial_wait * int(hal.Timer.Value.fpga_clock_cycles_per_us)))
 
         builder2 = sta.PlaybackProgramBuilder()
