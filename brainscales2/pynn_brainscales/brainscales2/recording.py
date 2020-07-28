@@ -43,12 +43,11 @@ class Recorder(pyNN.recording.Recorder):
         """Returns a dict containing the neuron_id and its spiketimes."""
         all_spiketimes = {}
         if len(simulator.state.spikes) > 0:
-            neuron_ids, spiketimes = zip(*simulator.state.spikes)
+            neuron_ids = simulator.state.spikes[:, 0]
+            spiketimes = simulator.state.spikes[:, 1]
             for cell_id in ids:
-                spikes = []
-                for i, neuron_id in enumerate(neuron_ids):
-                    if neuron_id == cell_id:
-                        spikes.append(spiketimes[i])
+                result_indices = np.where(neuron_ids == cell_id)
+                spikes = spiketimes[result_indices]
                 all_spiketimes[cell_id] = spikes
         return all_spiketimes
 
