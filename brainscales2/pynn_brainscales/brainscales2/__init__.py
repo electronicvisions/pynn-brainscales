@@ -2,7 +2,8 @@ from pyNN import common, space
 from pyNN.recording import get_io
 from pyNN.common.control import DEFAULT_MAX_DELAY, DEFAULT_TIMESTEP, \
     DEFAULT_MIN_DELAY
-from pynn_brainscales.brainscales2 import simulator, cells
+from pynn_brainscales.brainscales2 import simulator
+from pynn_brainscales.brainscales2.standardmodels import cells
 from pynn_brainscales.brainscales2.populations import Population, \
     PopulationView, Assembly
 

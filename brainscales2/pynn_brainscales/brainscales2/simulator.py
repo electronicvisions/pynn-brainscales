@@ -1,7 +1,7 @@
 import numpy as np
 from pyNN.common import IDMixin, Population
 from pyNN.common.control import BaseState
-from pynn_brainscales.brainscales2.cells import HXNeuron
+from pynn_brainscales.brainscales2.standardmodels.cells import HXNeuron
 from dlens_vx import hal, halco, sta, hxcomm
 
 

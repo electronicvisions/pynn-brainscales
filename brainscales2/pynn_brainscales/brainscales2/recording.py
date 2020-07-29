@@ -1,6 +1,6 @@
 import numpy as np
 import pyNN.recording
-from pynn_brainscales.brainscales2.cells import HXNeuron
+from pynn_brainscales.brainscales2.standardmodels.cells import HXNeuron
 from pynn_brainscales.brainscales2 import simulator
 
 
