@@ -63,11 +63,19 @@ class _State(BaseState):
 
     @staticmethod
     def get_spikes(spikes: np.ndarray, runtime: int) -> np.ndarray:
-        label = spikes["label"]
         spiketime = spikes["chip_time"] \
             / (int(hal.Timer.Value.fpga_clock_cycles_per_us) * 1000)
+        label = spikes["label"]
         label = label[(spiketime <= runtime)]
         spiketime = spiketime[spiketime <= runtime]
+
+        # calculate neuron label
+        hemisphere = (label & (0b1 << 5)) << 3
+        anncore = (label & (0b1 << 10)) >> 3
+        spl1 = (label & (0b11 << 14)) >> 9
+        addr = label & 31
+        label = hemisphere | anncore | spl1 | addr
+
         return_spikes = np.array((label, spiketime)).T
         return return_spikes
 
@@ -169,7 +177,6 @@ class _State(BaseState):
 
         # places the neurons from pop on chip
         for coord in population.all_cells:
-            coord_int = coord
             coord = halco.AtomicNeuronOnDLS(
                 halco.AtomicNeuronOnDLS.enum_type(coord))
 
@@ -177,8 +184,9 @@ class _State(BaseState):
             if enable_spike_recording:
                 atomic_neuron.event_routing.enable_analog = True
                 atomic_neuron.event_routing.enable_digital = True
-                # TODO: enhance address setting (cf. feature #3596)
-                atomic_neuron.event_routing.address = coord_int
+                addr = (coord.toNeuronColumnOnDLS().toEnum() % 32) \
+                    + (coord.toNeuronRowOnDLS().toEnum() * 32) + 64
+                atomic_neuron.event_routing.address = int(addr)
                 atomic_neuron.leak_reset.i_bias_source_follower = 280
 
             # configure v recording
