@@ -1,7 +1,6 @@
 from pyNN import common, space
 from pyNN.recording import get_io
-from pyNN.common.control import DEFAULT_MAX_DELAY, DEFAULT_TIMESTEP, \
-    DEFAULT_MIN_DELAY
+from pyNN.common.control import DEFAULT_MAX_DELAY, DEFAULT_MIN_DELAY
 from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.standardmodels import cells
 from pynn_brainscales.brainscales2.populations import Population, \
@@ -22,7 +21,7 @@ def list_standard_models():
     return [cells.HXNeuron]
 
 
-def setup(timestep=DEFAULT_TIMESTEP, min_delay=DEFAULT_MIN_DELAY,
+def setup(timestep=simulator.state.dt, min_delay=DEFAULT_MIN_DELAY,
           **extra_params):
     """
     Should be called at the very beginning of a script.
@@ -31,7 +30,10 @@ def setup(timestep=DEFAULT_TIMESTEP, min_delay=DEFAULT_MIN_DELAY,
     max_delay = extra_params.get('max_delay', DEFAULT_MAX_DELAY)
     common.setup(timestep, min_delay, **extra_params)
     simulator.state.clear()
-    simulator.state.dt = timestep
+    if min_delay == "auto":
+        min_delay = 0
+    if max_delay == "auto":
+        max_delay = 0
     simulator.state.min_delay = min_delay
     simulator.state.max_delay = max_delay
 
