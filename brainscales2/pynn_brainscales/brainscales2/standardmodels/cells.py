@@ -2,7 +2,7 @@ import inspect
 import numbers
 from typing import List, Dict, ClassVar
 from pyNN.models import BaseCellType
-from dlens_vx import lola, hal
+from dlens_vx_v1 import lola, hal
 
 
 class HXNeuron(BaseCellType):

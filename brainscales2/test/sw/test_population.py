@@ -1,7 +1,7 @@
 import unittest
 import inspect
 import numpy as np
-from dlens_vx import lola
+from dlens_vx_v1 import lola
 import pynn_brainscales.brainscales2 as pynn
 
 

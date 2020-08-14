@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import pynn_brainscales.brainscales2 as pynn
-from dlens_vx import logger
+from dlens_vx_v1 import logger
 
 
 init_values = {"threshold_v_threshold": 400,

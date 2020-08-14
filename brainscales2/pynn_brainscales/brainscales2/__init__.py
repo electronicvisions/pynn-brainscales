@@ -5,7 +5,7 @@ from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.standardmodels import cells
 from pynn_brainscales.brainscales2.populations import Population, \
     PopulationView, Assembly
-from dlens_vx import halco
+from dlens_vx_v1 import halco
 
 # To be added: connect
 
