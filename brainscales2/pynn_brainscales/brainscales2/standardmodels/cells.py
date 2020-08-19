@@ -2,6 +2,7 @@ import inspect
 import numbers
 from typing import List, Dict, ClassVar
 from pyNN.models import BaseCellType
+from pyNN.standardmodels import cells, build_translations
 from dlens_vx_v1 import lola, hal
 
 
@@ -165,3 +166,20 @@ class HXNeuron(BaseCellType):
 
 HXNeuron.default_initial_values = HXNeuron.get_default_values()
 HXNeuron.default_parameters = HXNeuron.default_initial_values
+
+
+class SpikeSourceArray(cells.SpikeSourceArray):
+    """
+    Spike source generating spikes at the times [ms] given in the spike_times
+    array.
+    """
+
+    translations = build_translations(
+        ('spike_times', 'spike_times'),
+    )
+
+    # TODO: implement L2-based read-out for injected spikes
+    recordable = []
+
+    def can_record(self, variable: str) -> bool:
+        return variable in self.recordable

@@ -1,6 +1,5 @@
 import numpy as np
 import pyNN.recording
-from pynn_brainscales.brainscales2.standardmodels.cells import HXNeuron
 from pynn_brainscales.brainscales2 import simulator
 
 
@@ -23,7 +22,7 @@ class Recorder(pyNN.recording.Recorder):
         if sampling_interval:
             raise ValueError("Can't customize sampling interval.")
 
-        assert HXNeuron().can_record(variable)
+        assert self.population.celltype.can_record(variable)
         if variable == "v" and len(new_ids) != 1:
             raise ValueError("""Can only record membrane potential of a
                 population with size 1.""")
