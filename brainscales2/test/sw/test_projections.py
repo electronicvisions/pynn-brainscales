@@ -28,12 +28,12 @@ class TestProjection(unittest.TestCase):
         proj = pynn.Projection(self.pop1, self.pop2, pynn.AllToAllConnector(),
                                synapse_type=synapse)
         self.assertEqual(proj.get("weight", format="array"), 32)
-        proj.set(weight=63)
-        self.assertEqual(proj.get("weight", format="list"), [(0, 0, 63)])
         proj.set(weight=60.5)
         self.assertEqual(proj.get("weight", format="array"), 60)
+        proj.set(weight=70)
+        self.assertEqual(proj.get("weight", format="list"), [(0, 0, 70)])
         with self.assertRaises(ValueError):
-            proj.set(weight=64)
+            proj.set(weight=16129)
         with self.assertRaises(ValueError):
             proj.set(weight=-1)
 

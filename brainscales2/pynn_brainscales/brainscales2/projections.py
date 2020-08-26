@@ -3,7 +3,6 @@ import pyNN.common
 from pyNN.space import Space
 from pynn_brainscales.brainscales2.standardmodels.synapses import StaticSynapse
 from pynn_brainscales.brainscales2 import simulator
-from dlens_vx_v1 import lola
 
 
 class Projection(pyNN.common.Projection):
@@ -105,6 +104,13 @@ class Projection(pyNN.common.Projection):
                     filtered_connection_parameters[key] = \
                         value[self.pre.id_to_index(pre_cell)]
 
+            if filtered_connection_parameters["weight"] < 0 \
+                    or filtered_connection_parameters["weight"] \
+                    > self._simulator.state.max_weight:
+                raise ValueError(
+                    "The weight must be positive and smaller than {}."
+                    .format(self._simulator.state.max_weight))
+
             connection = Connection(self, pre_cell, postsynaptic_cell,
                                     **filtered_connection_parameters)
             self.connections.append(connection)
@@ -125,11 +131,6 @@ class Connection(pyNN.common.Connection):
         self.presynaptic_cell = \
             pre_cell.parent.all_cells[self.presynaptic_index]
         self.postsynaptic_cell = post_cell
-        if parameters["weight"] < lola.SynapseMatrix.Weight.min \
-                or parameters["weight"] > lola.SynapseMatrix.Weight.max:
-            raise ValueError("The weight must be in the interval [{}, {}]."
-                             .format(lola.SynapseMatrix.Weight.min,
-                                     lola.SynapseMatrix.Weight.max))
         self._weight = parameters["weight"]
         if parameters["delay"] != 0:
             raise ValueError("Setting the delay unequal 0 is not supported.")
@@ -139,11 +140,9 @@ class Connection(pyNN.common.Connection):
 
     def _set_weight(self, new_weight):
         new_weight = round(new_weight)
-        if new_weight < lola.SynapseMatrix.Weight.min \
-                or new_weight > lola.SynapseMatrix.Weight.max:
-            raise ValueError("The weight must be in the interval [{}, {}]."
-                             .format(lola.SynapseMatrix.Weight.min,
-                                     lola.SynapseMatrix.Weight.max))
+        if new_weight < 0 or new_weight > simulator.state.max_weight:
+            raise ValueError("The weight must be in the interval [0, {}]."
+                             .format(simulator.state.max_weight))
         self._weight = new_weight
 
     def _get_weight(self):

@@ -1,3 +1,4 @@
+from typing import ClassVar
 import numpy as np
 from pyNN.common import IDMixin, Population, Connection
 from pyNN.common.control import BaseState
@@ -32,8 +33,8 @@ class ConnectionConfigurationBuilder:
         # list of allocated synapse drivers
         self._used_syndrv = np.zeros(0, dtype={
             "names": ("synapse_driver", "row", "pre_population",
-                      "receptor_type"),
-            "formats": (halco.SynapseDriverOnDLS, "i1", "i2", "U10")})
+                      "post_population", "receptor_type"),
+            "formats": (halco.SynapseDriverOnDLS, "i1", "i2", "i2", "U10")})
 
         # list of PADI busses with number of used input rows
         self._used_padi_rows = np.ndarray(shape=(0, 2))
@@ -104,16 +105,20 @@ class ConnectionConfigurationBuilder:
 
     def _synapse_driver_coord(self, connection: Connection) -> np.ndarray:
         pre = state.neuron_placement[connection.presynaptic_cell]
-        receptor_type = connection.projection.receptor_type
+        post = state.neuron_placement[connection.postsynaptic_cell]
 
         # check if a synapse driver for the presynaptic neuron with given
-        # receptor type was already allocated
-        coord_index = np.where(self._used_syndrv["pre_population"] == pre)
+        # receptor type was already allocated and if its synapse to the
+        # postsynaptic neuron is still available
+        coord_index = np.where(
+            (self._used_syndrv["pre_population"] == pre)
+            & (self._used_syndrv["post_population"] != post))
         coord_index = coord_index[0]
         if len(coord_index) != 0:
             assert len(coord_index) <= 2
             for coord in coord_index:
-                if self._used_syndrv[coord]["receptor_type"] == receptor_type:
+                if self._used_syndrv[coord]["receptor_type"] \
+                        == connection.projection.receptor_type:
                     return self._used_syndrv[coord]
 
         # calculate crossbar output, PADI bus
@@ -134,10 +139,14 @@ class ConnectionConfigurationBuilder:
             padi_row_index = 0
             self._used_padi_rows = np.append(self._used_padi_rows,
                                              [[padi_bus, 0]], axis=0)
-        elif self._used_padi_rows[int(padibus_index)][1] >= 63:
+        elif self._used_padi_rows[int(padibus_index)][1] \
+                >= lola.SynapseMatrix.Weight.max:
             raise RuntimeError("""Too many connections. Try decreasing the
-                               number of projections with the same presynaptic
-                               population, but different receptor types.""")
+                               weight values in a way they do not exceed large
+                               multiples of the maximum synaptic weight (63) or
+                               reduce the number of projections with the same
+                               presynaptic population, but different receptor
+                               types.""")
         else:
             padi_row_index = self._used_padi_rows[int(padibus_index)][1] + 1
             self._used_padi_rows[padi_bus][1] = padi_row_index
@@ -149,8 +158,8 @@ class ConnectionConfigurationBuilder:
         global_syndrv = halco.SynapseDriverOnDLS(
             syndrv, padi_bus.toPADIBusBlockOnDLS().toSynapseDriverBlockOnDLS())
 
-        used_syndrv = np.array([(global_syndrv, padi_row_index % 2,
-                                 pre, receptor_type)],
+        used_syndrv = np.array([(global_syndrv, padi_row_index % 2, pre, post,
+                                 connection.projection.receptor_type)],
                                dtype=self._used_syndrv.dtype)
         self._used_syndrv = np.append(self._used_syndrv, used_syndrv)
 
@@ -209,6 +218,9 @@ class ConnectionConfigurationBuilder:
 
 class _State(BaseState):
     """Represent the simulator state."""
+
+    max_weight: ClassVar[int] = halco.SynapseRowOnSynram.size \
+        * lola.SynapseMatrix.Weight.max
 
     # pragma pylint: disable=invalid-name
     def __init__(self):
@@ -625,7 +637,20 @@ class _State(BaseState):
             builder1 = self.configure_routing(builder1)
             connection_builder = ConnectionConfigurationBuilder()
             for connection in self.connections:
-                connection_builder.add(connection)
+                # distribute high weights over multiple synapse rows
+                if connection.weight > lola.SynapseMatrix.Weight.max:
+                    conns_full = connection.weight \
+                        // lola.SynapseMatrix.Weight.max
+                    weight_left = connection.weight \
+                        % lola.SynapseMatrix.Weight.max
+                    connection.weight = lola.SynapseMatrix.Weight.max
+                    for _ in range(int(conns_full)):
+                        connection_builder.add(connection)
+                    if weight_left > 0:
+                        connection.weight = weight_left
+                        connection_builder.add(connection)
+                else:
+                    connection_builder.add(connection)
             connection_builder_return, _ = connection_builder.generate()
             builder1.merge_back(connection_builder_return)
 
