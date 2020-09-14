@@ -45,7 +45,8 @@ class Recorder(pyNN.recording.Recorder):
             neuron_ids = simulator.state.spikes[:, 0]
             spiketimes = simulator.state.spikes[:, 1]
             for cell_id in ids:
-                result_indices = np.where(neuron_ids == cell_id)
+                result_indices = np.where(
+                    neuron_ids == simulator.state.neuron_placement[cell_id])
                 spikes = spiketimes[result_indices]
                 all_spiketimes[cell_id] = spikes
         return all_spiketimes
