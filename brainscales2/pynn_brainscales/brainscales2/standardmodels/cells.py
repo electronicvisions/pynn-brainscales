@@ -1,6 +1,7 @@
 import inspect
 import numbers
 from typing import List, Dict, ClassVar, Final, Optional, Union
+from pyNN.parameters import Sequence
 from pyNN.standardmodels import cells, build_translations, StandardCellType
 from dlens_vx_v2 import lola, hal, halco
 
@@ -194,6 +195,34 @@ HXNeuron.default_initial_values = HXNeuron.get_default_values()
 HXNeuron.default_parameters = HXNeuron.default_initial_values
 # pylint: disable=protected-access
 HXNeuron.translations = HXNeuron._create_translation()
+
+
+class SpikeSourcePoisson(cells.SpikeSourcePoisson):
+    """
+    Spike source, generating spikes according to a Poisson process.
+    """
+    def __init__(self, start, rate, duration):
+        self.default_parameters.update({"spike_times": Sequence([])})
+        self.units.update({"spike_times": "ms"})
+
+        parameters = {"start": start,
+                      "rate": rate,
+                      "duration": duration,
+                      "spike_times": Sequence([])}
+        super(cells.SpikeSourcePoisson, self).__init__(**parameters)
+
+    translations = build_translations(
+        ('start', 'start'),
+        ('rate', 'rate'),
+        ('duration', 'duration'),
+        ('spike_times', 'spike_times'),
+    )
+
+    # TODO: implement L2-based read-out injected spikes
+    recordable = []
+
+    def can_record(self, variable: str) -> bool:
+        return variable in self.recordable
 
 
 class SpikeSourceArray(cells.SpikeSourceArray):

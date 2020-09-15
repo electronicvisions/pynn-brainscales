@@ -2,10 +2,11 @@
 
 from typing import Optional, Set, Tuple, Final, List, Dict, Union
 import numpy as np
+from pyNN.parameters import Sequence
 from pyNN.common import IDMixin, Connection
 from pyNN.common.control import BaseState
 from pynn_brainscales.brainscales2.standardmodels.cells import HXNeuron, \
-    SpikeSourceArray
+    SpikeSourceArray, SpikeSourcePoisson
 from dlens_vx_v2 import hal, halco, sta, hxcomm, lola, logger
 
 
@@ -160,6 +161,7 @@ class ConnectionConfigurationBuilder:
         input_spikes = input_spikes[input_spikes[:, 0].argsort()]
         return input_spikes
 
+    # pylint: disable=too-many-locals
     def add(self, connection: Connection) -> None:
         """
         Add the given connection. On-chip connections are configured directly,
@@ -192,12 +194,26 @@ class ConnectionConfigurationBuilder:
         # external connections are stored in a list and added after all on-chip
         # connections are configured
         elif isinstance(connection.presynaptic_cell.celltype,
-                        SpikeSourceArray):
+                        (SpikeSourceArray, SpikeSourcePoisson)):
             pre = connection.presynaptic_cell
             post = state.neuron_placement.\
                 id2atomicneuron(connection.postsynaptic_cell)
             weight = connection.weight
             receptor_type = connection.projection.receptor_type
+
+            if isinstance(connection.presynaptic_cell.celltype,
+                          SpikeSourcePoisson):
+                # pylint: disable=protected-access
+                if getattr(pre, "spike_times") == Sequence([]):
+                    start = pre.celltype.parameter_space["start"]
+                    rate = pre.celltype.parameter_space["rate"]
+                    duration = pre.celltype.parameter_space["duration"]
+                    # generate spike train for external Poisson source
+                    num_spikes = np.random.poisson(
+                        int(duration / 1000. * rate))
+                    pre.spike_times = Sequence(np.random.rand(num_spikes)
+                                               * duration + start)
+
             external_connection = np.array(
                 [(pre, post, weight, receptor_type, pre.spike_times.value)],
                 dtype=self._external_connections.dtype)
@@ -912,7 +928,8 @@ class State(BaseState):
         for recorder in self.recorders:
             population = recorder.population
             assert isinstance(population.celltype, (HXNeuron,
-                                                    SpikeSourceArray))
+                                                    SpikeSourceArray,
+                                                    SpikeSourcePoisson))
             if isinstance(population.celltype, HXNeuron):
 
                 # retrieve for which neurons what kind of recording is active
