@@ -236,6 +236,7 @@ class _State(BaseState):
 
     def clear(self):
         self.recorders = set([])
+        self.connections = []
         self.id_counter = 0
         self.current_sources = []
         self.segment_counter = -1
