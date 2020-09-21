@@ -1053,6 +1053,28 @@ class _State(BaseState):
             self.log.ERROR("All highspeed links down at "
                            + "the end of the experiment.")
 
+    def _perform_post_fail_analysis(self, connection):
+        """
+        Read out and log FPGA status containers in a post-mortem program.
+        """
+        builder = sta.PlaybackProgramBuilder()
+
+        # perform stat readout at the end of the experiment
+        ticket_arq = builder.read(halco.HicannARQStatusOnFPGA())
+
+        tickets_phy = []
+        for coord in halco.iter_all(halco.PhyStatusOnFPGA):
+            tickets_phy.append(builder.read(coord))
+
+        sta.run(connection, builder.done())
+
+        error_msg = "_perform_post_fail_analysis(): "
+        error_msg += "Experiment failed, reading post-mortem status."
+        error_msg += str(ticket_arq.get())
+        for ticket_phy in tickets_phy:
+            error_msg += str(ticket_phy.get()) + "\n"
+        self.log.ERROR(error_msg)
+
     def run(self, runtime):
         self.t += runtime
         self.running = True
@@ -1102,11 +1124,18 @@ class _State(BaseState):
         builder2 = self.run_on_chip(builder2, runtime, v_recording,
                                     external_events)
 
-        # TODO: add stats readout (cf. feature #3597)
         program = builder2.done()
         with hxcomm.ManagedConnection() as conn:
-            sta.run(conn, builder1.done())
-            sta.run(conn, program)
+            try:
+                sta.run(conn, builder1.done())
+                sta.run(conn, program)
+            except RuntimeError:
+                # report hs link notifications in any case
+                self._check_link_notifications(
+                    program.highspeed_link_notifications)
+                # perform post-mortem read out of status
+                self._perform_post_fail_analysis(conn)
+                raise
 
         # make list 'spikes' of tupel (neuron id, spike time)
         self.spikes = self.get_spikes(program.spikes.to_numpy(), runtime)
