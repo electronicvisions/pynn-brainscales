@@ -993,6 +993,10 @@ class _State(BaseState):
             int(int(hal.Timer.Value.fpga_clock_cycles_per_us)
                 * ((runtime * 1000) + initial_wait))))
 
+        # disable event recording
+        rec_config.enable_event_recording = False
+        builder.write(halco.EventRecordingConfigOnFPGA(0), rec_config)
+
         return builder
 
     def run(self, runtime):
