@@ -1,10 +1,11 @@
 import unittest
-from examples.external_input import main
+from examples.external_input import main, init_values
 
 
 class TestExternalInput(unittest.TestCase):
     def test_spikes(self):
-        spike_number, _, _ = main()
+        spike_train, _, _ = main(init_values)
+        spike_number = len(spike_train)
         spike_expectation = 10
         spike_range = 1
         spike_difference = abs(spike_expectation - spike_number)
