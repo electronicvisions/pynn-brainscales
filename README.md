@@ -55,9 +55,10 @@ c ./waf install
 export SINGULARITYENV_PREPEND_PATH=`pwd`/bin:$SINGULARITYENV_PREPEND_PATH
 export SINGULARITYENV_LD_LIBRARY_PATH=`pwd`/lib:$SINGULARITYENV_LD_LIBRARY_PATH
 export PYTHONPATH=`pwd`/lib:$PYTHONPATH
+export PATH=`pwd`/bin:$PATH
 
 # 9) You can now run any program, e.g. plain unit tests
-c ./bin/test_population.py
+c pynn_brainscales2_test_population.py
 ```
 
 ### On the Electronic Vision(s) Cluster
