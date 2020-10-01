@@ -832,9 +832,10 @@ class _State(BaseState):
         return builder
 
     @staticmethod
-    def madc_start_recording(builder: sta.PlaybackProgramBuilder) \
+    def madc_arm_recording(builder: sta.PlaybackProgramBuilder) \
             -> sta.PlaybackProgramBuilder:
-        """Start MADC recording."""
+        """Arm MADC recording: Enable wakeup, needs some settle time
+        afterwards)."""
         config = hal.MADCControl()
         config.enable_power_down_after_sampling = True
         config.start_recording = False
@@ -844,9 +845,9 @@ class _State(BaseState):
         return builder
 
     @staticmethod
-    def madc_stop_recording(builder: sta.PlaybackProgramBuilder) \
+    def madc_start_recording(builder: sta.PlaybackProgramBuilder) \
             -> sta.PlaybackProgramBuilder:
-        """Stop MADC recording."""
+        """Start MADC recording."""
         config = hal.MADCControl()
         config.enable_power_down_after_sampling = True
         config.start_recording = True
@@ -974,7 +975,7 @@ class _State(BaseState):
         builder.write(halco.EventRecordingConfigOnFPGA(0), rec_config)
 
         if v_recording:
-            builder = state.madc_start_recording(builder)
+            builder = state.madc_arm_recording(builder)
 
         # wait 100 us to buffer some program in FPGA to reach precise timing
         # afterwards and sync time
@@ -985,7 +986,7 @@ class _State(BaseState):
         builder.write(halco.SystimeSyncOnFPGA(), hal.SystimeSync())
 
         if v_recording:
-            builder = state.madc_stop_recording(builder)
+            builder = state.madc_start_recording(builder)
 
         # insert events
         for time, label in events:
