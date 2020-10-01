@@ -64,7 +64,19 @@ class ConnectionConfigurationBuilder:
         for coord, config in self._synapse_matrices:
             builder.write(coord, config)
 
-        return builder, self._external_events
+        external_events = self._sort_external_events()
+
+        return builder, external_events
+
+    def _sort_external_events(self):
+        input_spikes = np.zeros(shape=(0, 2))
+        for spiketimes, label in self._external_events:
+            for time in spiketimes:
+                input_spikes = np.append(input_spikes, np.array([[time,
+                                                                  label]]),
+                                         axis=0)
+        input_spikes = input_spikes[input_spikes[:, 0].argsort()]
+        return input_spikes
 
     def add(self, connection: Connection) -> None:
         """
@@ -976,17 +988,15 @@ class _State(BaseState):
             builder = state.madc_stop_recording(builder)
 
         # insert events
-        for spiketimes, label in events:
-            if len(spiketimes) > 0:
-                for time in spiketimes:
-                    builder.block_until(
-                        halco.TimerOnDLS(),
-                        int((initial_wait + time * 1e3)
-                            * int(hal.Timer.Value.fpga_clock_cycles_per_us)))
-                    builder.write(
-                        halco.SpikePack1ToChipOnDLS(),
-                        hal.SpikePack1ToChip([
-                            hal.SpikeLabel(label)]))
+        for time, label in events:
+            builder.block_until(
+                halco.TimerOnDLS(),
+                int((initial_wait + time * 1e3)
+                    * int(hal.Timer.Value.fpga_clock_cycles_per_us)))
+            builder.write(
+                halco.SpikePack1ToChipOnDLS(),
+                hal.SpikePack1ToChip([
+                    hal.SpikeLabel(int(label))]))
 
         # record for time 'runtime'
         builder.block_until(halco.TimerOnDLS(), hal.Timer.Value(
