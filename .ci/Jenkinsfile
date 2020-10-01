@@ -1,22 +1,50 @@
 @Library("jenlib") _
 
-Map<String, Object> pipelineOptions = [
-		projects: ["pynn-brainscales"],
-		container: [app: "dls"],
-		notificationChannel: "#dls-software"
-]
+try {
 
-if (!isTriggeredByGerrit()) {
-	pipelineOptions << [
-			testSlurmResource: [partition: "cube", wafer: 62, "fpga-without-aout": 3],
-			preTestHook: { configureHxCubeBitfile() },
-			testOptions: "--test-execall -j1"
+	Map<String, Object> commonPipelineOptions = [
+			projects: ["pynn-brainscales"],
+			notificationChannel: "#jenkins-trashbin"  // success is checked globally
 	]
+
+	Map<String, Object> pipelineDeploymentOptions = [
+		container          : [app: "dls"]
+	] << commonPipelineOptions
+
+	Map<String, Object> pipelineNoDeploymentOptions = [
+		// upstream PyNN depends on h5py...
+		container          : [app: "dls"],
+	] << commonPipelineOptions
+
+	// Additional options for hardware testing in "no deployment" and not triggered by Gerrit case
+	if (!isTriggeredByGerrit()) {
+		pipelineNoDeploymentOptions << [
+				testSlurmResource: [partition: "cube", wafer: 62, "fpga-without-aout": 3],
+				preTestHook: { configureHxCubeBitfile() },
+				testOptions: "--test-execall -j1"
+		]
+	}
+
+	boolean deploy = env.GERRIT_EVENT_TYPE == "change-merged"
+
+	Map<String, Object> pipelineOptions = deploy ? pipelineDeploymentOptions : pipelineNoDeploymentOptions
+
+	withCcache() {
+		wafDefaultPipeline(pipelineOptions)
+	}
+
+	conditionalStage(name: "Module Deployment", skip: !deploy) {
+		runOnSlave(label: "frontend") {
+			inSingularity(app: "dls") {
+				deployModule([name: "pynn-brainscales", source: "bin/ lib/ repos_log.txt"])
+			}
+		}
+	}
+} catch (Throwable t) {
+	notifyFailure(mattermostChannel: "#dls-software")
+	throw t
 }
 
-wafDefaultPipeline(pipelineOptions)
-
-runOnSlave(label: "frontend") {
-    archiveArtifacts(artifacts: "pynn-brainscales/brainscales2/plot_isi_calib.pdf",
-                     allowEmptyArchive: true)
+if (currentBuild.currentResult != "SUCCESS") {
+	notifyFailure(mattermostChannel: "#dls-software")
 }
