@@ -839,7 +839,14 @@ class _State(BaseState):
             -> sta.PlaybackProgramBuilder:
         """Configure number of MADC samples depending on set runtime."""
         config = hal.MADCConfig()
-        config.number_of_samples = int(runtime / state.dt)
+        number_of_samples = int(runtime / state.dt)
+        if number_of_samples > hal.MADCConfig.NumberOfSamples.max:
+            raise ValueError(
+                "Recording time is limited to "
+                + f"{hal.MADCConfig.NumberOfSamples.max * state.dt}ms"
+                + f" ({hal.MADCConfig.NumberOfSamples.max} samples)."
+            )
+        config.number_of_samples = number_of_samples
         builder.write(halco.MADCConfigOnDLS(), config)
         return builder
 
