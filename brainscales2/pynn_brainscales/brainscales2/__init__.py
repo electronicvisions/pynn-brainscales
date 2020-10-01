@@ -38,6 +38,9 @@ def setup(timestep=simulator.state.dt, min_delay=DEFAULT_MIN_DELAY,
         neuronPermutation: List providing lookup for custom pyNN neuron to
                            hardware neuron. Can be shorter than total HW neuron
                            count.
+        enable_neuron_bypass: Enable neuron bypass mode: neurons forward spikes
+                              arriving at the synaptic input (i.e. no leaky
+                              integration is happening); defaults to False.
     """
 
     max_delay = extra_params.get('max_delay', DEFAULT_MAX_DELAY)
@@ -46,6 +49,7 @@ def setup(timestep=simulator.state.dt, min_delay=DEFAULT_MIN_DELAY,
             extra_params.get("neuronPermutation", range(
                 halco.AtomicNeuronOnDLS.size))
         )
+    enable_neuron_bypass = extra_params.get('enable_neuron_bypass', False)
     common.setup(timestep, min_delay, **extra_params)
     simulator.state.clear()
     if min_delay == "auto":
@@ -54,6 +58,7 @@ def setup(timestep=simulator.state.dt, min_delay=DEFAULT_MIN_DELAY,
         max_delay = 0
     simulator.state.min_delay = min_delay
     simulator.state.max_delay = max_delay
+    simulator.state.enable_neuron_bypass = enable_neuron_bypass
 
 
 def end():

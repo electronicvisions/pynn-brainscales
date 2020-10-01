@@ -611,6 +611,7 @@ class _State(BaseState):
         self.id_counter = 0
         self.current_sources = []
         self.segment_counter = -1
+        self.enable_neuron_bypass = False
 
     def run_until(self, tstop):
         self.run(tstop - self.t)
@@ -621,6 +622,8 @@ class _State(BaseState):
         self.id_counter = 0
         self.current_sources = []
         self.segment_counter = -1
+        self.enable_neuron_bypass = False
+
         self.reset()
 
     def reset(self):
@@ -782,6 +785,11 @@ class _State(BaseState):
                 atomic_neuron.event_routing.enable_analog = True
                 atomic_neuron.event_routing.enable_digital = True
                 atomic_neuron.event_routing.address = int(addr)
+                if state.enable_neuron_bypass:
+                    # disable threshold comparator
+                    atomic_neuron.threshold.enable = False
+                    atomic_neuron.event_routing.enable_bypass_excitatory = True
+                    atomic_neuron.event_routing.enable_bypass_inhibitory = True
                 atomic_neuron.leak_reset.i_bias_source_follower = 280
 
             # configure v recording
@@ -933,6 +941,9 @@ class _State(BaseState):
         padi_config = hal.CommonPADIBusConfig()
         for block in halco.iter_all(halco.PADIBusOnPADIBusBlock):
             padi_config.enable_spl1[block] = True
+            if state.enable_neuron_bypass:
+                # magic number (suggested by JWW)
+                padi_config.dacen_pulse_extension[block] = 4
         for padibus in halco.iter_all(halco.CommonPADIBusConfigOnDLS):
             builder.write(padibus, padi_config)
 
@@ -956,6 +967,8 @@ class _State(BaseState):
             halco.CapMemCellOnCapMemBlock.syn_i_bias_ramp: 1010,
             halco.CapMemCellOnCapMemBlock.syn_i_bias_store: 1010,
             halco.CapMemCellOnCapMemBlock.syn_i_bias_corout: 1010}
+        if state.enable_neuron_bypass:
+            synapse_params[halco.CapMemCellOnCapMemBlock.syn_i_bias_dac] = 1022
 
         for block in halco.iter_all(halco.CapMemBlockOnDLS):
             for k, v in synapse_params.items():
