@@ -8,7 +8,9 @@ from dlens_vx_v2 import lola, hal
 
 class HXNeuron(BaseCellType):
 
-    recordable: ClassVar[List[str]] = ["spikes", "v"]
+    # exc_synin, inh_synin and adaptation are technical voltages
+    recordable: ClassVar[List[str]] = ["spikes", "v", "exc_synin", "inh_synin",
+                                       "adaptation"]
     receptor_types: ClassVar[List[str]] = ["excitatory", "inhibitory"]
     conductance_based: ClassVar[bool] = False
     injectable: ClassVar[bool] = True
@@ -17,7 +19,10 @@ class HXNeuron(BaseCellType):
     # the actual unit of `v` is `haldls::vx::CapMemCell::Value`
     # [0–1022]; 1023 means off,
     # but only units included in the `quantity` package are accepted
-    units: ClassVar[Dict[str, str]] = {"v": "dimensionless"}
+    units: ClassVar[Dict[str, str]] = {"v": "dimensionless",
+                                       "exc_synin": "dimensionless",
+                                       "inh_synin": "dimensionless",
+                                       "adaptation": "dimensionless"}
 
     ATOMIC_NEURON_MEMBERS: ClassVar[List[str]] = \
         [name for name, _ in inspect.getmembers(lola.AtomicNeuron())

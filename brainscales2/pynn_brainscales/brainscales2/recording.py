@@ -7,6 +7,7 @@ class Recorder(pyNN.recording.Recorder):
 
     _simulator = simulator
     state_dt = _simulator.state.dt
+    _madc_variables = ["v", "exc_synin", "inh_synin", "adaptation"]
 
     def __init__(self, population, file=None):
         self._simulator.state.dt = self.state_dt
@@ -23,9 +24,8 @@ class Recorder(pyNN.recording.Recorder):
             raise ValueError("Can't customize sampling interval.")
 
         assert self.population.celltype.can_record(variable)
-        if variable == "v" and len(new_ids) != 1:
-            raise ValueError("""Can only record membrane potential of a
-                population with size 1.""")
+        if variable in Recorder._madc_variables and len(new_ids) != 1:
+            raise ValueError("Can only record single neurons via MADC")
 
         self.recorded[variable] = new_ids
 
@@ -54,11 +54,13 @@ class Recorder(pyNN.recording.Recorder):
     # pylint: disable=unused-argument
     @staticmethod
     def _get_all_signals(variable, ids, clear=False):
-        if variable == "v":
+        if variable in Recorder._madc_variables:
             signals = np.array(list(zip(simulator.state.times,
-                                        simulator.state.membrane)))
+                                        simulator.state.madc_samples)))
         else:
-            raise ValueError("Only implemented for membrane potential 'v'")
+            raise ValueError("Only implemented for membrane potential 'v' and"
+                             + "technical parameters: '{exc,inh}_synin', "
+                             + "'adaptation'.")
         return signals
 
     def _local_count(self, variable, filter_ids):

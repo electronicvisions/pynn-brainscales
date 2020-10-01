@@ -1,6 +1,6 @@
 # pylint: disable=too-many-lines
 
-from typing import ClassVar
+from typing import ClassVar, Optional
 import numpy as np
 from pyNN.common import IDMixin, Population, Connection
 from pyNN.common.control import BaseState
@@ -593,7 +593,7 @@ class _State(BaseState):
 
         self.spikes = []
         self.times = []
-        self.membrane = []
+        self.madc_samples = []
 
         self.mpi_rank = 0        # disabled
         self.num_processes = 1   # number of MPI processes
@@ -672,10 +672,10 @@ class _State(BaseState):
 
     @staticmethod
     def get_v(v_input: np.ndarray) -> [np.ndarray, np.ndarray]:
-        membrane = v_input["value"][1:]
+        madc_samples = v_input["value"][1:]
         times = v_input["chip_time"][1:] \
             / (int(hal.Timer.Value.fpga_clock_cycles_per_us) * 1000)
-        return times, membrane
+        return times, madc_samples
 
     @staticmethod
     def configure_common(builder: sta.PlaybackProgramBuilder) \
@@ -759,7 +759,9 @@ class _State(BaseState):
     def configure_hxneurons(builder: sta.PlaybackProgramBuilder,
                             population: Population,
                             enable_spike_recording: bool,
-                            enable_v_recording: bool) \
+                            enable_madc_recording: bool,
+                            readout_source:
+                            Optional[hal.NeuronConfig.ReadoutSource]) \
             -> sta.PlaybackProgramBuilder:
         """
         Places Neurons in Population "pop" on chip and configures spike and
@@ -798,12 +800,13 @@ class _State(BaseState):
                     atomic_neuron.event_routing.enable_bypass_inhibitory = True
 
             # configure v recording
-            if enable_v_recording:
+            if enable_madc_recording:
                 atomic_neuron.event_routing.analog_output = \
                     atomic_neuron.EventRouting.AnalogOutputMode.normal
                 atomic_neuron.event_routing.enable_digital = True
                 atomic_neuron.readout.enable_amplifier = True
                 atomic_neuron.readout.enable_buffered_access = True
+                atomic_neuron.readout.source = readout_source
                 builder = state.configure_madc(builder, coord)
 
             builder.write(coord, atomic_neuron)
@@ -814,28 +817,45 @@ class _State(BaseState):
     def configure_recorders_populations(builder: sta.PlaybackProgramBuilder) \
             -> (sta.PlaybackProgramBuilder, bool):
 
-        v_recording = False
+        have_madc_recording = False
+        ReadoutSource = hal.NeuronConfig.ReadoutSource
         for recorder in state.recorders:
             population = recorder.population
-            assert type(population.celltype) in [HXNeuron, SpikeSourceArray]
+            assert isinstance(population.celltype, (HXNeuron,
+                                                    SpikeSourceArray))
             if isinstance(population.celltype, HXNeuron):
                 enable_spike_recording = False
-                enable_v_recording = False
+                enable_madc_recording = False
+                readout_source = None
                 for variable in recorder.recorded:
                     if variable == "spikes":
                         enable_spike_recording = True
                     elif variable == "v":
-                        enable_v_recording = True
-                        v_recording = True
+                        enable_madc_recording = True
+                        have_madc_recording = True
+                        readout_source = ReadoutSource.membrane
+                    elif variable == "exc_synin":
+                        enable_madc_recording = True
+                        have_madc_recording = True
+                        readout_source = ReadoutSource.exc_synin
+                    elif variable == "inh_synin":
+                        enable_madc_recording = True
+                        have_madc_recording = True
+                        readout_source = ReadoutSource.inh_synin
+                    elif variable == "adaptation":
+                        enable_madc_recording = True
+                        have_madc_recording = True
+                        readout_source = ReadoutSource.adaptation
                     else:
                         raise NotImplementedError
                 builder = state.configure_hxneurons(
                     builder,
                     population,
                     enable_spike_recording=enable_spike_recording,
-                    enable_v_recording=enable_v_recording)
+                    enable_madc_recording=enable_madc_recording,
+                    readout_source=readout_source)
 
-        return builder, v_recording
+        return builder, have_madc_recording
 
     @staticmethod
     def madc_configuration(builder: sta.PlaybackProgramBuilder,
@@ -993,11 +1013,11 @@ class _State(BaseState):
 
     @staticmethod
     def run_on_chip(builder: sta.PlaybackProgramBuilder, runtime: float,
-                    v_recording: bool, events: np.ndarray) \
+                    have_madc_recording: bool, events: np.ndarray) \
             -> sta.PlaybackProgramBuilder:
         """
         Runs the experiment on chip and records MADC samples, if there is a
-        recorder recording 'v'.
+        recorder recording some MADC observable.
         """
 
         # enable event recording
@@ -1005,7 +1025,7 @@ class _State(BaseState):
         rec_config.enable_event_recording = True
         builder.write(halco.EventRecordingConfigOnFPGA(0), rec_config)
 
-        if v_recording:
+        if have_madc_recording:
             builder = state.madc_arm_recording(builder)
 
         # wait 100 us to buffer some program in FPGA to reach precise timing
@@ -1016,7 +1036,7 @@ class _State(BaseState):
             initial_wait * int(hal.Timer.Value.fpga_clock_cycles_per_us)))
         builder.write(halco.SystimeSyncOnFPGA(), hal.SystimeSync())
 
-        if v_recording:
+        if have_madc_recording:
             builder = state.madc_start_recording(builder)
 
         # insert events
@@ -1118,9 +1138,10 @@ class _State(BaseState):
         builder1 = self.configure_common(builder1)
 
         # configure populations and recorders
-        builder1, v_recording = self.configure_recorders_populations(builder1)
+        builder1, have_madc_recording = \
+            self.configure_recorders_populations(builder1)
 
-        if v_recording:
+        if have_madc_recording:
             builder1 = self.madc_configuration(builder1, runtime)
 
         external_events = []
@@ -1153,7 +1174,7 @@ class _State(BaseState):
             initial_wait * int(hal.Timer.Value.fpga_clock_cycles_per_us)))
 
         builder2 = sta.PlaybackProgramBuilder()
-        builder2 = self.run_on_chip(builder2, runtime, v_recording,
+        builder2 = self.run_on_chip(builder2, runtime, have_madc_recording,
                                     external_events)
 
         program1 = builder1.done()
@@ -1181,9 +1202,9 @@ class _State(BaseState):
         # make list 'spikes' of tupel (neuron id, spike time)
         self.spikes = self.get_spikes(program2.spikes.to_numpy(), runtime)
 
-        # make two list for madc samples: times, membrane
-        self.times, self.membrane = \
-            self.get_v(program2.madc_samples.to_numpy())
+        # make two list for madc samples: times, madc_samples
+        self.times, self.madc_samples = self.get_v(
+            program2.madc_samples.to_numpy())
 
         # warn if unexpected highspeed link notifications have been received.
         self._check_link_notifications(program1.highspeed_link_notifications,
