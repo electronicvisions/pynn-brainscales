@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import unittest
 import pynn_brainscales.brainscales2 as pynn
 

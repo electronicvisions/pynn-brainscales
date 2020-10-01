@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import unittest
 import inspect
 import numpy as np
