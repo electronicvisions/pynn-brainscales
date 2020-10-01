@@ -890,12 +890,12 @@ class _State(BaseState):
                                             halco.CrossbarInputOnDLS(cinput)),
                     silent_crossbar_node)
 
-        # enable loopback
+        # disable loopback
         for cinput in range(4):
             builder.write(
                 halco.CrossbarNodeOnDLS(halco.CrossbarOutputOnDLS(8 + cinput),
                                         halco.CrossbarInputOnDLS(8 + cinput)),
-                active_crossbar_node)
+                silent_crossbar_node)
 
         # enable input from L2 to top half
         for coutput in range(4):
