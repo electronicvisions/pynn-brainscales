@@ -31,9 +31,8 @@ def main(initial_values: dict):
                                 cellparams={"spike_times": spike_times})
 
     synapse = pynn.standardmodels.synapses.StaticSynapse(weight=63)
-    # pylint: disable=unused-variable
-    proj = pynn.Projection(pop_input, nrn, pynn.AllToAllConnector(),
-                           synapse_type=synapse)
+    pynn.Projection(pop_input, nrn, pynn.AllToAllConnector(),
+                    synapse_type=synapse)
 
     pynn.run(0.2)
 

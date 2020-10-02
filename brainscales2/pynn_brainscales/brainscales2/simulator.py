@@ -587,7 +587,7 @@ class _State(BaseState):
     max_weight: ClassVar[int] = halco.SynapseRowOnSynram.size \
         * lola.SynapseMatrix.Weight.max
 
-    # pragma pylint: disable=invalid-name
+    # pylint: disable=invalid-name
     def __init__(self):
         super(_State, self).__init__()
 
