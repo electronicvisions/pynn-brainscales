@@ -597,7 +597,9 @@ class _State(BaseState):
 
         self.mpi_rank = 0        # disabled
         self.num_processes = 1   # number of MPI processes
+        self.running = False
         self.t = 0
+        self.t_start = 0
         # TODO: replace by calculation (cf. feature #3594)
         self.dt = 3.4e-05        # average time between two MADC samples
         self.min_delay = 0
@@ -606,7 +608,9 @@ class _State(BaseState):
         self.populations = []
         self.recorders = set([])
         self.connections = []
-        self.clear()
+        self.id_counter = 0
+        self.current_sources = []
+        self.segment_counter = -1
 
     def run_until(self, tstop):
         self.run(tstop - self.t)
