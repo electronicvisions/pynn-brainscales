@@ -6,7 +6,7 @@ from pyNN.common import IDMixin, Population, Connection
 from pyNN.common.control import BaseState
 from pynn_brainscales.brainscales2.standardmodels.cells import HXNeuron, \
     SpikeSourceArray
-from dlens_vx_v1 import hal, halco, sta, hxcomm, lola
+from dlens_vx_v1 import hal, halco, sta, hxcomm, lola, logger
 
 
 name = "HX"  # for use in annotating output data
@@ -612,6 +612,7 @@ class _State(BaseState):
         self.current_sources = []
         self.segment_counter = -1
         self.enable_neuron_bypass = False
+        self.log = logger.get("pyNN.brainscales2")
 
     def run_until(self, tstop):
         self.run(tstop - self.t)
