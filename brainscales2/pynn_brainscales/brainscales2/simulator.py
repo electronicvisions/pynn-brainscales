@@ -1035,6 +1035,24 @@ class _State(BaseState):
 
         return builder
 
+    def _check_link_notifications(self, link_notifications):
+        """
+        Check for unexpected link notifications and log accordingly.
+        """
+        notis_per_phy = dict()
+        for noti in link_notifications:
+            if noti.link_up and noti.phy not in notis_per_phy.keys():
+                # first link up message per phy is expected
+                pass
+            else:
+                # everything else is not expected
+                self.log.WARN(noti)
+            notis_per_phy[noti.phy] = noti
+
+        if all(not noti.link_up for noti in notis_per_phy.values()):
+            self.log.ERROR("All highspeed links down at "
+                           + "the end of the experiment.")
+
     def run(self, runtime):
         self.t += runtime
         self.running = True
@@ -1095,6 +1113,9 @@ class _State(BaseState):
 
         # make two list for madc samples: times, membrane
         self.times, self.membrane = self.get_v(program.madc_samples.to_numpy())
+
+        # warn if unexpected highspeed link notifications have been received
+        self._check_link_notifications(program.highspeed_link_notifications)
 
 
 state = _State()  # a Singleton, so only a single instance ever exists
