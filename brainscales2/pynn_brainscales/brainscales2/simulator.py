@@ -1150,9 +1150,17 @@ class _State(BaseState):
             raise RuntimeError("Unexpected chip version: "
                                + str(chip_version))
 
-    # pylint: disable=too-many-locals
-    def run(self, runtime):
-        self.t += runtime
+    # pylint: disable=too-many-locals,too-many-statements
+    def run(self, runtime: Optional[float]):
+        """
+        Performs a hardware run for `runtime` milliseconds.
+        If runtime is `None`, we only perform preparatory steps.
+        """
+        if runtime is None:
+            self.log.INFO("User requested 'None' runtime: "
+                          + "no hardware run performed.")
+        else:
+            self.t += runtime
         self.running = True
 
         # initialize chip
@@ -1190,6 +1198,9 @@ class _State(BaseState):
             connection_builder_return, external_events = \
                 connection_builder.generate()
             builder1.merge_back(connection_builder_return)
+
+        if runtime is None:
+            return
 
         # wait 20000 us for capmem voltages to stabilize
         initial_wait = 20000  # us

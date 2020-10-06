@@ -70,7 +70,11 @@ def end():
     simulator.state.write_on_end = []
 
 
-run, run_until = common.build_run(simulator)
+# common.build_run's run (first return value) performs some arithmetic (plus)
+# on run's runtime parameter and finally dispatches to run_until; to support
+# runtime=`None` we need to directly dispatch to our own run function.
+_, run_until = common.build_run(simulator)
+run = simulator.state.run
 run_for = run
 
 reset = common.build_reset(simulator)
