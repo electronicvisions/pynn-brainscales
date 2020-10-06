@@ -1,7 +1,7 @@
 import inspect
 import numbers
 from typing import List, Dict, ClassVar, Final, Optional, Union
-from pyNN.parameters import Sequence
+from pyNN.parameters import Sequence, ArrayParameter
 from pyNN.standardmodels import cells, build_translations, StandardCellType
 from dlens_vx_v2 import lola, hal, halco
 
@@ -230,6 +230,8 @@ class SpikeSourceArray(cells.SpikeSourceArray):
     Spike source generating spikes at the times [ms] given in the spike_times
     array.
     """
+    # FIXME: workaround, see https://github.com/NeuralEnsemble/PyNN/issues/709
+    default_parameters = {'spike_times': ArrayParameter([])}
 
     translations = build_translations(
         ('spike_times', 'spike_times'),

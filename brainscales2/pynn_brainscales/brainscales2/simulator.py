@@ -214,8 +214,18 @@ class ConnectionConfigurationBuilder:
                     pre.spike_times = Sequence(np.random.rand(num_spikes)
                                                * duration + start)
 
+            # In case of PopulationView use grandparent index,
+            # else use presynaptic_index of connection
+            try:
+                index_base_pop = connection.projection.\
+                    pre.index_in_grandparent(connection.presynaptic_index)
+            except AttributeError:
+                index_base_pop = connection.presynaptic_index
+
+            spiketimes = pre.celltype.parameter_space["spike_times"][
+                index_base_pop].value
             external_connection = np.array(
-                [(pre, post, weight, receptor_type, pre.spike_times.value)],
+                [(pre, post, weight, receptor_type, spiketimes)],
                 dtype=self._external_connections.dtype)
             self._external_connections = np.append(self._external_connections,
                                                    external_connection)
