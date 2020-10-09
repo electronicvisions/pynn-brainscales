@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pynn_brainscales.brainscales2 as pynn
-from dlens_vx_v1 import logger
+import pylogging as logger
 
 initial_values = {"threshold_v_threshold": 400,
                   "leak_reset_leak_v_leak": 1022,

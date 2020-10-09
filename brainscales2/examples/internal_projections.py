@@ -1,7 +1,7 @@
 from copy import deepcopy
 import matplotlib.pyplot as plt
 import pynn_brainscales.brainscales2 as pynn
-from dlens_vx_v1 import logger
+import pylogging as logger
 
 
 def main():
