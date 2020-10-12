@@ -32,7 +32,7 @@ def build(bld):
         features = 'use py pylint pycodestyle',
         source = bld.path.ant_glob('pynn_brainscales/**/*.py'),
         relative_trick = True,
-        use = ['dlens_vx_v1', 'pylogging'],
+        use = ['dlens_vx_v2', 'pylogging'],
         install_path = '${PREFIX}/lib',
         pylint_config = join(get_toplevel_path(), "code-format", "pylintrc"),
         pycodestyle_config = join(get_toplevel_path(), "code-format", "pycodestyle"),

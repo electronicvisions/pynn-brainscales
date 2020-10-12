@@ -3,19 +3,21 @@ import pynn_brainscales.brainscales2 as pynn
 
 
 init_values = {"threshold_v_threshold": 300,
-               "leak_reset_leak_v_leak": 750,
-               "leak_reset_reset_v_reset": 200,
-               "leak_reset_leak_i_bias": 420,
-               "leak_reset_reset_i_bias": 950,
-               "leak_reset_leak_enable_division": True,
+               "leak_v_leak": 750,
+               "leak_i_bias": 420,
+               "leak_enable_division": True,
+               "reset_v_reset": 200,
+               "reset_i_bias": 950,
+               "reset_enable_multiplication": True,
                "threshold_enable": True,
-               "leak_reset_reset_enable_multiplication": True,
                "membrane_capacitance_capacitance": 4,
                "refractory_period_refractory_time": 250,
                "excitatory_input_enable": True,
-               "excitatory_input_i_bias_res": 150,
+               "excitatory_input_i_bias_tau": 150,
                "excitatory_input_i_bias_gm": 200,
-               "excitatory_input_v_syn": 700}
+               # FIXME: replace by i_drop_input and i_shift_reference
+               # "excitatory_input_v_syn": 700
+               }
 
 
 def main(initial_values: dict):

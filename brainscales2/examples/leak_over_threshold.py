@@ -2,15 +2,14 @@ import matplotlib.pyplot as plt
 import pynn_brainscales.brainscales2 as pynn
 
 
-init_values = {"threshold_v_threshold": 400,
-               "leak_reset_leak_v_leak": 1022,
-               "leak_reset_reset_v_reset": 50,
-               "leak_reset_leak_i_bias": 420,
-               "leak_reset_reset_i_bias": 950,
-               "leak_reset_leak_enable_division": True,
+init_values = {"threshold_v_threshold": 350,
+               "leak_v_leak": 1022,
+               "leak_i_bias": 320,
+               "reset_v_reset": 400,
+               "reset_i_bias": 950,
+               "reset_enable_multiplication": True,
                "threshold_enable": True,
-               "leak_reset_reset_enable_multiplication": True,
-               "membrane_capacitance_capacitance": 32,
+               "membrane_capacitance_capacitance": 63,
                "refractory_period_refractory_time": 95}
 
 

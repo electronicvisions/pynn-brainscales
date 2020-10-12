@@ -3,7 +3,7 @@ import numbers
 from typing import List, Dict, ClassVar
 from pyNN.models import BaseCellType
 from pyNN.standardmodels import cells, build_translations
-from dlens_vx_v1 import lola, hal
+from dlens_vx_v2 import lola, hal
 
 
 class HXNeuron(BaseCellType):
@@ -24,36 +24,6 @@ class HXNeuron(BaseCellType):
          if(not(name.startswith("_")) and name.islower())]
 
     @staticmethod
-    def _get_leak_reset_values() -> dict:
-        default_values = {}
-        mem = getattr(lola.AtomicNeuron(), "leak_reset")
-        for submember, _ in inspect.getmembers(mem):
-            if submember.startswith("_") or not submember.islower():
-                continue
-            # extra nesting
-            nesting = ["leak", "reset"]
-            if submember in nesting:
-                submem = getattr(mem, submember)
-                attributes = []
-                for name, value in inspect.getmembers(submem):
-                    if name.startswith("_") or not name.islower():
-                        continue
-                    # asserts just a subset of possible
-                    # unwanted types
-                    assert not inspect.ismethod(value)
-                    assert not inspect.isbuiltin(value)
-                    attributes.append(name)
-                for attr in attributes:
-                    default_val = getattr(submem, attr)
-                    key = "leak_reset_" + submember + "_" + attr
-                    default_values[key] = default_val
-            else:
-                default_val = getattr(mem, submember)
-                key = "leak_reset_" + submember
-                default_values[key] = default_val
-        return default_values
-
-    @staticmethod
     # TODO: add more precise return type (cf. feature #3599)
     def get_default_values() -> dict:
         """Get the default values of a LoLa Neuron."""
@@ -68,61 +38,33 @@ class HXNeuron(BaseCellType):
             assert not inspect.ismethod(value)
             assert not inspect.isbuiltin(value)
 
-            # special case due to extra nesting
-            if member == "leak_reset":
-                default_values.update(HXNeuron._get_leak_reset_values())
+            mem = getattr(lola.AtomicNeuron(), member)
+            attributes = []
+            for name, inner_value in inspect.getmembers(mem):
+                lola_member = getattr(mem, name)
 
-            else:
-                mem = getattr(lola.AtomicNeuron(), member)
-                attributes = []
-                for name, inner_value in inspect.getmembers(mem):
-                    lola_member = getattr(mem, name)
+                # get members
+                # exclude lola.AtomicNeuron.EventRouting, since they
+                # only have the signature of members, but actually are
+                # none
+                if name.startswith("_") or not name.islower() \
+                    or isinstance(lola_member,
+                                  lola.AtomicNeuron.EventRouting):
+                    continue
+                # asserts just a subset of possible unwanted types
+                assert not inspect.ismethod(inner_value)
+                assert not inspect.isbuiltin(inner_value)
+                attributes.append(name)
 
-                    # get members
-                    # exclude lola.AtomicNeuron.EventRouting, since they
-                    # only have the signature of members, but actually are
-                    # none
-                    if name.startswith("_") or not name.islower() \
-                       or isinstance(lola_member,
-                                     lola.AtomicNeuron.EventRouting):
-                        continue
-                    # asserts just a subset of possible unwanted types
-                    assert not inspect.ismethod(inner_value)
-                    assert not inspect.isbuiltin(inner_value)
-                    attributes.append(name)
-
-                for attr in attributes:
-                    default_val = getattr(mem, attr)
-                    key = member + "_" + attr
-                    default_values[key] = default_val
+            for attr in attributes:
+                default_val = getattr(mem, attr)
+                key = member + "_" + attr
+                default_values[key] = default_val
 
         return default_values
 
     def can_record(self, variable: str) -> bool:
         return variable in self.recordable
-
-    @staticmethod
-    def _set_lola_leak_reset(initial_values: dict, param: str, attr: str,
-                             real_member: str) -> None:
-        nesting = False
-        param_members = ["leak", "reset"]
-        param_member = ""
-        cut = 0
-        for param_mem in param_members:  # slice
-            start_index = attr.find(param_mem)
-            if start_index == 0:
-                cut = start_index + len(param_mem) + 1
-                param_member = param_mem
-                nesting = True
-        param_attr = attr[cut:]
-        if nesting:
-            nested_member = getattr(real_member, param_member)
-            setattr(nested_member, param_attr,
-                    initial_values[param].base_value)
-            setattr(real_member, param_member, nested_member)
-        else:
-            setattr(real_member, attr,
-                    initial_values[param].base_value)
 
     @staticmethod
     def lola_from_dict(initial_values: dict) -> lola.AtomicNeuron:
@@ -150,15 +92,16 @@ class HXNeuron(BaseCellType):
 
             # set initial values
             real_member = getattr(neuron, member)
-            if member == "leak_reset":
-                HXNeuron._set_lola_leak_reset(initial_values, param, attr,
-                                              real_member)
-            elif param == "readout_source":
+            if param == "readout_source":
                 setattr(real_member, attr,
                         hal.NeuronConfig.ReadoutSource(
                             initial_values[param].base_value))
             else:
-                setattr(real_member, attr, initial_values[param].base_value)
+                # PyNN uses lazyarrays for value storage; need to restore
+                # original type
+                val = type(getattr(real_member,
+                                   attr))(initial_values[param].base_value)
+                setattr(real_member, attr, val)
             setattr(neuron, member, real_member)
 
         return neuron

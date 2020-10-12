@@ -3,7 +3,7 @@
 import unittest
 import inspect
 import numpy as np
-from dlens_vx_v1 import lola
+from dlens_vx_v2 import lola
 import pynn_brainscales.brainscales2 as pynn
 
 
@@ -19,7 +19,7 @@ class TestAPopulation(unittest.TestCase):
             "threshold_v_threshold": 200})
         self.pop3 = pynn.Population(3, pynn.cells.HXNeuron, initial_values={
             "threshold_v_threshold": 300,
-            "leak_reset_leak_i_bias": 100,
+            "leak_i_bias": 100,
             "exponential_enable": True})
 
     def test_size(self):
@@ -54,24 +54,30 @@ class TestAPopulation(unittest.TestCase):
     def test_inital_values(self):
         self.assertEqual(self.pop2.get("threshold_v_threshold"), 200)
         self.assertEqual(self.pop3.get(["threshold_v_threshold",
-                                        "leak_reset_leak_i_bias"]),
+                                        "leak_i_bias"]),
                          [300, 100])
         self.assertTrue(self.pop3.get("exponential_enable"))
 
     def test_not_configurable(self):
         with self.assertRaises(ValueError):
             pynn.Population(1, pynn.cells.HXNeuron, initial_values={
-                "event_routing_enable_analog": True})
+                "event_routing_analog_output": 0})
+        with self.assertRaises(ValueError):
             pynn.Population(1, pynn.cells.HXNeuron, initial_values={
                 "event_routing_enable_digital": False})
+        with self.assertRaises(ValueError):
             pynn.Population(1, pynn.cells.HXNeuron, initial_values={
                 "leak_reset_i_bias_source_follower": 0})
+        with self.assertRaises(ValueError):
             pynn.Population(1, pynn.cells.HXNeuron, initial_values={
                 "readout_enable_amplifier": True})
+        with self.assertRaises(ValueError):
             pynn.Population(1, pynn.cells.HXNeuron, initial_values={
                 "readout_source": "something"})
+        with self.assertRaises(ValueError):
             pynn.Population(1, pynn.cells.HXNeuron, initial_values={
                 "readout_enable_buffered_access": True})
+        with self.assertRaises(ValueError):
             pynn.Population(1, pynn.cells.HXNeuron, initial_values={
                 "readout_i_bias": 1000})
 
@@ -107,16 +113,6 @@ class TestLolaNeuronConstruction(unittest.TestCase):
 
                 key = param + "_" + attr
                 value = getattr(pop_mem, attr)
-                # special case due to extra nesting
-                if param == "leak_reset" and attr in ["leak", "reset"]:
-                    pre_key = param + "_" + attr
-                    for nested_attr, _ in inspect.getmembers(pop_member):
-                        if not(nested_attr.startswith("_")) \
-                                and nested_attr.islower():
-
-                            key = pre_key + "_" + nested_attr
-                            value = getattr(pop_member, nested_attr)
-
                 # check values
                 if param == "threshold":
                     if attr == "enable":

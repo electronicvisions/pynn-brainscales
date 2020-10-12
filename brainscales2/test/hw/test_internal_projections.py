@@ -3,12 +3,9 @@ from examples.internal_projections import main
 
 
 class TestTryProjections(unittest.TestCase):
-    def test_spikes(self):
-        spike_number, _, _ = main()
-        spike_expectation = 25
-        spike_range = 3
-        spike_difference = abs(spike_expectation - spike_number)
-        self.assertLessEqual(spike_difference, spike_range)
+    def test_main(self):
+        # Simply tests if program runs
+        main()
 
 
 if __name__ == "__main__":

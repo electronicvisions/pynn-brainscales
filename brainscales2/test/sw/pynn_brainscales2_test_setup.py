@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import unittest
-from dlens_vx_v1 import halco
+from dlens_vx_v2 import halco
 import pynn_brainscales.brainscales2 as pynn
 
 

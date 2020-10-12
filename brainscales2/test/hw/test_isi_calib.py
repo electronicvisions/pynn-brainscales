@@ -4,8 +4,8 @@ from examples import isi_calib
 
 class TestISICalib(unittest.TestCase):
     def test_calibrate_isi(self):
-        target_isi = 0.04
-        calibrated_isi, _ = isi_calib.calibrate_isi(0.04)
+        target_isi = 0.01
+        calibrated_isi, _ = isi_calib.calibrate_isi(target_isi)
         uncertainty = 0.001
         self.assertLessEqual(abs(target_isi - calibrated_isi), uncertainty)
 

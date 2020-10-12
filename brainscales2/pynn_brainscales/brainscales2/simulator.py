@@ -6,7 +6,7 @@ from pyNN.common import IDMixin, Population, Connection
 from pyNN.common.control import BaseState
 from pynn_brainscales.brainscales2.standardmodels.cells import HXNeuron, \
     SpikeSourceArray
-from dlens_vx_v1 import hal, halco, sta, hxcomm, lola, logger
+from dlens_vx_v2 import hal, halco, sta, hxcomm, lola, logger
 
 
 name = "HX"  # for use in annotating output data
@@ -683,9 +683,11 @@ class _State(BaseState):
 
         # set global cells
         neuron_params = {
-            halco.CapMemCellOnCapMemBlock.neuron_i_bias_synin_sd_exc: 1008,
-            halco.CapMemCellOnCapMemBlock.neuron_i_bias_synin_sd_inh: 1008,
-            halco.CapMemCellOnCapMemBlock.neuron_i_bias_threshold_comparator:
+            halco.CapMemCellOnCapMemBlock.neuron_v_bias_casc_n: 340,
+            halco.CapMemCellOnCapMemBlock.neuron_i_bias_readout_amp: 110,
+            halco.CapMemCellOnCapMemBlock.neuron_i_bias_leak_source_follower:
+            100,
+            halco.CapMemCellOnCapMemBlock.neuron_i_bias_spike_comparator:
             500}
 
         for block in halco.iter_all(halco.CapMemBlockOnDLS):
@@ -785,7 +787,8 @@ class _State(BaseState):
                 addr = (coord.toNeuronColumnOnDLS().toEnum() % neurons) \
                     + (coord.toNeuronRowOnDLS().toEnum() * neurons) + offset
 
-                atomic_neuron.event_routing.enable_analog = True
+                atomic_neuron.event_routing.analog_output = \
+                    atomic_neuron.EventRouting.AnalogOutputMode.normal
                 atomic_neuron.event_routing.enable_digital = True
                 atomic_neuron.event_routing.address = int(addr)
                 if state.enable_neuron_bypass:
@@ -793,16 +796,14 @@ class _State(BaseState):
                     atomic_neuron.threshold.enable = False
                     atomic_neuron.event_routing.enable_bypass_excitatory = True
                     atomic_neuron.event_routing.enable_bypass_inhibitory = True
-                atomic_neuron.leak_reset.i_bias_source_follower = 280
 
             # configure v recording
             if enable_v_recording:
-                atomic_neuron.event_routing.enable_analog = True
+                atomic_neuron.event_routing.analog_output = \
+                    atomic_neuron.EventRouting.AnalogOutputMode.normal
                 atomic_neuron.event_routing.enable_digital = True
-                atomic_neuron.leak_reset.i_bias_source_follower = 280
                 atomic_neuron.readout.enable_amplifier = True
                 atomic_neuron.readout.enable_buffered_access = True
-                atomic_neuron.readout.i_bias = 1000
                 builder = state.configure_madc(builder, coord)
 
             builder.write(coord, atomic_neuron)
@@ -1101,7 +1102,7 @@ class _State(BaseState):
         jtag_id_ticket = builder_chip_version.read(halco.JTAGIdCodeOnDLS())
         sta.run(connection, builder_chip_version.done())
         chip_version = jtag_id_ticket.get().version.value()
-        if chip_version != 0:
+        if chip_version != 2:
             raise RuntimeError("Unexpected chip version: "
                                + str(chip_version))
 

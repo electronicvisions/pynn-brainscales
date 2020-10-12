@@ -35,7 +35,7 @@ class Population(pyNN.common.Population, PopulationMixin):
     _simulator = simulator
     _recorder_class = Recorder
     _assembly_class = Assembly
-    not_configurable = ["event_routing_enable_analog",
+    not_configurable = ["event_routing_analog_output",
                         "event_routing_enable_digital",
                         "leak_reset_i_bias_source_follower",
                         "readout_enable_amplifier",
