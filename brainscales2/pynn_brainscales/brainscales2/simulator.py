@@ -952,8 +952,11 @@ class _State(BaseState):
         for block in halco.iter_all(halco.PADIBusOnPADIBusBlock):
             padi_config.enable_spl1[block] = True
             if state.enable_neuron_bypass:
-                # magic number (suggested by JWW)
-                padi_config.dacen_pulse_extension[block] = 4
+                # extend pulse length such that pre-synaptic signals have
+                # a stronger effect on the synaptic input voltage and spikes
+                # are more easily detected by the bypass circuit.
+                padi_config.dacen_pulse_extension[block] = \
+                    hal.CommonPADIBusConfig.DacenPulseExtension.max
         for padibus in halco.iter_all(halco.CommonPADIBusConfigOnDLS):
             builder.write(padibus, padi_config)
 
