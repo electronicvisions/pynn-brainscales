@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import pynn_brainscales.brainscales2 as pynn
-import pylogging as logger
 
 
 init_values = {"threshold_v_threshold": 300,
@@ -46,7 +45,8 @@ def main(initial_values: dict):
 
 
 if __name__ == "__main__":
-    log = logger.get("external_input")
+    pynn.logger.default_config(level=pynn.logger.LogLevel.INFO)
+    log = pynn.logger.get("external_input")
     spiketimes, times, membrane = main(init_values)
 
     log.INFO("Number of spikes of stimulated neuron: ", len(spiketimes))

@@ -13,11 +13,12 @@ from pynn_brainscales.brainscales2.populations import Population, \
     PopulationView, Assembly
 from pynn_brainscales.brainscales2.projections import Projection
 from dlens_vx_v1 import halco
+import pylogging as logger
 
 
 __all__ = ["list_standard_models", "setup", "end", "run", "run_until",
            "run_for", "reset", "initialize", "get_current_time", "create",
-           "connect", "set", "record"]
+           "connect", "set", "record", "logger"]
 
 
 def list_standard_models():

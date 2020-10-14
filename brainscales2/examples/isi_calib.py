@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pynn_brainscales.brainscales2 as pynn
-import pylogging as logger
 
 initial_values = {"threshold_v_threshold": 400,
                   "leak_reset_leak_v_leak": 1022,
@@ -36,7 +35,7 @@ def get_isi(tau_ref: int):
 
 # pylint: disable=too-many-locals
 def calibrate_isi(target_isi: float):
-    log = logger.get("isi_calib.calibrate_isi")
+    log = pynn.logger.get("isi_calib.calibrate_isi")
     best_isi_diff = target_isi
     best_tau_ref = 0
     best_isi = 0
@@ -78,7 +77,8 @@ def calibrate_isi(target_isi: float):
 
 
 if __name__ == "__main__":
+    pynn.logger.default_config(level=pynn.logger.LogLevel.INFO)
     result_isi, result_tau_ref = calibrate_isi(0.035)
-    main_log = logger.get("isi_calib")
+    main_log = pynn.logger.get("isi_calib")
     main_log.INFO("Best result:")
     main_log.INFO("isi: ", result_isi, ", ", "tau_ref: ", result_tau_ref)

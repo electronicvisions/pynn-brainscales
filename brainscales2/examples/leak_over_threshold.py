@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import pynn_brainscales.brainscales2 as pynn
-import pylogging as logger
 
 
 init_values = {"threshold_v_threshold": 400,
@@ -16,7 +15,7 @@ init_values = {"threshold_v_threshold": 400,
 
 
 def main(initial_values: dict):
-    log = logger.get("leak_over_threshold")
+    log = pynn.logger.get("leak_over_threshold")
     pynn.setup()
 
     pop2 = pynn.Population(2, pynn.cells.HXNeuron,
@@ -56,4 +55,5 @@ def main(initial_values: dict):
 
 
 if __name__ == "__main__":
+    pynn.logger.default_config(level=pynn.logger.LogLevel.INFO)
     main(init_values)

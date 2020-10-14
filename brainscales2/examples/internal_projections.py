@@ -1,11 +1,10 @@
 from copy import deepcopy
 import matplotlib.pyplot as plt
 import pynn_brainscales.brainscales2 as pynn
-import pylogging as logger
 
 
 def main():
-    main_log = logger.get("internal_projections_main")
+    main_log = pynn.logger.get("internal_projections_main")
 
     pynn.setup()
 
@@ -64,7 +63,8 @@ def main():
 
 
 if __name__ == "__main__":
-    log = logger.get("internal_projections")
+    pynn.logger.default_config(level=pynn.logger.LogLevel.INFO)
+    log = pynn.logger.get("internal_projections")
     spikenumber, times, membrane = main()
     log.INFO("Number of spikes of first neuron: ", spikenumber)
 
