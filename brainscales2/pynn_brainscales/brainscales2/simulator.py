@@ -177,7 +177,7 @@ class ConnectionConfigurationBuilder:
                                types.""")
         else:
             padi_row_index = self._used_padi_rows[int(padibus_index)][1] + 1
-            self._used_padi_rows[padi_bus][1] = padi_row_index
+            self._used_padi_rows[int(padibus_index)][1] = padi_row_index
 
         # set synapse driver
         syndrv = halco.SynapseDriverOnSynapseDriverBlock(
