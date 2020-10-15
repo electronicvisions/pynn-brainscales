@@ -613,6 +613,7 @@ class _State(BaseState):
         self.segment_counter = -1
         self.enable_neuron_bypass = False
         self.log = logger.get("pyNN.brainscales2")
+        self.checked_hardware = False
 
     def run_until(self, tstop):
         self.run(tstop - self.t)
@@ -624,6 +625,7 @@ class _State(BaseState):
         self.current_sources = []
         self.segment_counter = -1
         self.enable_neuron_bypass = False
+        self.checked_hardware = False
 
         self.reset()
 
@@ -1075,6 +1077,20 @@ class _State(BaseState):
             error_msg += str(ticket_phy.get()) + "\n"
         self.log.ERROR(error_msg)
 
+    @staticmethod
+    def _perform_hardware_check(connection):
+        """
+        Check hardware for requirements such as chip version.
+        """
+        # perform chip-version check
+        builder_chip_version, _ = sta.DigitalInit().generate()
+        jtag_id_ticket = builder_chip_version.read(halco.JTAGIdCodeOnDLS())
+        sta.run(connection, builder_chip_version.done())
+        chip_version = jtag_id_ticket.get().version.value()
+        if chip_version != 0:
+            raise RuntimeError("Unexpected chip version: "
+                               + str(chip_version))
+
     def run(self, runtime):
         self.t += runtime
         self.running = True
@@ -1125,7 +1141,11 @@ class _State(BaseState):
                                     external_events)
 
         program = builder2.done()
+
         with hxcomm.ManagedConnection() as conn:
+            if not self.checked_hardware:
+                self._perform_hardware_check(conn)
+                self.checked_hardware = True
             try:
                 sta.run(conn, builder1.done())
                 sta.run(conn, program)
