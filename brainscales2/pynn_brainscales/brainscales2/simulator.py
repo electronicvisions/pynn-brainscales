@@ -1040,22 +1040,33 @@ class _State(BaseState):
 
         return builder
 
-    def _check_link_notifications(self, link_notifications):
+    def _check_link_notifications(self, link_notifications,
+                                  n_expected_notifications):
         """
         Check for unexpected link notifications and log accordingly.
+        When turning the link on, a link up message is expected.
+
+        :param link_notifications: List of link notifications
+        :param n_expected_notifications: Number of expected link up messages
         """
         notis_per_phy = dict()
         for noti in link_notifications:
-            if noti.link_up and noti.phy not in notis_per_phy.keys():
-                # first link up message per phy is expected
+            if n_expected_notifications > 0 and noti.link_up and \
+                    noti.phy not in notis_per_phy.keys():
+                # one link up message per phy is expected (when turned on)
                 pass
             else:
                 # everything else is not expected
                 self.log.WARN(noti)
             notis_per_phy[noti.phy] = noti
 
-        if all(not noti.link_up for noti in notis_per_phy.values()):
-            self.log.ERROR("All highspeed links down at "
+        if len(notis_per_phy) < n_expected_notifications:
+            self.log.ERROR("Not all configured highspeed links sent link "
+                           + "notifications.")
+
+        if len(notis_per_phy) == halco.PhyStatusOnFPGA.size and \
+                all(not noti.link_up for noti in notis_per_phy.values()):
+            self.log.ERROR("All configured highspeed links down at "
                            + "the end of the experiment.")
 
     def _perform_post_fail_analysis(self, connection):
@@ -1094,6 +1105,7 @@ class _State(BaseState):
             raise RuntimeError("Unexpected chip version: "
                                + str(chip_version))
 
+    # pylint: disable=too-many-locals
     def run(self, runtime):
         self.t += runtime
         self.running = True
@@ -1143,31 +1155,42 @@ class _State(BaseState):
         builder2 = self.run_on_chip(builder2, runtime, v_recording,
                                     external_events)
 
-        program = builder2.done()
-
+        program1 = builder1.done()
+        program2 = builder2.done()
         with hxcomm.ManagedConnection() as conn:
             if not self.checked_hardware:
                 self._perform_hardware_check(conn)
                 self.checked_hardware = True
             try:
-                sta.run(conn, builder1.done())
-                sta.run(conn, program)
+                sta.run(conn, program1)
+                sta.run(conn, program2)
             except RuntimeError:
-                # report hs link notifications in any case
+                # Link up messages for all links are expected.
                 self._check_link_notifications(
-                    program.highspeed_link_notifications)
+                    program1.highspeed_link_notifications,
+                    halco.PhyStatusOnFPGA.size)
+                # Since the simulation builder (builder2) does not modify the
+                # highspeed links, no notifications are expected.
+                self._check_link_notifications(
+                    program2.highspeed_link_notifications, 0)
                 # perform post-mortem read out of status
                 self._perform_post_fail_analysis(conn)
                 raise
 
         # make list 'spikes' of tupel (neuron id, spike time)
-        self.spikes = self.get_spikes(program.spikes.to_numpy(), runtime)
+        self.spikes = self.get_spikes(program2.spikes.to_numpy(), runtime)
 
         # make two list for madc samples: times, membrane
-        self.times, self.membrane = self.get_v(program.madc_samples.to_numpy())
+        self.times, self.membrane = \
+            self.get_v(program2.madc_samples.to_numpy())
 
-        # warn if unexpected highspeed link notifications have been received
-        self._check_link_notifications(program.highspeed_link_notifications)
+        # warn if unexpected highspeed link notifications have been received.
+        self._check_link_notifications(program1.highspeed_link_notifications,
+                                       halco.PhyStatusOnFPGA.size)
+        # Since the simulation builder (builder2) does not modify the highspeed
+        # links, no notifications are expected.
+        self._check_link_notifications(program2.highspeed_link_notifications,
+                                       0)
 
 
 state = _State()  # a Singleton, so only a single instance ever exists
