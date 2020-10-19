@@ -18,7 +18,8 @@ class TestNeuronBypassMode(unittest.TestCase):
     runtime = 10000  # ms
     rate = 200  # Hz
 
-    def poisson_spike_train(self, rate: float, start: float = 0,
+    @staticmethod
+    def poisson_spike_train(rate: float, start: float = 0,
                             stop: float = runtime,
                             seed: int = 4245) -> np.array:
         """
@@ -79,7 +80,8 @@ class TestNeuronBypassMode(unittest.TestCase):
         spikes_out = output_pop.get_data().segments[0].spiketrains[0].magnitude
 
         # Add a small number such that timestamps with a '5' the third decimal
-        # place are rounded up to the next higher (and not to the next even) number
+        # place are rounded up to the next higher (and not to the next even)
+        # number
         input_set = set(np.round(spikes_in + 1e-9, 2))
         output_set = set(np.round(spikes_out + 1e-9, 2))
         assert len(input_set - output_set) / len(input_set) < 0.02
