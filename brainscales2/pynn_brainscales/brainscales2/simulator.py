@@ -1,6 +1,6 @@
 # pylint: disable=too-many-lines
 
-from typing import ClassVar, Optional
+from typing import ClassVar, Optional, Set
 import numpy as np
 from pyNN.common import IDMixin, Population, Connection
 from pyNN.common.control import BaseState
@@ -482,7 +482,7 @@ class ConnectionConfigurationBuilder:
             place = place[0]
             config.row_address_compare_mask = free_padibusses[place][1]
 
-    # pylint: disable=too-many-locals
+    # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     def _external_configuration(self,
                                 connections: np.ndarray,
                                 free_rows: np.ndarray,
@@ -523,6 +523,27 @@ class ConnectionConfigurationBuilder:
                     update_entry = True
                     break
 
+            # Synapse driver used for the current connection
+            using_driver = halco.SynapseRowOnSynram(row). \
+                toSynapseDriverOnSynapseDriverBlock()
+
+            # Check what synapse labels are in use for the current synapse
+            # driver, use the following one.
+            # It is enough to keep labels unique per synapse driver, because
+            # row address select mask 0b11111 is used for external inputs.
+            addr: int = hal.SynapseLabelValue.min
+            used_labels: Set[int] = set()
+            for entry in used_entries:
+                used_driver = halco.SynapseRowOnSynram(entry["row"]). \
+                    toSynapseDriverOnSynapseDriverBlock()
+                if using_driver == used_driver:
+                    used_labels.add(entry["number_pres"])
+            if len(used_labels) > 0:
+                addr = max(used_labels) + 1
+            if addr > hal.SynapseLabelValue.max:
+                raise RuntimeError("Label too large, cannot map the network.")
+            using_entry["number_pres"] = addr
+
             # configure synapse matrix
             rows_per_syndrv = 2
             pre = int((row - row % rows_per_syndrv)
@@ -530,9 +551,6 @@ class ConnectionConfigurationBuilder:
                       + (row % rows_per_syndrv)
                       + int(bus.toEnum()) * rows_per_syndrv)
             posts = []
-            addr = using_entry["number_pres"]
-            if isinstance(addr, np.ndarray):
-                addr = addr[0]
             for conn in conns:
                 post_ind = int(conn["post"].toEnum())
                 synmtx_config.labels[pre][post_ind] = int(addr)
@@ -570,7 +588,6 @@ class ConnectionConfigurationBuilder:
             except ValueError:
                 using_entry["posts"][0] = np.append(using_entry["posts"][0],
                                                     posts)
-            using_entry["number_pres"] += 1
             if not update_entry:
                 used_entries = np.append(used_entries, using_entry)
 
