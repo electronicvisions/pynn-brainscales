@@ -544,7 +544,9 @@ class ConnectionConfigurationBuilder:
                 int(halco.SynapseDriverOnPADIBus(row // 2))
                 * halco.PADIBusOnPADIBusBlock.size
                 + int(bus))
-            label = int(bus.toEnum()) << 14 | int(syndrv.toEnum()) << 6 | addr
+            label = int(bus.toEnum()) << 14 | \
+                int(syndrv.toSynapseDriverOnPADIBus().toEnum()) << 6 | \
+                addr
             external_event = np.array(
                 [(conns["spiketimes"][0], label)],
                 dtype=self._external_events.dtype)
