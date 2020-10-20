@@ -999,7 +999,7 @@ class _State(BaseState):
 
         # set synapse capmem cells
         synapse_params = {
-            halco.CapMemCellOnCapMemBlock.syn_i_bias_dac: 300,
+            halco.CapMemCellOnCapMemBlock.syn_i_bias_dac: 1022,
             halco.CapMemCellOnCapMemBlock.syn_i_bias_ramp: 1010,
             halco.CapMemCellOnCapMemBlock.syn_i_bias_store: 1010,
             halco.CapMemCellOnCapMemBlock.syn_i_bias_corout: 1010}
