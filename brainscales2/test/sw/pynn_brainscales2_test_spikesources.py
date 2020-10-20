@@ -120,23 +120,35 @@ class TestSpikeSources(unittest.TestCase):
         for pop in self.pops:
             for pop_in in self.pops_in.values():
                 pynn.Projection(pop_in, pop, pynn.OneToOneConnector())
+                pynn.run(None)
+                pynn.simulator.state.projections = []
                 pynn.Projection(pynn.PopulationView(pop_in, [0]),
                                 pop,
                                 pynn.OneToOneConnector())
+                pynn.run(None)
+                pynn.simulator.state.projections = []
                 pynn.Projection(pop_in,
                                 pynn.PopulationView(pop, [0]),
                                 pynn.OneToOneConnector())
+                pynn.run(None)
+                pynn.simulator.state.projections = []
 
     def test_alltoallconnector(self):
         for pop in self.pops:
             for pop_in in self.pops_in.values():
                 pynn.Projection(pop_in, pop, pynn.AllToAllConnector())
+                pynn.run(None)
+                pynn.simulator.state.projections = []
                 pynn.Projection(pynn.PopulationView(pop_in, [0]),
                                 pop,
                                 pynn.AllToAllConnector())
+                pynn.run(None)
+                pynn.simulator.state.projections = []
                 pynn.Projection(pop_in,
                                 pynn.PopulationView(pop, [0]),
                                 pynn.AllToAllConnector())
+                pynn.run(None)
+                pynn.simulator.state.projections = []
 
     def test_accessors(self):
         pops_in = self.pops_in

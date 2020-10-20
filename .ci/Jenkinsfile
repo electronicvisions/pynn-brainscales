@@ -4,7 +4,8 @@ try {
 
 	Map<String, Object> commonPipelineOptions = [
 			projects: ["pynn-brainscales"],
-			notificationChannel: "#jenkins-trashbin"  // success is checked globally
+			notificationChannel: "#jenkins-trashbin",  // success is checked globally
+			moduleOptions: [modules: ["ppu-toolchain"]],
 	]
 
 	Map<String, Object> pipelineDeploymentOptions = [

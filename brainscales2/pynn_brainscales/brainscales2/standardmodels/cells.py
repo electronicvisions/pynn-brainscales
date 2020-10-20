@@ -1,15 +1,44 @@
+from abc import abstractmethod, ABC
 import inspect
 import numbers
-from typing import List, Dict, ClassVar, Final, Optional, Union
 import numpy as np
+from typing import List, Dict, ClassVar, Final, Optional, Union
 
 from pyNN.parameters import ArrayParameter
 from pyNN.standardmodels import cells, build_translations, StandardCellType
-
+from pyNN.common import Population
+from pynn_brainscales.brainscales2 import simulator
 from dlens_vx_v2 import lola, hal, halco
+import pygrenade_vx as grenade
 
 
-class HXNeuron(StandardCellType):
+class NetworkAddableCell(ABC):
+    @staticmethod
+    @abstractmethod
+    def add_to_network_graph(population: Population,
+                             builder: grenade.NetworkBuilder) \
+            -> grenade.PopulationDescriptor:
+        """
+        Add population to network builder.
+        :param population: Population to add featuring this cell's celltype.
+        :param builder: Network builder to add population to.
+        :return: Descriptor of added population
+        """
+        raise NotImplementedError
+
+    @staticmethod
+    @abstractmethod
+    def add_to_input_generator(population: Population,
+                               builder: grenade.InputGenerator):
+        """
+        Add external events to input generator.
+        :param population: Population to add featuring this cell's celltype.
+        :param builder: Input builder to add external events to.
+        """
+        raise NotImplementedError
+
+
+class HXNeuron(StandardCellType, NetworkAddableCell):
     """
     One to one representation of subset of parameter space of a
     lola.AtomicNeuron. Parameter hierarchy is flattened. Defaults to "silent"
@@ -193,6 +222,47 @@ class HXNeuron(StandardCellType):
         # parameters provided manually by the user have precedence -> overwrite
         self.parameter_space.update(**self._user_provided_parameters)
 
+    @staticmethod
+    def add_to_network_graph(population: Population,
+                             builder: grenade.NetworkBuilder) \
+            -> grenade.PopulationDescriptor:
+        # get neuron coordinates
+        coords: List[halco.AtomicNeuronOnDLS] = [
+            simulator.state.neuron_placement.id2atomicneuron(coord) for coord
+            in population.all_cells
+        ]
+        # get recorder configuration
+        enable_record_spikes = np.zeros((len(coords)), dtype=bool)
+        if "spikes" in population.recorder.recorded:
+            enable_record_spikes = np.isin(
+                population.all_cells,
+                list(population.recorder.recorded["spikes"]))
+        readout_source = None
+        if simulator.state.madc_recorder is not None:
+            readout_source = simulator.state.madc_recorder.readout_source \
+                if simulator.state.madc_recorder.cell_id in population \
+                .all_cells else None
+        # create grenade population
+        gpopulation = grenade.Population(coords, enable_record_spikes)
+        # add to builder
+        descriptor = builder.add(gpopulation)
+        # add MADC recording
+        if readout_source:
+            madc_recording = grenade.MADCRecording()
+            madc_recording.population = descriptor
+            madc_recording.source = readout_source
+            index = np.where(population.all_cells
+                             == simulator.state.madc_recorder.cell_id)
+            assert len(index) == 1
+            madc_recording.index = index[0]
+            builder.add(madc_recording)
+        return descriptor
+
+    @staticmethod
+    def add_to_input_generator(population: Population,
+                               builder: grenade.InputGenerator):
+        pass
+
 
 HXNeuron.default_initial_values = HXNeuron.get_default_values()
 HXNeuron.default_parameters = HXNeuron.default_initial_values
@@ -200,7 +270,7 @@ HXNeuron.default_parameters = HXNeuron.default_initial_values
 HXNeuron.translations = HXNeuron._create_translation()
 
 
-class SpikeSourcePoisson(cells.SpikeSourcePoisson):
+class SpikeSourcePoisson(cells.SpikeSourcePoisson, NetworkAddableCell):
     """
     Spike source, generating spikes according to a Poisson process.
     """
@@ -276,8 +346,27 @@ class SpikeSourcePoisson(cells.SpikeSourcePoisson):
 
         return self._spike_times
 
+    @staticmethod
+    def add_to_network_graph(population: Population,
+                             builder: grenade.NetworkBuilder) \
+            -> grenade.PopulationDescriptor:
+        # create grenade population
+        gpopulation = grenade.ExternalPopulation(population.size)
+        # add to builder
+        return builder.add(gpopulation)
 
-class SpikeSourceArray(cells.SpikeSourceArray):
+    @staticmethod
+    def add_to_input_generator(population: Population,
+                               builder: grenade.InputGenerator):
+
+        spiketimes = population.celltype.get_spike_times()
+        spiketimes = np.sort(spiketimes, axis=1)
+        descriptor = grenade.PopulationDescriptor(
+            simulator.state.populations.index(population))
+        builder.add(spiketimes, descriptor)
+
+
+class SpikeSourceArray(cells.SpikeSourceArray, NetworkAddableCell):
     """
     Spike source generating spikes at the times [ms] given in the spike_times
     array.
@@ -294,3 +383,21 @@ class SpikeSourceArray(cells.SpikeSourceArray):
 
     def can_record(self, variable: str) -> bool:
         return variable in self.recordable
+
+    @staticmethod
+    def add_to_network_graph(population: Population,
+                             builder: grenade.NetworkBuilder) \
+            -> grenade.PopulationDescriptor:
+        # create grenade population
+        gpopulation = grenade.ExternalPopulation(population.size)
+        # add to builder
+        return builder.add(gpopulation)
+
+    @staticmethod
+    def add_to_input_generator(population: Population,
+                               builder: grenade.InputGenerator):
+        spiketimes = population.celltype.parameter_space["spike_times"]
+        spiketimes = [s.value for s in spiketimes]
+        descriptor = grenade.PopulationDescriptor(
+            simulator.state.populations.index(population))
+        builder.add(spiketimes, descriptor)

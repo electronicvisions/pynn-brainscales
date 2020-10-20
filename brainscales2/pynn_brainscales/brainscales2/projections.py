@@ -1,8 +1,12 @@
+from __future__ import annotations
+from typing import List
 from copy import deepcopy
 import pyNN.common
+from pyNN.common import Population
 from pyNN.space import Space
 from pynn_brainscales.brainscales2.standardmodels.synapses import StaticSynapse
 from pynn_brainscales.brainscales2 import simulator
+import pygrenade_vx as grenade
 
 
 class Projection(pyNN.common.Projection):
@@ -59,6 +63,7 @@ class Projection(pyNN.common.Projection):
                                          space, label)
         self.connections = []
         connector.connect(self)
+        self._simulator.state.projections.append(self)
 
     def __len__(self):
         """Return the total number of local connections."""
@@ -114,7 +119,44 @@ class Projection(pyNN.common.Projection):
             connection = Connection(self, pre_cell, postsynaptic_cell,
                                     **filtered_connection_parameters)
             self.connections.append(connection)
-            self._simulator.state.connections.append(connection)
+
+    @staticmethod
+    def add_to_network_graph(populations: List[Population],
+                             projection: Projection,
+                             builder: grenade.NetworkBuilder) \
+            -> grenade.ProjectionDescriptor:
+        # get pre- and post-synaptic population descriptor
+        pre = projection.pre.grandparent if \
+            hasattr(projection.pre, "grandparent") \
+            else projection.pre
+        post = projection.post.grandparent if \
+            hasattr(projection.post, "grandparent") \
+            else projection.post
+        population_pre = grenade.PopulationDescriptor(
+            populations.index(pre))
+        population_post = grenade.PopulationDescriptor(
+            populations.index(post))
+        # get connections
+        connections: grenade.Projection.Connections = [
+            grenade.Projection.Connection(
+                conn.presynaptic_index,
+                conn.postsynaptic_index,
+                int(conn.weight))
+            for conn in projection.connections]
+        # get receptor type
+        if projection.receptor_type == "excitatory":
+            receptor_type = grenade.Projection.ReceptorType.excitatory
+        elif projection.receptor_type == "inhibitory":
+            receptor_type = grenade.Projection.ReceptorType.inhibitory
+        else:
+            raise NotImplementedError(
+                "grenade.Projection.RecetorType does "
+                + f"not support {projection.receptor_type}.")
+        # create grenade projection
+        gprojection = grenade.Projection(
+            receptor_type, connections, population_pre, population_post)
+        # add to builder
+        return builder.add(gprojection)
 
 
 class Connection(pyNN.common.Connection):

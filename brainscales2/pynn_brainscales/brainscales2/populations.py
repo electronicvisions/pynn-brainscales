@@ -41,6 +41,7 @@ class Population(pyNN.common.Population):
         parameter_space.evaluate(mask=self._mask_local, simplify=False)
 
         simulator.state.id_counter += self.size
+        simulator.state.populations.append(self)
 
     def _get_parameters(self, *names):
         """Return a ParameterSpace containing native parameters"""
