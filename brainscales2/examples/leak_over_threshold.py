@@ -17,10 +17,8 @@ def main(initial_values: dict):
     log = pynn.logger.get("leak_over_threshold")
     pynn.setup()
 
-    pop2 = pynn.Population(2, pynn.cells.HXNeuron,
-                           initial_values=initial_values)
-    pop1 = pynn.Population(1, pynn.cells.HXNeuron,
-                           initial_values=initial_values)
+    pop2 = pynn.Population(2, pynn.cells.HXNeuron(**initial_values))
+    pop1 = pynn.Population(1, pynn.cells.HXNeuron(**initial_values))
 
     pop1.record(["spikes", "v"])
     pop2.record("spikes")

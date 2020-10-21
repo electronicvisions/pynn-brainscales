@@ -116,10 +116,8 @@ class ConnectionConfigurationBuilder:
                 state.neuron_placement[connection.postsynaptic_cell]))
             weight = connection.weight
             receptor_type = connection.projection.receptor_type
-            spiketimes = pre.celltype.parameter_space["spike_times"] \
-                .base_value.value
             external_connection = np.array(
-                [(pre, post, weight, receptor_type, spiketimes)],
+                [(pre, post, weight, receptor_type, pre.spike_times.value)],
                 dtype=self._external_connections.dtype)
             self._external_connections = np.append(self._external_connections,
                                                    external_connection)
@@ -794,14 +792,13 @@ class _State(BaseState):
         v recording.
         """
 
-        # configures a neuron with the passed initial values
-        atomic_neuron = HXNeuron.lola_from_dict(population.initial_values)
-
         # places the neurons from pop on chip
         # TODO: derive coord from something else than all_cells
         #       (cf. feature #3687)
-        for coord in population.all_cells:
-            coord = state.neuron_placement[coord]
+        for cell_id, parameters in zip(population.all_cells,
+                                       population.celltype.parameter_space):
+            atomic_neuron = HXNeuron.lola_from_dict(parameters)
+            coord = state.neuron_placement[cell_id]
             coord = halco.AtomicNeuronOnDLS(
                 halco.AtomicNeuronOnDLS.enum_type(coord))
 

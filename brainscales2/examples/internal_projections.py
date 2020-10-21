@@ -30,12 +30,12 @@ def main():
                         })
 
     # not leak over threshold
-    pop1 = pynn.Population(1, pynn.standardmodels.cells.HXNeuron,
-                           initial_values=init_values)
+    pop1 = pynn.Population(
+        1, pynn.standardmodels.cells.HXNeuron(**init_values))
 
     # leak over threshold
-    pop2 = pynn.Population(100, pynn.standardmodels.cells.HXNeuron,
-                           initial_values=lot_values)
+    pop2 = pynn.Population(
+        100, pynn.standardmodels.cells.HXNeuron(**init_values))
 
     pop1.record(["spikes", "v"])
     pop2.record("spikes")

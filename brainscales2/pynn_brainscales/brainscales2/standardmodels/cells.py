@@ -1,12 +1,11 @@
 import inspect
 import numbers
 from typing import List, Dict, ClassVar
-from pyNN.models import BaseCellType
-from pyNN.standardmodels import cells, build_translations
+from pyNN.standardmodels import cells, build_translations, StandardCellType
 from dlens_vx_v2 import lola, hal
 
 
-class HXNeuron(BaseCellType):
+class HXNeuron(StandardCellType):
 
     # exc_synin, inh_synin and adaptation are technical voltages
     recordable: ClassVar[List[str]] = ["spikes", "v", "exc_synin", "inh_synin",
@@ -23,6 +22,15 @@ class HXNeuron(BaseCellType):
                                        "exc_synin": "dimensionless",
                                        "inh_synin": "dimensionless",
                                        "adaptation": "dimensionless"}
+    # manual list of all parameters which should not be exposed
+    _not_configurable: ClassVar[List[str]] = [
+        "event_routing_analog_output",
+        "event_routing_enable_digital",
+        "leak_reset_i_bias_source_follower",
+        "readout_enable_amplifier",
+        "readout_source",
+        "readout_enable_buffered_access",
+        "readout_i_bias"]
 
     ATOMIC_NEURON_MEMBERS: ClassVar[List[str]] = \
         [name for name, _ in inspect.getmembers(lola.AtomicNeuron())
@@ -30,57 +38,71 @@ class HXNeuron(BaseCellType):
 
     @staticmethod
     # TODO: add more precise return type (cf. feature #3599)
-    def get_default_values() -> dict:
-        """Get the default values of a LoLa Neuron."""
+    def get_values(atomic_neuron: lola.AtomicNeuron()) -> dict:
+        """Get values of a LoLa Neuron instance as a dict."""
 
         # TODO: types again like above (cf. feature #3599)
-        default_values = {}
+        values = {}
 
-        for member, value in inspect.getmembers(lola.AtomicNeuron()):
+        for member, value in inspect.getmembers(atomic_neuron):
             if member.startswith("_") or not member.islower():
                 continue
             # asserts just a subset of possible unwanted types
             assert not inspect.ismethod(value)
             assert not inspect.isbuiltin(value)
 
-            mem = getattr(lola.AtomicNeuron(), member)
-            attributes = []
-            for name, inner_value in inspect.getmembers(mem):
-                lola_member = getattr(mem, name)
+            for name, inner_value in inspect.getmembers(value):
 
                 # get members
                 # exclude lola.AtomicNeuron.EventRouting, since they
                 # only have the signature of members, but actually are
                 # none
                 if name.startswith("_") or not name.islower() \
-                    or isinstance(lola_member,
+                    or isinstance(inner_value,
                                   lola.AtomicNeuron.EventRouting):
                     continue
                 # asserts just a subset of possible unwanted types
                 assert not inspect.ismethod(inner_value)
                 assert not inspect.isbuiltin(inner_value)
-                attributes.append(name)
 
-            for attr in attributes:
-                default_val = getattr(mem, attr)
-                key = member + "_" + attr
-                default_values[key] = default_val
+                key = member + "_" + name
+                if key in HXNeuron._not_configurable:
+                    continue
+                if type(inner_value) == bool:
+                    values[key] = inner_value
+                else:
+                    values[key] = float(inner_value)
 
-        return default_values
+        return values
+
+    @staticmethod
+    def get_default_values() -> dict:
+        """Get the default values of a LoLa Neuron."""
+
+        return HXNeuron.get_values(lola.AtomicNeuron())
+
+    @staticmethod
+    def _create_translation() -> dict:
+        default_values = HXNeuron.get_default_values()
+        translation = []
+        for key in default_values:
+            translation.append((key, key))
+
+        return build_translations(*translation)
 
     def can_record(self, variable: str) -> bool:
         return variable in self.recordable
 
     @staticmethod
-    def lola_from_dict(initial_values: dict) -> lola.AtomicNeuron:
+    def lola_from_dict(pynn_parameters: dict) -> lola.AtomicNeuron:
         """
-        Builds a Lola Neuron with the values from the dict 'initial_values'.
+        Builds a Lola Neuron with the values from the dict 'pynn_parameters'.
         """
 
         neuron = lola.AtomicNeuron()
         neuron_members = HXNeuron.ATOMIC_NEURON_MEMBERS
 
-        for param in initial_values:
+        for param in pynn_parameters:
             member = ""
             cut = 0
             for mem in neuron_members:  # slice
@@ -90,22 +112,22 @@ class HXNeuron(BaseCellType):
                     member = mem
             attr = param[cut:]
 
-            # enable to hand over integers in initial_values
-            if isinstance(initial_values[param].base_value, numbers.Real):
-                initial_values[param].base_value = \
-                    int(initial_values[param].base_value)
+            # enable to hand over integers in pynn_parameters
+            if isinstance(pynn_parameters[param], numbers.Real):
+                pynn_parameters[param] = \
+                    int(pynn_parameters[param])
 
             # set initial values
             real_member = getattr(neuron, member)
             if param == "readout_source":
                 setattr(real_member, attr,
                         hal.NeuronConfig.ReadoutSource(
-                            initial_values[param].base_value))
+                            pynn_parameters[param]))
             else:
                 # PyNN uses lazyarrays for value storage; need to restore
                 # original type
                 val = type(getattr(real_member,
-                                   attr))(initial_values[param].base_value)
+                                   attr))(pynn_parameters[param])
                 setattr(real_member, attr, val)
             setattr(neuron, member, real_member)
 
@@ -114,6 +136,7 @@ class HXNeuron(BaseCellType):
 
 HXNeuron.default_initial_values = HXNeuron.get_default_values()
 HXNeuron.default_parameters = HXNeuron.default_initial_values
+HXNeuron.translations = HXNeuron._create_translation()
 
 
 class SpikeSourceArray(cells.SpikeSourceArray):

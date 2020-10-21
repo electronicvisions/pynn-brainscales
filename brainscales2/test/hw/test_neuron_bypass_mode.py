@@ -64,7 +64,7 @@ class TestNeuronBypassMode(unittest.TestCase):
         input_pop = pynn.Population(1, pynn.cells.SpikeSourceArray,
                                     cellparams={"spike_times": spikes_in})
 
-        output_pop = pynn.Population(1, pynn.cells.HXNeuron)
+        output_pop = pynn.Population(1, pynn.cells.HXNeuron())
         output_pop.record(["spikes"])
 
         synapse = pynn.standardmodels.synapses.StaticSynapse(weight=63)

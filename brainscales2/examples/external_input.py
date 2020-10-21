@@ -23,8 +23,7 @@ init_values = {"threshold_v_threshold": 300,
 def main(initial_values: dict):
     pynn.setup()
 
-    nrn = pynn.Population(1, pynn.cells.HXNeuron,
-                          initial_values=initial_values)
+    nrn = pynn.Population(1, pynn.cells.HXNeuron(**initial_values))
     nrn.record(["spikes", "v"])
 
     spike_times = [0.01, 0.03, 0.05, 0.07, 0.09, 0.11, 0.13, 0.15, 0.17, 0.19]

@@ -14,8 +14,7 @@ initial_values = {"threshold_v_threshold": 400,
 def get_isi(tau_ref: int):
     pynn.setup()
     initial_values.update({"refractory_period_refractory_time": tau_ref})
-    pop = pynn.Population(1, pynn.cells.HXNeuron,
-                          initial_values=initial_values)
+    pop = pynn.Population(1, pynn.cells.HXNeuron(**initial_values))
     pop.record("spikes")
     pynn.run(0.2)
 
