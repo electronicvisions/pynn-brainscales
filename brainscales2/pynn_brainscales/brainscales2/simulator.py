@@ -2,7 +2,7 @@
 
 from typing import ClassVar, Optional, Set
 import numpy as np
-from pyNN.common import IDMixin, Population, Connection
+from pyNN.common import IDMixin, Connection
 from pyNN.common.control import BaseState
 from pynn_brainscales.brainscales2.standardmodels.cells import HXNeuron, \
     SpikeSourceArray
@@ -624,6 +624,7 @@ class _State(BaseState):
         self.neuron_placement = []
         self.populations = []
         self.recorders = set([])
+        self.madc_recorder = None
         self.connections = []
         self.id_counter = 0
         self.current_sources = []
@@ -638,6 +639,7 @@ class _State(BaseState):
     def clear(self):
         self.recorders = set([])
         self.populations = []
+        self.madc_recorder = None
         self.connections = []
         self.id_counter = 0
         self.current_sources = []
@@ -779,106 +781,105 @@ class _State(BaseState):
 
         return builder
 
-    @staticmethod
-    def configure_hxneurons(builder: sta.PlaybackProgramBuilder,
-                            population: Population,
-                            enable_spike_recording: bool,
-                            enable_madc_recording: bool,
-                            readout_source:
-                            Optional[hal.NeuronConfig.ReadoutSource]) \
+    # pylint: disable=too-many-arguments
+    def configure_hxneuron(self,
+                           builder: sta.PlaybackProgramBuilder,
+                           neuron_id: ID,
+                           parameters: dict,
+                           enable_spike_recording: bool,
+                           readout_source:
+                           Optional[hal.NeuronConfig.ReadoutSource]) \
             -> sta.PlaybackProgramBuilder:
         """
-        Places Neurons in Population "pop" on chip and configures spike and
+        Places Neuron in Population "pop" on chip and configures spike and
         v recording.
         """
 
         # places the neurons from pop on chip
         # TODO: derive coord from something else than all_cells
         #       (cf. feature #3687)
-        for cell_id, parameters in zip(population.all_cells,
-                                       population.celltype.parameter_space):
-            atomic_neuron = HXNeuron.lola_from_dict(parameters)
-            coord = state.neuron_placement[cell_id]
-            coord = halco.AtomicNeuronOnDLS(
-                halco.AtomicNeuronOnDLS.enum_type(coord))
+        atomic_neuron = HXNeuron.lola_from_dict(parameters)
+        coord = self.neuron_placement[neuron_id]
+        coord = halco.AtomicNeuronOnDLS(
+            halco.AtomicNeuronOnDLS.enum_type(coord))
 
-            # configure spike recording
-            if enable_spike_recording:
-                # neurons per crossbar input channel
-                neurons = int(halco.NeuronColumnOnDLS.size
-                              / halco.NeuronEventOutputOnDLS.size)
-                # arbitrary shift to leave 0 open
-                offset = 64
-                addr = (coord.toNeuronColumnOnDLS().toEnum() % neurons) \
-                    + (coord.toNeuronRowOnDLS().toEnum() * neurons) + offset
+        # configure spike recording
+        if enable_spike_recording:
+            # neurons per crossbar input channel
+            neurons = int(halco.NeuronColumnOnDLS.size
+                          / halco.NeuronEventOutputOnDLS.size)
+            # arbitrary shift to leave 0 open
+            offset = 64
+            addr = (coord.toNeuronColumnOnDLS().toEnum() % neurons) \
+                + (coord.toNeuronRowOnDLS().toEnum() * neurons) + offset
 
-                atomic_neuron.event_routing.analog_output = \
-                    atomic_neuron.EventRouting.AnalogOutputMode.normal
-                atomic_neuron.event_routing.enable_digital = True
-                atomic_neuron.event_routing.address = int(addr)
-                if state.enable_neuron_bypass:
-                    # disable threshold comparator
-                    atomic_neuron.threshold.enable = False
-                    atomic_neuron.event_routing.enable_bypass_excitatory = True
-                    atomic_neuron.event_routing.enable_bypass_inhibitory = True
+            atomic_neuron.event_routing.analog_output = \
+                atomic_neuron.EventRouting.AnalogOutputMode.normal
+            atomic_neuron.event_routing.enable_digital = True
+            atomic_neuron.event_routing.address = int(addr)
+            if self.enable_neuron_bypass:
+                # disable threshold comparator
+                atomic_neuron.threshold.enable = False
+                atomic_neuron.event_routing.enable_bypass_excitatory = True
+                atomic_neuron.event_routing.enable_bypass_inhibitory = True
 
-            # configure v recording
-            if enable_madc_recording:
-                atomic_neuron.event_routing.analog_output = \
-                    atomic_neuron.EventRouting.AnalogOutputMode.normal
-                atomic_neuron.event_routing.enable_digital = True
-                atomic_neuron.readout.enable_amplifier = True
-                atomic_neuron.readout.enable_buffered_access = True
-                atomic_neuron.readout.source = readout_source
-                builder = state.configure_madc(builder, coord)
+        # configure v recording
+        if readout_source is not None:
+            atomic_neuron.event_routing.analog_output = \
+                atomic_neuron.EventRouting.AnalogOutputMode.normal
+            atomic_neuron.event_routing.enable_digital = True
+            atomic_neuron.readout.enable_amplifier = True
+            atomic_neuron.readout.enable_buffered_access = True
+            atomic_neuron.readout.source = readout_source
+            builder = self.configure_madc(builder, coord)
 
-            builder.write(coord, atomic_neuron)
+        builder.write(coord, atomic_neuron)
 
         return builder
 
-    @staticmethod
-    def configure_recorders_populations(builder: sta.PlaybackProgramBuilder) \
+    def configure_recorders_populations(self,
+                                        builder: sta.PlaybackProgramBuilder) \
             -> (sta.PlaybackProgramBuilder, bool):
 
-        have_madc_recording = False
-        ReadoutSource = hal.NeuronConfig.ReadoutSource
-        for recorder in state.recorders:
+        for recorder in self.recorders:
             population = recorder.population
             assert isinstance(population.celltype, (HXNeuron,
                                                     SpikeSourceArray))
             if isinstance(population.celltype, HXNeuron):
-                enable_spike_recording = False
-                enable_madc_recording = False
-                readout_source = None
-                for variable in recorder.recorded:
-                    if variable == "spikes":
-                        enable_spike_recording = True
-                    elif variable == "v":
-                        enable_madc_recording = True
-                        have_madc_recording = True
-                        readout_source = ReadoutSource.membrane
-                    elif variable == "exc_synin":
-                        enable_madc_recording = True
-                        have_madc_recording = True
-                        readout_source = ReadoutSource.exc_synin
-                    elif variable == "inh_synin":
-                        enable_madc_recording = True
-                        have_madc_recording = True
-                        readout_source = ReadoutSource.inh_synin
-                    elif variable == "adaptation":
-                        enable_madc_recording = True
-                        have_madc_recording = True
-                        readout_source = ReadoutSource.adaptation
-                    else:
-                        raise NotImplementedError
-                builder = state.configure_hxneurons(
-                    builder,
-                    population,
-                    enable_spike_recording=enable_spike_recording,
-                    enable_madc_recording=enable_madc_recording,
-                    readout_source=readout_source)
 
-        return builder, have_madc_recording
+                # retrieve for which neurons what kind of recording is active
+                spike_rec_indexes = []
+                madc_recording_id = None
+                readout_source = Optional[hal.NeuronConfig.ReadoutSource]
+                for parameter, cell_ids in recorder.recorded.items():
+                    for cell_id in cell_ids:
+                        if parameter == "spikes":
+                            spike_rec_indexes.append(cell_id)
+                        elif parameter in recorder.madc_variables:
+                            assert self.madc_recorder is not None and \
+                                cell_id == self.madc_recorder.cell_id
+                            madc_recording_id = cell_id
+                            readout_source = self.madc_recorder.readout_source
+                        else:
+                            raise NotImplementedError
+                for cell_id, parameters in zip(
+                        population.all_cells,
+                        population.celltype.parameter_space):
+
+                    enable_spike_recording = False
+                    this_source = None
+                    if cell_id in spike_rec_indexes:
+                        enable_spike_recording = True
+                    if cell_id == madc_recording_id:
+                        this_source = readout_source
+                    builder = self.configure_hxneuron(
+                        builder,
+                        cell_id,
+                        parameters,
+                        enable_spike_recording=enable_spike_recording,
+                        readout_source=this_source)
+
+        return builder
 
     @staticmethod
     def madc_configuration(builder: sta.PlaybackProgramBuilder,
@@ -1160,9 +1161,9 @@ class _State(BaseState):
         # common configuration
         builder1 = self.configure_common(builder1)
 
+        have_madc_recording = self.madc_recorder is not None
         # configure populations and recorders
-        builder1, have_madc_recording = \
-            self.configure_recorders_populations(builder1)
+        builder1 = self.configure_recorders_populations(builder1)
 
         if have_madc_recording:
             builder1 = self.madc_configuration(builder1, runtime)

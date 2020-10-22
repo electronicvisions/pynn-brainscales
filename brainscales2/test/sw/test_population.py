@@ -136,6 +136,40 @@ class TestAPopulation(unittest.TestCase):
             pynn.Population(
                 1, pynn.cells.HXNeuron(readout_i_bias=1000))
 
+    def test_record(self):
+        # test all valid madc types
+        for value in ["v", "exc_synin", "inh_synin", "adaptation"]:
+            self.hxpop1.record(value)
+            self.hxpop1.record(None)
+        self.hxpop1.record("spikes")
+        self.hxpop1.record(None)
+        self.hxpop1.record(["spikes", "v"])
+        self.hxpop1.record(None)
+
+        # MADC record for pop view of size one should work
+        self.hxpop2[0:1].record("v")
+        self.hxpop2.record(None)
+
+        # only one MADC readout per chip allowed
+        self.hxpop1.record("v")
+        with self.assertRaises(ValueError):
+            self.hxpop1.record("inh_synin")
+        with self.assertRaises(ValueError):
+            self.hxpop2[0:1].record("inh_synin")
+        self.hxpop1.record(None)
+        with self.assertRaises(ValueError):
+            self.hxpop1.record(["v", "inh_synin"])
+
+        with self.assertRaises(errors.RecordingError):
+            self.hxpop1.record("undefined_variable")
+
+        # MADC record for pop of size larger one should throw
+        with self.assertRaises(ValueError):
+            self.hxpop2.record("v")
+        # MADC record for pop view of size larger one should throw
+        with self.assertRaises(ValueError):
+            self.hxpop2[0, 2].record("v")
+
 
 class TestLolaNeuronConstruction(unittest.TestCase):
 
