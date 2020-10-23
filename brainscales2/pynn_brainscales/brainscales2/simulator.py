@@ -694,6 +694,12 @@ class _State(BaseState):
         madc_samples = v_input["value"][1:]
         times = v_input["chip_time"][1:] \
             / (int(hal.Timer.Value.fpga_clock_cycles_per_us) * 1000)
+
+        # samples may be returned out of order -> sort here
+        times_sorted_indices = times.argsort()
+        times = times[times_sorted_indices]
+        madc_samples = madc_samples[times_sorted_indices]
+
         return times, madc_samples
 
     @staticmethod
