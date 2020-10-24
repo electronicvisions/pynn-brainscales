@@ -45,11 +45,10 @@ class HXNeuron(StandardCellType):
         values = {}
 
         for member, value in inspect.getmembers(atomic_neuron):
-            if member.startswith("_") or not member.islower():
+            # skip for non container members
+            if member.startswith("_") or not member.islower() \
+                    or inspect.ismethod(value) or inspect.isbuiltin(value):
                 continue
-            # asserts just a subset of possible unwanted types
-            assert not inspect.ismethod(value)
-            assert not inspect.isbuiltin(value)
 
             for name, inner_value in inspect.getmembers(value):
 
