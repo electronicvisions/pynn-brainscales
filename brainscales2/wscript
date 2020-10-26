@@ -61,12 +61,18 @@ def build(bld):
     bld(name = 'pynn_brainscales2_hwtest',
         tests = bld.path.ant_glob('test/hw/*.py'),
         test_timeout = 360,
-        features = 'use pytest pylint pycodestyle',
+        features = 'use pytest',
         use = ['pynn_brainscales2_examples'],
         install_path = '${PREFIX}/bin',
+        skip_run = not bld.env.DLSvx_HARDWARE_AVAILABLE
+    )
+
+    bld(name = 'pynn_brainscales2_hwtest_pylint',
+        tests = bld.path.ant_glob('test/hw/*.py'),
+        features = 'use pylint pycodestyle',
+        use = ['pynn_brainscales2_examples'],
         pylint_config = join(get_toplevel_path(), "code-format", "pylintrc"),
         pycodestyle_config = join(get_toplevel_path(), "code-format", "pycodestyle"),
-        skip_run = not bld.env.DLSvx_HARDWARE_AVAILABLE
     )
 
     bld.add_post_fun(summary)
