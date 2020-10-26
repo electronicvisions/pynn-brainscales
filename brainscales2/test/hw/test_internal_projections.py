@@ -3,7 +3,8 @@ from examples.internal_projections import main
 
 
 class TestTryProjections(unittest.TestCase):
-    def test_main(self):
+    @staticmethod
+    def test_main():
         # Simply tests if program runs
         main()
 

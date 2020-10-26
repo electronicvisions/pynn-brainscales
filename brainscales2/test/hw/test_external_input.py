@@ -3,7 +3,8 @@ from examples.external_input import main, init_values
 
 
 class TestExternalInput(unittest.TestCase):
-    def test_main(self):
+    @staticmethod
+    def test_main():
         # Simply tests if program runs
         main(init_values)
 
