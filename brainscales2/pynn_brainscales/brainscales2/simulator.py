@@ -716,6 +716,7 @@ class State(BaseState):
         self.enable_neuron_bypass = False
         self.log = logger.get("pyNN.brainscales2")
         self.checked_hardware = False
+        self.injected_config = None
 
     def run_until(self, tstop):
         self.run(tstop - self.t)
@@ -731,6 +732,7 @@ class State(BaseState):
         self.enable_neuron_bypass = False
         self.checked_hardware = False
         self.neuron_placement = None
+        self.injected_config = None
 
         self.reset()
 
@@ -1217,7 +1219,7 @@ class State(BaseState):
             raise RuntimeError("Unexpected chip version: "
                                + str(chip_version))
 
-    # pylint: disable=too-many-locals,too-many-statements
+    # pylint: disable=too-many-locals,too-many-statements,too-many-branches
     def run(self, runtime: Optional[float]):
         """
         Performs a hardware run for `runtime` milliseconds.
@@ -1232,6 +1234,11 @@ class State(BaseState):
 
         # initialize chip
         builder1, _ = sta.ExperimentInit().generate()
+
+        # injected configuration pre non realtime
+        tmpdumper = sta.DumperDone()
+        tmpdumper.values = list(self.injected_config.pre_non_realtime.items())
+        builder1.merge_back(sta.convert_to_builder(tmpdumper))
 
         # common configuration
         builder1 = self.configure_common(builder1)
@@ -1266,6 +1273,11 @@ class State(BaseState):
                 connection_builder.generate()
             builder1.merge_back(connection_builder_return)
 
+        # injected configuration post non realtime
+        tmpdumper = sta.DumperDone()
+        tmpdumper.values = list(self.injected_config.post_non_realtime.items())
+        builder1.merge_back(sta.convert_to_builder(tmpdumper))
+
         if runtime is None:
             return
 
@@ -1276,8 +1288,19 @@ class State(BaseState):
             initial_wait * int(hal.Timer.Value.fpga_clock_cycles_per_us)))
 
         builder2 = sta.PlaybackProgramBuilder()
+
+        # injected configuration pre realtime
+        tmpdumper = sta.DumperDone()
+        tmpdumper.values = list(self.injected_config.pre_realtime.items())
+        builder2.merge_back(sta.convert_to_builder(tmpdumper))
+
         builder2 = self.run_on_chip(builder2, runtime, have_madc_recording,
                                     external_events)
+
+        # injected configuration post realtime
+        tmpdumper = sta.DumperDone()
+        tmpdumper.values = list(self.injected_config.post_realtime.items())
+        builder2.merge_back(sta.convert_to_builder(tmpdumper))
 
         program1 = builder1.done()
         program2 = builder2.done()

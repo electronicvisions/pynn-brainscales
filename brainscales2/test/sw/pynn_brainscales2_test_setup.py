@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import unittest
-from dlens_vx_v2 import halco
+from dlens_vx_v2 import halco, lola
 import pynn_brainscales.brainscales2 as pynn
 
 
@@ -36,6 +36,37 @@ class TestpyNNSetup(unittest.TestCase):
     def test_negative_index(self):
         with self.assertRaises(ValueError):
             pynn.setup(neuronPermutation=[-1])
+
+    @staticmethod
+    def test_injected_config():
+        pynn.setup(injected_config=pynn.InjectedConfiguration(
+            pre_non_realtime={halco.AtomicNeuronOnDLS(): lola.AtomicNeuron()}))
+        pynn.run(None)
+        pynn.end()
+
+        pynn.setup(injected_config=pynn.InjectedConfiguration(
+            post_non_realtime={halco.AtomicNeuronOnDLS():
+                               lola.AtomicNeuron()}))
+        pynn.run(None)
+        pynn.end()
+
+        pynn.setup(injected_config=pynn.InjectedConfiguration(
+            pre_realtime={halco.AtomicNeuronOnDLS(): lola.AtomicNeuron()}))
+        pynn.run(None)
+        pynn.end()
+
+        pynn.setup(injected_config=pynn.InjectedConfiguration(
+            post_realtime={halco.AtomicNeuronOnDLS(): lola.AtomicNeuron()}))
+        pynn.run(None)
+        pynn.end()
+
+        pynn.setup(injected_config=pynn.InjectedConfiguration(
+            pre_non_realtime={halco.AtomicNeuronOnDLS(): lola.AtomicNeuron()},
+            post_non_realtime={halco.AtomicNeuronOnDLS(): lola.AtomicNeuron()},
+            pre_realtime={halco.AtomicNeuronOnDLS(): lola.AtomicNeuron()},
+            post_realtime={halco.AtomicNeuronOnDLS(): lola.AtomicNeuron()}))
+        pynn.run(None)
+        pynn.end()
 
 
 if __name__ == '__main__':

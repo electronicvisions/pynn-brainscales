@@ -1,3 +1,5 @@
+from dataclasses import dataclass, field
+from typing import Dict, Union
 from pyNN import common, space
 from pyNN.recording import get_io
 from pyNN.common.control import DEFAULT_MAX_DELAY, DEFAULT_MIN_DELAY
@@ -13,7 +15,7 @@ from pynn_brainscales.brainscales2.populations import Population, \
     PopulationView, Assembly
 from pynn_brainscales.brainscales2.projections import Projection
 from pynn_brainscales.brainscales2 import helper
-from dlens_vx_v2 import halco
+from dlens_vx_v2 import hal, halco
 import pylogging as logger
 
 
@@ -28,6 +30,34 @@ def list_standard_models():
     simulator.
     """
     return [cells.HXNeuron]
+
+
+@dataclass
+class InjectedConfiguration():
+    """User defined injected configuration
+
+    :param pre_non_realtime: A dictionary of key=coordinate and
+                              value=containers entries written prior to
+                              the non realtime configuration.
+    :param post_non_realtime: A dictionary of key=coordinate and
+                               value=containers entries written after the
+                               the non realtime configuration.
+    :param pre_realtime: A dictionary of key=coordinate and
+                          value=containers entries written prior to
+                          the realtime configuration.
+    :param post_realtime: A dictionary of key=coordinate and
+                           value=containers entries written after the
+                           the realtime configuration.
+    """
+    # TODO: replace hal.Container with union over hal and lola containers
+    pre_non_realtime: Dict[halco.Coordinate,
+                           hal.Container] = field(default_factory=dict)
+    post_non_realtime: Dict[halco.Coordinate,
+                            hal.Container] = field(default_factory=dict)
+    pre_realtime: Dict[halco.Coordinate,
+                       hal.Container] = field(default_factory=dict)
+    post_realtime: Dict[halco.Coordinate,
+                        hal.Container] = field(default_factory=dict)
 
 
 # TODO: handle the delays (cf. feature #3657)
@@ -47,6 +77,7 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
         enable_neuron_bypass: Enable neuron bypass mode: neurons forward spikes
                               arriving at the synaptic input (i.e. no leaky
                               integration is happening); defaults to False.
+        injected_config: Optional user defined injected configuration.
     """
 
     # global instance singleton
@@ -66,6 +97,8 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
     simulator.state.neuron_placement = simulator.NeuronPlacement(
         extra_params.get("neuronPermutation",
                          simulator.NeuronPlacement.default_permutation))
+    simulator.state.injected_config = \
+        extra_params.get('injected_config', InjectedConfiguration())
 
 
 def end():
