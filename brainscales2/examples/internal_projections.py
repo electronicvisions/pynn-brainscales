@@ -19,8 +19,8 @@ def main():
                   "membrane_capacitance_capacitance": 10,
                   "refractory_period_refractory_time": 95}
 
-    init_values = deepcopy(lot_values)
-    init_values.update({"leak_v_leak": 650,
+    cell_params = deepcopy(lot_values)
+    cell_params.update({"leak_v_leak": 650,
                         "reset_v_reset": 650,
                         "excitatory_input_enable": True,
                         "excitatory_input_i_bias_tau": 150,
@@ -31,11 +31,11 @@ def main():
 
     # not leak over threshold
     pop1 = pynn.Population(
-        1, pynn.standardmodels.cells.HXNeuron(**init_values))
+        1, pynn.standardmodels.cells.HXNeuron(**cell_params))
 
     # leak over threshold
     pop2 = pynn.Population(
-        100, pynn.standardmodels.cells.HXNeuron(**init_values))
+        100, pynn.standardmodels.cells.HXNeuron(**cell_params))
 
     pop1.record(["spikes", "v"])
     pop2.record("spikes")

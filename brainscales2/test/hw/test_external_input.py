@@ -1,12 +1,12 @@
 import unittest
-from examples.external_input import main, init_values
+from examples.external_input import main, cell_params
 
 
 class TestExternalInput(unittest.TestCase):
     @staticmethod
     def test_main():
         # Simply tests if program runs
-        main(init_values)
+        main(cell_params)
 
 
 if __name__ == "__main__":

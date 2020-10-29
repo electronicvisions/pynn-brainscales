@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import pynn_brainscales.brainscales2 as pynn
 
 
-init_values = {"threshold_v_threshold": 350,
+cell_params = {"threshold_v_threshold": 350,
                "leak_v_leak": 1022,
                "leak_i_bias": 320,
                "reset_v_reset": 400,
@@ -13,12 +13,12 @@ init_values = {"threshold_v_threshold": 350,
                "refractory_period_refractory_time": 95}
 
 
-def main(initial_values: dict):
+def main(params: dict):
     log = pynn.logger.get("leak_over_threshold")
     pynn.setup()
 
-    pop2 = pynn.Population(2, pynn.cells.HXNeuron(**initial_values))
-    pop1 = pynn.Population(1, pynn.cells.HXNeuron(**initial_values))
+    pop2 = pynn.Population(2, pynn.cells.HXNeuron(**params))
+    pop1 = pynn.Population(1, pynn.cells.HXNeuron(**params))
 
     pop1.record(["spikes", "v"])
     pop2.record("spikes")
@@ -53,4 +53,4 @@ def main(initial_values: dict):
 
 if __name__ == "__main__":
     pynn.logger.default_config(level=pynn.logger.LogLevel.INFO)
-    main(init_values)
+    main(cell_params)

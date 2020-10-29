@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import pynn_brainscales.brainscales2 as pynn
 
 
-init_values = {"threshold_v_threshold": 300,
+cell_params = {"threshold_v_threshold": 300,
                "leak_v_leak": 750,
                "leak_i_bias": 420,
                "leak_enable_division": True,
@@ -20,10 +20,10 @@ init_values = {"threshold_v_threshold": 300,
                }
 
 
-def main(initial_values: dict):
+def main(params: dict):
     pynn.setup()
 
-    nrn = pynn.Population(1, pynn.cells.HXNeuron(**initial_values))
+    nrn = pynn.Population(1, pynn.cells.HXNeuron(**params))
     nrn.record(["spikes", "v"])
 
     spike_times = [0.01, 0.03, 0.05, 0.07, 0.09, 0.11, 0.13, 0.15, 0.17, 0.19]
@@ -48,7 +48,7 @@ def main(initial_values: dict):
 if __name__ == "__main__":
     pynn.logger.default_config(level=pynn.logger.LogLevel.INFO)
     log = pynn.logger.get("external_input")
-    spiketimes, times, membrane = main(init_values)
+    spiketimes, times, membrane = main(cell_params)
 
     log.INFO("Number of spikes of stimulated neuron: ", len(spiketimes))
     log.INFO("Spiketimes of stimulated neuron: ", spiketimes)

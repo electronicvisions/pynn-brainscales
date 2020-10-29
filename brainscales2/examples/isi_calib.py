@@ -2,19 +2,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pynn_brainscales.brainscales2 as pynn
 
-initial_values = {"threshold_v_threshold": 400,
-                  "leak_v_leak": 1022,
-                  "leak_i_bias": 950,
-                  "reset_v_reset": 400,
-                  "reset_i_bias": 950,
-                  "threshold_enable": True,
-                  "membrane_capacitance_capacitance": 32}
+cell_params = {"threshold_v_threshold": 400,
+               "leak_v_leak": 1022,
+               "leak_i_bias": 950,
+               "reset_v_reset": 400,
+               "reset_i_bias": 950,
+               "threshold_enable": True,
+               "membrane_capacitance_capacitance": 32}
 
 
 def get_isi(tau_ref: int):
     pynn.setup()
-    initial_values.update({"refractory_period_refractory_time": tau_ref})
-    pop = pynn.Population(1, pynn.cells.HXNeuron(**initial_values))
+    cell_params.update({"refractory_period_refractory_time": tau_ref})
+    pop = pynn.Population(1, pynn.cells.HXNeuron(**cell_params))
     pop.record("spikes")
     pynn.run(0.2)
 
