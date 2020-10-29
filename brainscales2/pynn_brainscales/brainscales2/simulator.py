@@ -1213,6 +1213,8 @@ class State(BaseState):
         # perform chip-version check
         builder_chip_version, _ = sta.DigitalInit().generate()
         jtag_id_ticket = builder_chip_version.read(halco.JTAGIdCodeOnDLS())
+        builder_chip_version.block_until(halco.BarrierOnFPGA(),
+                                         hal.Barrier.jtag)
         sta.run(connection, builder_chip_version.done())
         chip_version = jtag_id_ticket.get().version.value()
         if chip_version != 2:
