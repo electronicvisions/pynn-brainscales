@@ -148,8 +148,12 @@ class TestAPopulation(unittest.TestCase):
             self.hxpop1.record(None)
         self.hxpop1.record("spikes")
         self.hxpop1.record(None)
+
+        # multi population recording
         self.hxpop1.record(["spikes", "v"])
+        self.hxpop2.record("spikes")
         self.hxpop1.record(None)
+        self.hxpop2.record(None)
 
         # MADC record for pop view of size one should work
         self.hxpop2[0:1].record("v")

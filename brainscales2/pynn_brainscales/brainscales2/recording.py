@@ -37,7 +37,6 @@ class Recorder(pyNN.recording.Recorder):
         if madc_inter_size == 1 and len(ids) != 1:
             raise ValueError("Can only record single neurons via MADC")
 
-        madc_recorder = None
         for variable in variable_list:
             if variable in Recorder.madc_variables:
                 # get value of the single entry of the set. Only needed for
@@ -55,22 +54,21 @@ class Recorder(pyNN.recording.Recorder):
                 else:
                     raise RuntimeError("Encountered not handled MADC case")
 
+                # check if MADC recorder already set. Ignore if already
+                # existing config is set again.
+                global_madc_rec = self._simulator.state.madc_recorder
+                if global_madc_rec is not None \
+                    and (global_madc_rec.cell_id != n_id
+                         or global_madc_rec.readout_source != readout_source):
+                    raise ValueError(
+                        f"Analog record for ID {global_madc_rec.cell_id} of "
+                        f"type {global_madc_rec.readout_source} already "
+                        "active. Only one concurrent analog readout "
+                        "supported.")
+
                 madc_recorder = MADCRecorderSetting(
                     cell_id=n_id, readout_source=readout_source)
-
-        # check if MADC recorder already set. Ignore if already existing config
-        # is set again.
-        global_madc_rec = self._simulator.state.madc_recorder
-        if global_madc_rec is not None \
-            and (global_madc_rec.cell_id != n_id
-                 or global_madc_rec.readout_source != readout_source):
-            raise ValueError(
-                f"Analog record for ID {global_madc_rec.cell_id} of type "
-                f"{global_madc_rec.readout_source} already active. "
-                "Only one concurrent analog readout supported.")
-
-        if madc_recorder is not None:
-            self._simulator.state.madc_recorder = madc_recorder
+                self._simulator.state.madc_recorder = madc_recorder
 
         super(Recorder, self).record(
             variables=variables,
