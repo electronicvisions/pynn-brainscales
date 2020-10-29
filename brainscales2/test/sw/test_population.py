@@ -24,6 +24,9 @@ class TestAPopulation(unittest.TestCase):
                 exponential_enable=True))
         self.hxpop4 = pynn.Population(
             2, pynn.cells.HXNeuron(leak_i_bias=[100, 150]))
+        # test old API support
+        self.hxpop5 = pynn.Population(
+            2, pynn.cells.HXNeuron, cellparams={'leak_i_bias': [100, 200]})
         self.sapop1 = pynn.Population(
             1, pynn.cells.SpikeSourceArray(spike_times=[0, 1, 2]))
         self.sapop2 = pynn.Population(
@@ -79,6 +82,8 @@ class TestAPopulation(unittest.TestCase):
         self.assertEqual(self.hxpop4[0].leak_i_bias, 100)
         self.assertEqual(self.hxpop4[1:2].get("leak_i_bias"), 150)
         self.assertEqual(self.hxpop4[1].leak_i_bias, 150)
+        self.assertTrue(np.array_equal(
+            self.hxpop5.get("leak_i_bias"), [100, 200]))
         self.assertEqual(
             self.sapop1.get("spike_times"), parameters.Sequence([0, 1, 2]))
         self.assertEqual(
