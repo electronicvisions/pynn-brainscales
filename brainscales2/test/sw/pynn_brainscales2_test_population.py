@@ -189,7 +189,7 @@ class TestLolaNeuronConstruction(unittest.TestCase):
         self.neurons = [None] * self.pop.size
 
         for idx, item in enumerate(self.pop.celltype.parameter_space):
-            neuron = pynn.cells.HXNeuron.lola_from_dict(item)
+            neuron = pynn.cells.HXNeuron.create_hw_entity(item)
             self.neurons[idx] = neuron
 
     def tearDown(self):

@@ -93,7 +93,7 @@ class HXNeuron(StandardCellType):
         return variable in self.recordable
 
     @staticmethod
-    def lola_from_dict(pynn_parameters: dict) -> lola.AtomicNeuron:
+    def create_hw_entity(pynn_parameters: dict) -> lola.AtomicNeuron:
         """
         Builds a Lola Neuron with the values from the dict 'pynn_parameters'.
         """

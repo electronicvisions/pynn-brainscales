@@ -1,6 +1,6 @@
 # pylint: disable=too-many-lines
 
-from typing import ClassVar, Optional, Set, Tuple
+from typing import ClassVar, Optional, Set, Tuple, Final, List, Dict, Union
 import numpy as np
 from pyNN.common import IDMixin, Connection
 from pyNN.common.control import BaseState
@@ -20,6 +20,87 @@ class ID(int, IDMixin):
 
         int.__init__(n)
         IDMixin.__init__(self)
+
+
+class NeuronPlacement:
+    # TODO: support multi compartment issue #3750
+    """
+    Tracks assignment of pyNN IDs of HXNeuron based populations to the
+    corresponding hardware entity, i.e. AtomicNeuronOnDLS. Default constructed
+    with 1 to 1 permutation.
+
+    :param neuron_id: Look up table for permutation. Index: HW related
+                    population neuron enumeration. Value: HW neuron
+                    enumeration.
+    """
+    _id_2_an: Dict[ID, halco.AtomicNeuronOnDLS]
+    _permutation: List[halco.AtomicNeuronOnDLS]
+    _max_num_entries: Final[int] = halco.AtomicNeuronOnDLS.size
+    default_permutation: Final[List[int]] = range(halco.AtomicNeuronOnDLS.size)
+
+    def __init__(self, permutation: List[int] = None):
+        if permutation is None:
+            permutation = range(self._max_num_entries)
+        self._id_2_an = dict()
+        self._permutation = self._check_and_transform(permutation)
+
+    def register_id(self, neuron_id: Union[List[ID], ID]):
+        """
+        Register a new ID to placement
+
+        :param neuron_id: pyNN neuron ID to be registered
+        """
+        if not (hasattr(neuron_id, "__iter__")
+                and hasattr(neuron_id, "__len__")):
+            neuron_id = [neuron_id]
+        if len(self._id_2_an) + len(neuron_id) > len(self._permutation):
+            raise ValueError(
+                f"Cannot register more than {len(self._permutation)} IDs")
+        for idx in neuron_id:
+            self._id_2_an[idx] = self._permutation[len(self._id_2_an)]
+
+    def id2atomicneuron(self, neuron_id: Union[List[ID], ID]) \
+            -> Union[List[halco.AtomicNeuronOnDLS], halco.AtomicNeuronOnDLS]:
+        """
+        Get hardware coordinate from pyNN ID
+
+        :param neuron_id: pyNN neuron ID
+        """
+        try:
+            return [self._id_2_an[idx] for idx in neuron_id]
+        except TypeError:
+            return self._id_2_an[neuron_id]
+
+    def id2hwenum(self, neuron_id: Union[List[ID], ID]) \
+            -> Union[List[int], int]:
+        """
+        Get hardware coordinate as plain int from pyNN ID
+
+        :param neuron_id: pyNN neuron ID
+        """
+        atomic_neuron = self.id2atomicneuron(neuron_id)
+        try:
+            return [int(idx.toEnum()) for idx in atomic_neuron]
+        except TypeError:
+            return int(atomic_neuron.toEnum())
+
+    @staticmethod
+    def _check_and_transform(lut: list) -> list:
+
+        cell_id_size = NeuronPlacement._max_num_entries
+        if len(lut) > cell_id_size:
+            raise ValueError("Too many elements in HW LUT.")
+        if len(lut) > len(set(lut)):
+            raise ValueError("Non unique entries in HW LUT.")
+        permutation = []
+        for neuron_idx in lut:
+            if not 0 <= neuron_idx < cell_id_size:
+                raise ValueError(
+                    f"NeuronPermutation list entry {neuron_idx} out of range. "
+                    + f"Needs to be in range [0, {cell_id_size - 1}]"
+                )
+            permutation.append(halco.AtomicNeuronOnDLS(halco.Enum(neuron_idx)))
+        return permutation
 
 
 class ConnectionConfigurationBuilder:
@@ -112,8 +193,8 @@ class ConnectionConfigurationBuilder:
         elif isinstance(connection.presynaptic_cell.celltype,
                         SpikeSourceArray):
             pre = connection.presynaptic_cell
-            post = halco.AtomicNeuronOnDLS(halco.Enum(
-                state.neuron_placement[connection.postsynaptic_cell]))
+            post = state.neuron_placement.\
+                id2atomicneuron(connection.postsynaptic_cell)
             weight = connection.weight
             receptor_type = connection.projection.receptor_type
             external_connection = np.array(
@@ -131,8 +212,8 @@ class ConnectionConfigurationBuilder:
         Calculate the synapse driver coordinate.
         """
 
-        pre = state.neuron_placement[connection.presynaptic_cell]
-        post = state.neuron_placement[connection.postsynaptic_cell]
+        pre = state.neuron_placement.id2hwenum(connection.presynaptic_cell)
+        post = state.neuron_placement.id2hwenum(connection.postsynaptic_cell)
 
         # check if a synapse driver for the presynaptic neuron with given
         # receptor type was already allocated and if its synapse to the
@@ -268,8 +349,8 @@ class ConnectionConfigurationBuilder:
         Determine synapse matrix coordinate.
         """
 
-        post = state.neuron_placement[connection.postsynaptic_cell]
-        nrn = halco.AtomicNeuronOnDLS(halco.Enum(post))
+        nrn = state.neuron_placement. \
+            id2atomicneuron(connection.postsynaptic_cell)
         return nrn.toNeuronRowOnDLS().toSynramOnDLS()
 
     def _find_used_synapse_matrix(self, synmtx_coord: halco.SynramOnDLS) \
@@ -299,9 +380,9 @@ class ConnectionConfigurationBuilder:
         Configure the label and weight for the given connection.
         """
 
-        pre = int(state.neuron_placement[connection.presynaptic_cell])
-        pre = halco.AtomicNeuronOnDLS(halco.Enum(pre))
-        post = int(state.neuron_placement[connection.postsynaptic_cell])
+        pre = state.neuron_placement. \
+            id2atomicneuron(connection.presynaptic_cell)
+        post = state.neuron_placement.id2hwenum(connection.postsynaptic_cell)
         # neurons per crossbar input channel
         neurons = int(halco.NeuronColumnOnDLS.size
                       / halco.NeuronEventOutputOnDLS.size)
@@ -623,7 +704,7 @@ class State(BaseState):
         self.t_start = 0
         self.min_delay = 0
         self.max_delay = 0
-        self.neuron_placement = []
+        self.neuron_placement = None
         self.populations = []
         self.recorders = set([])
         self.madc_recorder = None
@@ -648,6 +729,7 @@ class State(BaseState):
         self.segment_counter = -1
         self.enable_neuron_bypass = False
         self.checked_hardware = False
+        self.neuron_placement = None
 
         self.reset()
 
@@ -657,22 +739,6 @@ class State(BaseState):
         self.t = 0
         self.t_start = 0
         self.segment_counter += 1
-
-    @staticmethod
-    def check_neuron_placement_lut(id_list: list) -> list:
-        # TODO: support multi chip
-        cell_id_size = halco.AtomicNeuronOnDLS.size
-        if len(id_list) > cell_id_size:
-            raise ValueError("Too many elements in HW LUT.")
-        if len(id_list) > len(set(id_list)):
-            raise ValueError("Non unique entries in HW LUT.")
-        for index in id_list:
-            if not 0 <= index < cell_id_size:
-                raise ValueError(
-                    "NeuronPermutation list entry out of range."
-                    + f"0 < {index} < {cell_id_size}"
-                )
-        return id_list
 
     @staticmethod
     def get_spikes(spikes: np.ndarray, runtime: int) -> np.ndarray:
@@ -729,7 +795,7 @@ class State(BaseState):
         builder.write(halco.EventRecordingConfigOnFPGA(0), rec_config)
 
         # set all neurons on chip to default values
-        default_neuron = HXNeuron.lola_from_dict({})
+        default_neuron = HXNeuron.create_hw_entity({})
         for coord in halco.iter_all(halco.AtomicNeuronOnDLS):
             builder.write(coord, default_neuron)
 
@@ -798,12 +864,8 @@ class State(BaseState):
         """
 
         # places the neurons from pop on chip
-        # TODO: derive coord from something else than all_cells
-        #       (cf. feature #3687)
-        atomic_neuron = HXNeuron.lola_from_dict(parameters)
-        coord = self.neuron_placement[neuron_id]
-        coord = halco.AtomicNeuronOnDLS(
-            halco.AtomicNeuronOnDLS.enum_type(coord))
+        atomic_neuron = HXNeuron.create_hw_entity(parameters)
+        coord = self.neuron_placement.id2atomicneuron(neuron_id)
 
         # configure spike recording
         if enable_spike_recording:

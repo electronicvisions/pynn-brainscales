@@ -28,6 +28,9 @@ class Population(pyNN.common.Population):
         for cell_id in self.all_cells:
             cell_id.parent = self
 
+        if hasattr(self.celltype, "create_hw_entity"):
+            simulator.state.neuron_placement.register_id(self.all_cells)
+
         parameter_space = self.celltype.parameter_space
         parameter_space.shape = (self.size,)
         # we want to iterate over parameter space -> evaluate to get rid of
