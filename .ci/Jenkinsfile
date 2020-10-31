@@ -19,7 +19,7 @@ try {
 	// Additional options for hardware testing in "no deployment" and not triggered by Gerrit case
 	if (!isTriggeredByGerrit()) {
 		pipelineNoDeploymentOptions << [
-				testSlurmResource: [partition: "cube", wafer: 62, "fpga-without-aout": 3],
+				testSlurmResource: [partition: "cube", wafer: 62, "fpga-without-aout": 0],
 				preTestHook: { configureHxCubeBitfile() },
 				testOptions: "--test-execall -j1"
 		]
