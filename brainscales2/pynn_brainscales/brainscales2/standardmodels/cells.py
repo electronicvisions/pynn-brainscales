@@ -1,6 +1,6 @@
 import inspect
 import numbers
-from typing import List, Dict, ClassVar
+from typing import List, Dict, ClassVar, Final
 from pyNN.standardmodels import cells, build_translations, StandardCellType
 from dlens_vx_v2 import lola, hal
 
@@ -8,22 +8,22 @@ from dlens_vx_v2 import lola, hal
 class HXNeuron(StandardCellType):
 
     # exc_synin, inh_synin and adaptation are technical voltages
-    recordable: ClassVar[List[str]] = ["spikes", "v", "exc_synin", "inh_synin",
-                                       "adaptation"]
-    receptor_types: ClassVar[List[str]] = ["excitatory", "inhibitory"]
-    conductance_based: ClassVar[bool] = False
-    injectable: ClassVar[bool] = True
+    recordable: Final[List[str]] = ["spikes", "v", "exc_synin", "inh_synin",
+                                    "adaptation"]
+    receptor_types: Final[List[str]] = ["excitatory", "inhibitory"]
+    conductance_based: Final[bool] = False
+    injectable: Final[bool] = True
     default_initial_values: ClassVar[dict]
 
     # the actual unit of `v` is `haldls::vx::CapMemCell::Value`
     # [0–1022]; 1023 means off,
     # but only units included in the `quantity` package are accepted
-    units: ClassVar[Dict[str, str]] = {"v": "dimensionless",
-                                       "exc_synin": "dimensionless",
-                                       "inh_synin": "dimensionless",
-                                       "adaptation": "dimensionless"}
+    units: Final[Dict[str, str]] = {"v": "dimensionless",
+                                    "exc_synin": "dimensionless",
+                                    "inh_synin": "dimensionless",
+                                    "adaptation": "dimensionless"}
     # manual list of all parameters which should not be exposed
-    _not_configurable: ClassVar[List[str]] = [
+    _not_configurable: Final[List[str]] = [
         "event_routing_analog_output",
         "event_routing_enable_digital",
         "leak_reset_i_bias_source_follower",
@@ -32,7 +32,7 @@ class HXNeuron(StandardCellType):
         "readout_enable_buffered_access",
         "readout_i_bias"]
 
-    ATOMIC_NEURON_MEMBERS: ClassVar[List[str]] = \
+    ATOMIC_NEURON_MEMBERS: Final[List[str]] = \
         [name for name, _ in inspect.getmembers(lola.AtomicNeuron())
          if(not(name.startswith("_")) and name.islower())]
 

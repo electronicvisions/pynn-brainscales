@@ -1,6 +1,6 @@
 # pylint: disable=too-many-lines
 
-from typing import ClassVar, Optional, Set, Tuple, Final, List, Dict, Union
+from typing import Optional, Set, Tuple, Final, List, Dict, Union
 import numpy as np
 from pyNN.common import IDMixin, Connection
 from pyNN.common.control import BaseState
@@ -682,12 +682,12 @@ class ConnectionConfigurationBuilder:
 class State(BaseState):
     """Represent the simulator state."""
 
-    max_weight: ClassVar[int] = halco.SynapseRowOnSynram.size \
+    max_weight: Final[int] = halco.SynapseRowOnSynram.size \
         * lola.SynapseMatrix.Weight.max
 
     # pylint: disable=invalid-name
     # TODO: replace by calculation (cf. feature #3594)
-    dt: ClassVar[float] = 3.4e-05  # average time between two MADC samples
+    dt: Final[float] = 3.4e-05  # average time between two MADC samples
 
     # pylint: disable=invalid-name
     def __init__(self):
