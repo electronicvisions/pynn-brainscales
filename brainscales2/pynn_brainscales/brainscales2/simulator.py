@@ -1136,17 +1136,15 @@ class _State(BaseState):
             error_msg += str(ticket_phy.get()) + "\n"
         self.log.ERROR(error_msg)
 
-    def _perform_hardware_check(self, connection):
+    @staticmethod
+    def _perform_hardware_check(connection):
         """
         Check hardware for requirements such as chip version.
         """
         # perform chip-version check
         builder_chip_version, _ = sta.DigitalInit().generate()
         jtag_id_ticket = builder_chip_version.read(halco.JTAGIdCodeOnDLS())
-        time_info = sta.run(connection, builder_chip_version.done())
-        runtime_ms = time_info.connection. \
-            execution_duration.microseconds / 1000
-        self.log.DEBUG(f"Hardware check took {runtime_ms} ms")
+        sta.run(connection, builder_chip_version.done())
         chip_version = jtag_id_ticket.get().version.value()
         if chip_version != 2:
             raise RuntimeError("Unexpected chip version: "
@@ -1210,14 +1208,8 @@ class _State(BaseState):
                 self._perform_hardware_check(conn)
                 self.checked_hardware = True
             try:
-                static_time_info = sta.run(conn, program1)
-                static_ms = static_time_info.connection. \
-                    execution_duration.microseconds / 1000
-                self.log.INFO(f"Static configuration took {static_ms} ms")
-                dynamic_time_info = sta.run(conn, program2)
-                dynamic_ms = dynamic_time_info.connection. \
-                    execution_duration.microseconds / 1000
-                self.log.INFO(f"Network run took {dynamic_ms} ms")
+                sta.run(conn, program1)
+                sta.run(conn, program2)
             except RuntimeError:
                 # Link up messages for all links are expected.
                 self._check_link_notifications(
