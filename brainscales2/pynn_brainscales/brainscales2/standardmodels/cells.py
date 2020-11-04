@@ -1,11 +1,26 @@
 import inspect
 import numbers
-from typing import List, Dict, ClassVar, Final
+from typing import List, Dict, ClassVar, Final, Optional, Union
 from pyNN.standardmodels import cells, build_translations, StandardCellType
-from dlens_vx_v2 import lola, hal
+from dlens_vx_v2 import lola, hal, halco
 
 
 class HXNeuron(StandardCellType):
+    """
+    One to one representation of subset of parameter space of a
+    lola.AtomicNeuron. Parameter hierarchy is flattened. Defaults to "silent"
+    neuron.
+
+    :param coco_inject: Optional coordinate container pair (coco) injection as
+                        a mapping of AtomicNeuronOnDLS to AtomicNeuron.
+                        Can be used, e.g. to apply calibration results. If
+                        provided default values are replaced with coco entries.
+                        Values are applied according to neuron placement.
+    :param parameters: Mapping of parameters and corresponding values, e.g.
+                       dict. Either 1-dimensional or population size
+                       dimensions. Default as well as coco values are
+                       overwritten for specified parameters.
+    """
 
     # exc_synin, inh_synin and adaptation are technical voltages
     recordable: Final[List[str]] = ["spikes", "v", "exc_synin", "inh_synin",
@@ -35,6 +50,18 @@ class HXNeuron(StandardCellType):
     ATOMIC_NEURON_MEMBERS: Final[List[str]] = \
         [name for name, _ in inspect.getmembers(lola.AtomicNeuron())
          if(not(name.startswith("_")) and name.islower())]
+
+    _coco_inject: Optional[Dict[halco.AtomicNeuronOnDLS, lola.AtomicNeuron]]
+    # needed to restore after coco was injected
+    _user_provided_parameters: Optional[Dict[str, Union[int, bool]]]
+
+    def __init__(self, coco_inject: Optional[dict] = None, **parameters):
+        """
+        `parameters` should be a mapping object, e.g. a dict
+        """
+        self._coco_inject = coco_inject
+        self._user_provided_parameters = parameters
+        super().__init__(**parameters)
 
     @staticmethod
     # TODO: add more precise return type (cf. feature #3599)
@@ -131,6 +158,36 @@ class HXNeuron(StandardCellType):
             setattr(neuron, member, real_member)
 
         return neuron
+
+    def apply_coco(self, coords: List[halco.AtomicNeuronOnDLS]):
+        """
+        Extract and apply coco according to provided atomic neuron list
+
+        :param coords: List of coordinates to look up coco. Needs
+                       same order and dimensions as parameter_space.
+        """
+        if self._coco_inject is None:
+            # no coco provided -> skip
+            return
+
+        param_per_neuron: List[Dict[str, Union[int, bool]]]
+        param_per_neuron = []
+        param_dict: Dict[str, List[Union[int, bool]]]
+        param_dict = {}
+        for coord in coords:
+            try:
+                param_per_neuron.append(
+                    self.get_values(self._coco_inject[coord]))
+            except KeyError:
+                raise KeyError(f"No coco entry for {coord}")
+        # "fuse" entries of individual parameters to one large dict of arrays
+        for k in param_per_neuron[0].keys():
+            param_dict[k] = \
+                tuple(coco_entry[k] for coco_entry in param_per_neuron)
+
+        self.parameter_space.update(**param_dict)
+        # parameters provided manually by the user have precedence -> overwrite
+        self.parameter_space.update(**self._user_provided_parameters)
 
 
 HXNeuron.default_initial_values = HXNeuron.get_default_values()
