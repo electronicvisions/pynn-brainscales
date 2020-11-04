@@ -15,7 +15,7 @@ class Population(pyNN.common.Population):
     _simulator = simulator
     _recorder_class = Recorder
     _assembly_class = Assembly
-    all_cells: np.array
+    all_cells: np.ndarray
     _mask_local: np.ndarray
 
     def _create_cells(self):

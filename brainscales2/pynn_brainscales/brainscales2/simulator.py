@@ -1,6 +1,6 @@
 # pylint: disable=too-many-lines
 
-from typing import ClassVar, Optional, Set
+from typing import ClassVar, Optional, Set, Tuple
 import numpy as np
 from pyNN.common import IDMixin, Connection
 from pyNN.common.control import BaseState
@@ -52,7 +52,7 @@ class ConnectionConfigurationBuilder:
             "names": ("spiketimes", "label"),
             "formats": (object, "u2")})
 
-    def generate(self) -> [sta.PlaybackProgramBuilder, np.ndarray]:
+    def generate(self) -> Tuple[sta.PlaybackProgramBuilder, np.ndarray]:
         """
         Generate a builder with configured synapse drivers and synapse matix
         and also return a list of external events to be injected.
@@ -273,7 +273,7 @@ class ConnectionConfigurationBuilder:
         return nrn.toNeuronRowOnDLS().toSynramOnDLS()
 
     def _find_used_synapse_matrix(self, synmtx_coord: halco.SynramOnDLS) \
-            -> [lola.SynapseMatrix, np.ndarray]:
+            -> Tuple[lola.SynapseMatrix, np.ndarray]:
         """
         Return the already existing synapse matrix configuration for the given
         coordinate or create a new one.
@@ -378,7 +378,7 @@ class ConnectionConfigurationBuilder:
                     connections, free_rows_top, used_entries, hemisphere)
 
     def _find_unused_synapse_drivers(self) \
-            -> [np.ndarray, np.ndarray, np.ndarray]:
+            -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Check which PADI bus has how many unused synapse driver and make
         lists with free synapse driver rows and their padibusses per
@@ -485,7 +485,7 @@ class ConnectionConfigurationBuilder:
                                 connections: np.ndarray,
                                 free_rows: np.ndarray,
                                 used_entries: np.ndarray,
-                                hemisphere: int) -> None:
+                                hemisphere: int) -> np.ndarray:
         """
         Configure the synapse drivers and synapse matrix to forward the
         specified external events.
@@ -691,7 +691,7 @@ class _State(BaseState):
         return return_spikes
 
     @staticmethod
-    def get_v(v_input: np.ndarray) -> [np.ndarray, np.ndarray]:
+    def get_v(v_input: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         madc_samples = v_input["value"][1:]
         times = v_input["chip_time"][1:] \
             / (int(hal.Timer.Value.fpga_clock_cycles_per_us) * 1000)
@@ -839,7 +839,7 @@ class _State(BaseState):
 
     def configure_recorders_populations(self,
                                         builder: sta.PlaybackProgramBuilder) \
-            -> (sta.PlaybackProgramBuilder, bool):
+            -> sta.PlaybackProgramBuilder:
 
         for recorder in self.recorders:
             population = recorder.population
