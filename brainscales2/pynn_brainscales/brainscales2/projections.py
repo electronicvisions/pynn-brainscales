@@ -126,8 +126,9 @@ class Connection(pyNN.common.Connection):
 
     def __init__(self, projection, pre_cell, post_cell, **parameters):
         self.projection = projection
-        self.presynaptic_index = projection.pre.id_to_index(pre_cell)
-        self.postsynaptic_index = projection.post.id_to_index(post_cell)
+        # TODO: understand why lookup via int is faster, cf. #3749
+        self.presynaptic_index = projection.pre.id_to_index(int(pre_cell))
+        self.postsynaptic_index = projection.post.id_to_index(int(post_cell))
         self.presynaptic_cell = \
             pre_cell.parent.all_cells[self.presynaptic_index]
         self.postsynaptic_cell = post_cell
