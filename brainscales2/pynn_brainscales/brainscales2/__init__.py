@@ -12,6 +12,7 @@ from pynn_brainscales.brainscales2.standardmodels import cells, synapses
 from pynn_brainscales.brainscales2.populations import Population, \
     PopulationView, Assembly
 from pynn_brainscales.brainscales2.projections import Projection
+from pynn_brainscales.brainscales2 import helper
 from dlens_vx_v2 import halco
 import pylogging as logger
 
