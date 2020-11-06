@@ -30,7 +30,7 @@ def list_standard_models():
 
 
 # TODO: handle the delays (cf. feature #3657)
-def setup(timestep=simulator.state.dt, min_delay=DEFAULT_MIN_DELAY,
+def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
           **extra_params):
     """
     Should be called at the very beginning of a script.
@@ -43,6 +43,9 @@ def setup(timestep=simulator.state.dt, min_delay=DEFAULT_MIN_DELAY,
                               arriving at the synaptic input (i.e. no leaky
                               integration is happening); defaults to False.
     """
+
+    # global instance singleton
+    simulator.state = simulator.State()
 
     max_delay = extra_params.get('max_delay', DEFAULT_MAX_DELAY)
     simulator.state.neuron_placement = simulator.\
@@ -69,12 +72,20 @@ def end():
         population.write_data(io_file, variables)
     simulator.state.write_on_end = []
 
+    # remove instance singleton
+    simulator.state = None
+
 
 # common.build_run's run (first return value) performs some arithmetic (plus)
 # on run's runtime parameter and finally dispatches to run_until; to support
 # runtime=`None` we need to directly dispatch to our own run function.
 _, run_until = common.build_run(simulator)
-run = simulator.state.run
+
+
+def run(*args, **kwargs):
+    return simulator.state.run(*args, **kwargs)
+
+
 run_for = run
 
 reset = common.build_reset(simulator)

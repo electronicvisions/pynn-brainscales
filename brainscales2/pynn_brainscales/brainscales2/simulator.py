@@ -598,15 +598,19 @@ class ConnectionConfigurationBuilder:
         return used_entries
 
 
-class _State(BaseState):
+class State(BaseState):
     """Represent the simulator state."""
 
     max_weight: ClassVar[int] = halco.SynapseRowOnSynram.size \
         * lola.SynapseMatrix.Weight.max
 
     # pylint: disable=invalid-name
+    # TODO: replace by calculation (cf. feature #3594)
+    dt: ClassVar[float] = 3.4e-05  # average time between two MADC samples
+
+    # pylint: disable=invalid-name
     def __init__(self):
-        super(_State, self).__init__()
+        super(State, self).__init__()
 
         self.spikes = []
         self.times = []
@@ -617,8 +621,6 @@ class _State(BaseState):
         self.running = False
         self.t = 0
         self.t_start = 0
-        # TODO: replace by calculation (cf. feature #3594)
-        self.dt = 3.4e-05        # average time between two MADC samples
         self.min_delay = 0
         self.max_delay = 0
         self.neuron_placement = []
@@ -1250,4 +1252,5 @@ class _State(BaseState):
                                        0)
 
 
-state = _State()  # a Singleton, so only a single instance ever exists
+# state is instantiated in setup()
+state: Optional[State] = None

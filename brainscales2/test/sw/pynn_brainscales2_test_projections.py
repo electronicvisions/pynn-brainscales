@@ -10,10 +10,14 @@ import pynn_brainscales.brainscales2 as pynn
 class TestProjection(unittest.TestCase):
 
     def setUp(self):
+        pynn.setup()
         self.pop1 = pynn.Population(1, pynn.cells.HXNeuron())
         self.pop2 = pynn.Population(1, pynn.cells.HXNeuron())
         self.pop3 = pynn.Population(2, pynn.cells.HXNeuron())
         self.pop4 = pynn.Population(3, pynn.cells.HXNeuron())
+
+    def tearDown(self):
+        pynn.end()
 
     def test_delay(self):
         proj = pynn.Projection(self.pop1, self.pop2, pynn.AllToAllConnector())

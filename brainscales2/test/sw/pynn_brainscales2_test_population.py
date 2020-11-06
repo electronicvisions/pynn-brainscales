@@ -183,6 +183,7 @@ class TestAPopulation(unittest.TestCase):
 class TestLolaNeuronConstruction(unittest.TestCase):
 
     def setUp(self):
+        pynn.setup()
         self.pop = pynn.Population(2, pynn.cells.HXNeuron(
             threshold_v_threshold=200, threshold_enable=200))
         self.neurons = [None] * self.pop.size
@@ -190,6 +191,9 @@ class TestLolaNeuronConstruction(unittest.TestCase):
         for idx, item in enumerate(self.pop.celltype.parameter_space):
             neuron = pynn.cells.HXNeuron.lola_from_dict(item)
             self.neurons[idx] = neuron
+
+    def tearDown(self):
+        pynn.end()
 
     def test_equal(self):
         self.assertEqual(self.neurons[0], self.neurons[1])
