@@ -862,31 +862,35 @@ class State(BaseState):
         """
         Places Neuron in Population "pop" on chip and configures spike and
         v recording.
+
+        :param enable_spike_recording: toggles if spikes are send off chip;
+                                       ignored at the moment
         """
+
+        assert enable_spike_recording
 
         # places the neurons from pop on chip
         atomic_neuron = HXNeuron.create_hw_entity(parameters)
         coord = self.neuron_placement.id2atomicneuron(neuron_id)
 
         # configure spike recording
-        if enable_spike_recording:
-            # neurons per crossbar input channel
-            neurons = int(halco.NeuronColumnOnDLS.size
-                          / halco.NeuronEventOutputOnDLS.size)
-            # arbitrary shift to leave 0 open
-            offset = 64
-            addr = (coord.toNeuronColumnOnDLS().toEnum() % neurons) \
-                + (coord.toNeuronRowOnDLS().toEnum() * neurons) + offset
+        # neurons per crossbar input channel
+        neurons = int(halco.NeuronColumnOnDLS.size
+                      / halco.NeuronEventOutputOnDLS.size)
+        # arbitrary shift to leave 0 open
+        offset = 64
+        addr = (coord.toNeuronColumnOnDLS().toEnum() % neurons) \
+            + (coord.toNeuronRowOnDLS().toEnum() * neurons) + offset
 
-            atomic_neuron.event_routing.analog_output = \
-                atomic_neuron.EventRouting.AnalogOutputMode.normal
-            atomic_neuron.event_routing.enable_digital = True
-            atomic_neuron.event_routing.address = int(addr)
-            if self.enable_neuron_bypass:
-                # disable threshold comparator
-                atomic_neuron.threshold.enable = False
-                atomic_neuron.event_routing.enable_bypass_excitatory = True
-                atomic_neuron.event_routing.enable_bypass_inhibitory = True
+        atomic_neuron.event_routing.analog_output = \
+            atomic_neuron.EventRouting.AnalogOutputMode.normal
+        atomic_neuron.event_routing.enable_digital = True
+        atomic_neuron.event_routing.address = int(addr)
+        if self.enable_neuron_bypass:
+            # disable threshold comparator
+            atomic_neuron.threshold.enable = False
+            atomic_neuron.event_routing.enable_bypass_excitatory = True
+            atomic_neuron.event_routing.enable_bypass_inhibitory = True
 
         # configure v recording
         if readout_source is not None:
@@ -918,8 +922,10 @@ class State(BaseState):
                 readout_source = Optional[hal.NeuronConfig.ReadoutSource]
                 for parameter, cell_ids in recorder.recorded.items():
                     for cell_id in cell_ids:
+                        # we always record spikes at the moment
+                        spike_rec_indexes.append(cell_id)
                         if parameter == "spikes":
-                            spike_rec_indexes.append(cell_id)
+                            pass
                         elif parameter in recorder.madc_variables:
                             assert self.madc_recorder is not None and \
                                 cell_id == self.madc_recorder.cell_id
@@ -931,10 +937,9 @@ class State(BaseState):
                         population.all_cells,
                         population.celltype.parameter_space):
 
-                    enable_spike_recording = False
+                    # we always record spikes at the moment
+                    enable_spike_recording = True
                     this_source = None
-                    if cell_id in spike_rec_indexes:
-                        enable_spike_recording = True
                     if cell_id == madc_recording_id:
                         this_source = readout_source
                     builder = self.configure_hxneuron(
