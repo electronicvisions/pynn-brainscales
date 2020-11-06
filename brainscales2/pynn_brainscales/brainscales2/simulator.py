@@ -894,9 +894,6 @@ class State(BaseState):
 
         # configure v recording
         if readout_source is not None:
-            atomic_neuron.event_routing.analog_output = \
-                atomic_neuron.EventRouting.AnalogOutputMode.normal
-            atomic_neuron.event_routing.enable_digital = True
             atomic_neuron.readout.enable_amplifier = True
             atomic_neuron.readout.enable_buffered_access = True
             atomic_neuron.readout.source = readout_source
