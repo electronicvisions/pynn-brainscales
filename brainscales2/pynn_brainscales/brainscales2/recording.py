@@ -14,12 +14,9 @@ class MADCRecorderSetting(NamedTuple):
 class Recorder(pyNN.recording.Recorder):
 
     _simulator = simulator
-    state_dt = _simulator.state.dt
     madc_variables = ["v", "exc_synin", "inh_synin", "adaptation"]
 
     def __init__(self, population, file=None):
-        self._simulator.state.dt = self.state_dt
-        assert self._simulator.state.dt == 3.4e-05
         super(Recorder, self).__init__(population, file=file)
 
     def record(self, variables, ids, sampling_interval=None):
