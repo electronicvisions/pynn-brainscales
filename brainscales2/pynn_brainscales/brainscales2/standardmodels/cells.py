@@ -68,7 +68,7 @@ class HXNeuron(StandardCellType):
                 key = member + "_" + name
                 if key in HXNeuron._not_configurable:
                     continue
-                if type(inner_value) == bool:
+                if isinstance(inner_value, bool):
                     values[key] = inner_value
                 else:
                     values[key] = float(inner_value)
@@ -136,6 +136,7 @@ class HXNeuron(StandardCellType):
 
 HXNeuron.default_initial_values = HXNeuron.get_default_values()
 HXNeuron.default_parameters = HXNeuron.default_initial_values
+# pylint: disable=protected-access
 HXNeuron.translations = HXNeuron._create_translation()
 
 
