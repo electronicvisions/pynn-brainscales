@@ -9,10 +9,10 @@ from dlens_vx_v2 import halco, lola
 class TestCoCoInject(unittest.TestCase):
 
     def setUp(self):
-        coord0 = halco.AtomicNeuronOnDLS(halco.Enum(0))
+        coord0 = halco.AtomicNeuronOnDLS(halco.common.Enum(0))
         an0 = lola.AtomicNeuron()
         an0.leak.i_bias = 555
-        coord1 = halco.AtomicNeuronOnDLS(halco.Enum(1))
+        coord1 = halco.AtomicNeuronOnDLS(halco.common.Enum(1))
         an1 = lola.AtomicNeuron()
         an1.threshold.v_threshold = 123
         self.coco = {coord0: an0, coord1: an1}
@@ -33,7 +33,7 @@ class TestCoCoInject(unittest.TestCase):
         pynn.end()
 
     def test_permutation(self):
-        coord = halco.AtomicNeuronOnDLS(halco.Enum(8))
+        coord = halco.AtomicNeuronOnDLS(halco.common.Enum(8))
         neuron = lola.AtomicNeuron()
         neuron.leak.i_bias = 666
         pynn.setup(neuronPermutation=[8])

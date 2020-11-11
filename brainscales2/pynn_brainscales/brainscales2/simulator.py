@@ -99,7 +99,8 @@ class NeuronPlacement:
                     f"NeuronPermutation list entry {neuron_idx} out of range. "
                     + f"Needs to be in range [0, {cell_id_size - 1}]"
                 )
-            permutation.append(halco.AtomicNeuronOnDLS(halco.Enum(neuron_idx)))
+            coord = halco.AtomicNeuronOnDLS(halco.common.Enum(neuron_idx))
+            permutation.append(coord)
         return permutation
 
 

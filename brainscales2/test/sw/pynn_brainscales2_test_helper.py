@@ -12,8 +12,8 @@ class TestHelper(unittest.TestCase):
 
     def test_coco_extraction(self):
         builder = sta.PlaybackProgramBuilderDumper()
-        an_coord0 = halco.AtomicNeuronOnDLS(halco.Enum(0))
-        an_coord1 = halco.AtomicNeuronOnDLS(halco.Enum(1))
+        an_coord0 = halco.AtomicNeuronOnDLS(halco.common.Enum(0))
+        an_coord1 = halco.AtomicNeuronOnDLS(halco.common.Enum(1))
         neuron0 = lola.AtomicNeuron()
         neuron0.leak.i_bias = 666
         neuron1 = lola.AtomicNeuron()
