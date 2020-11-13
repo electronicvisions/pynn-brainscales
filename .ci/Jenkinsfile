@@ -33,6 +33,14 @@ try {
 		wafDefaultPipeline(pipelineOptions)
 	}
 
+	// Archive plots from hardware tests
+	stage(name: "Archive Test Plots") {
+		runOnSlave(label: "frontend") {
+			archiveArtifacts(artifacts: 'pynn-brainscales/brainscales2/*.pdf',
+			                 allowEmptyArchive: true)
+		}
+	}
+
 	conditionalStage(name: "Module Deployment", skip: !deploy) {
 		runOnSlave(label: "frontend") {
 			inSingularity(app: "dls") {
