@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import unittest
-from examples import isi_calib
+from pynn_brainscales.brainscales2.examples import isi_calib
 
 
 class TestISICalib(unittest.TestCase):

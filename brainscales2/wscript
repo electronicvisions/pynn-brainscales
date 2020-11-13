@@ -43,7 +43,7 @@ def build(bld):
 
     bld(name = 'pynn_brainscales2_examples',
         features = 'use py pylint pycodestyle',
-        source = bld.path.ant_glob('examples/*.py'),
+        source = bld.path.ant_glob('pynn_brainscales/brainscales2/examples/*.py'),
         relative_trick = True,
         use = ['pynn_brainscales2'],
         install_from = 'examples',
@@ -67,7 +67,7 @@ def build(bld):
         tests = bld.path.ant_glob('test/hw/*.py'),
         test_timeout = 360,
         features = 'use pytest',
-        use = ['pynn_brainscales2_examples'],
+        use = ['pynn_brainscales2'],
         install_path = '${PREFIX}/bin',
         chmod=Utils.O755,
         skip_run = not bld.env.DLSvx_HARDWARE_AVAILABLE
@@ -76,7 +76,7 @@ def build(bld):
     bld(name = 'pynn_brainscales2_hwtest_pylint',
         tests = bld.path.ant_glob('test/hw/*.py'),
         features = 'use pylint pycodestyle',
-        use = ['pynn_brainscales2_examples'],
+        use = ['pynn_brainscales2'],
         pylint_config = join(get_toplevel_path(), "code-format", "pylintrc"),
         pycodestyle_config = join(get_toplevel_path(), "code-format", "pycodestyle"),
     )

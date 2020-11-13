@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import unittest
-from examples.leak_over_threshold import main
+from pynn_brainscales.brainscales2.examples.leak_over_threshold import main
 
 
 class TestLeakOverThreshold(unittest.TestCase):

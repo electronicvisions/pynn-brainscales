@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 import unittest
-from examples.external_input import main, cell_params
+from pynn_brainscales.brainscales2.examples.external_input import main, \
+    cell_params
 
 
 class TestExternalInput(unittest.TestCase):

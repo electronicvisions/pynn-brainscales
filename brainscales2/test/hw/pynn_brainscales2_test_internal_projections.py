@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import unittest
-from examples.internal_projections import main
+from pynn_brainscales.brainscales2.examples.internal_projections import main
 
 
 class TestTryProjections(unittest.TestCase):
