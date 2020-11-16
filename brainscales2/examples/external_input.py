@@ -44,20 +44,21 @@ def main(params: dict):
 
     pynn.end()
 
-    return spiketrain, membrane_times, membrane_voltage
+    # Plot data
+    plt.figure()
+    plt.xlabel("Time [ms]")
+    plt.ylabel("Membrane Potential [LSB]")
+    plt.plot(membrane_times, membrane_voltage)
+    plt.savefig("plot_external_input.pdf")
+    plt.close()
+
+    return spiketrain
 
 
 if __name__ == "__main__":
     pynn.logger.default_config(level=pynn.logger.LogLevel.INFO)
     log = pynn.logger.get("external_input")
-    spiketimes, times, membrane = main(cell_params)
+    spiketimes = main(cell_params)
 
     log.INFO("Number of spikes of stimulated neuron: ", len(spiketimes))
     log.INFO("Spiketimes of stimulated neuron: ", spiketimes)
-
-    plt.figure()
-    plt.xlabel("Time [ms]")
-    plt.ylabel("Membrane Potential [LSB]")
-    plt.plot(times, membrane)
-    plt.savefig("plot_external_input.pdf")
-    plt.close()

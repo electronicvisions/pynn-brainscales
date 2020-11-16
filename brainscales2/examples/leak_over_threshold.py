@@ -47,7 +47,7 @@ def main(params: dict):
     plt.xlabel("Time [ms]")
     plt.ylabel("Membrane Potential [LSB]")
     plt.plot(times, membrane)
-    plt.savefig("plot_tauref95_3.pdf")
+    plt.savefig("plot_leak_over_threshold.pdf")
     plt.close()
 
     pynn.end()

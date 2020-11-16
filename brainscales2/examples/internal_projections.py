@@ -63,18 +63,19 @@ def main():
 
     pynn.end()
 
-    return len(spiketimes1), membrane_times, membrane_voltage
+    # Plot data
+    plt.figure()
+    plt.xlabel("Time [ms]")
+    plt.ylabel("Membrane Potential [LSB]")
+    plt.plot(membrane_times, membrane_voltage)
+    plt.savefig("plot_internal_projections.pdf")
+    plt.close()
+
+    return len(spiketimes1)
 
 
 if __name__ == "__main__":
     pynn.logger.default_config(level=pynn.logger.LogLevel.INFO)
     log = pynn.logger.get("internal_projections")
-    spikenumber, times, membrane = main()
+    spikenumber = main()
     log.INFO("Number of spikes of first neuron: ", spikenumber)
-
-    plt.figure()
-    plt.xlabel("Time [ms]")
-    plt.ylabel("Membrane Potential [LSB]")
-    plt.plot(times, membrane)
-    plt.savefig("plot_proj.pdf")
-    plt.close()
