@@ -1196,6 +1196,7 @@ class State(BaseState):
         for coord in halco.iter_all(halco.PhyStatusOnFPGA):
             tickets_phy.append(builder.read(coord))
 
+        builder.block_until(halco.BarrierOnFPGA(), hal.Barrier.omnibus)
         sta.run(connection, builder.done())
 
         error_msg = "_perform_post_fail_analysis(): "
@@ -1288,6 +1289,7 @@ class State(BaseState):
         builder1.write(halco.TimerOnDLS(), hal.Timer())
         builder1.block_until(halco.TimerOnDLS(), int(
             initial_wait * int(hal.Timer.Value.fpga_clock_cycles_per_us)))
+        builder1.block_until(halco.BarrierOnFPGA(), hal.Barrier())
 
         builder2 = sta.PlaybackProgramBuilder()
 
@@ -1303,6 +1305,7 @@ class State(BaseState):
         tmpdumper = sta.DumperDone()
         tmpdumper.values = list(self.injected_config.post_realtime.items())
         builder2.merge_back(sta.convert_to_builder(tmpdumper))
+        builder2.block_until(halco.BarrierOnFPGA(), hal.Barrier())
 
         program1 = builder1.done()
         program2 = builder2.done()
