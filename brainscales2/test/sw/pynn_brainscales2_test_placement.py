@@ -63,5 +63,16 @@ class TestPlacement(unittest.TestCase):
         pynn.end()
 
 
+class TestDefaultPlacement(unittest.TestCase):
+
+    def test_number_of_neurons(self):
+        for n_neurons in [1, 16, 32, 64, 128, 256, 512]:
+            with self.subTest(n_neurons=n_neurons):
+                pynn.setup()
+                pynn.Population(n_neurons, pynn.cells.HXNeuron())
+                pynn.run(None)
+                pynn.end()
+
+
 if __name__ == '__main__':
     unittest.main()
