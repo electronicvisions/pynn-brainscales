@@ -101,6 +101,14 @@ class TestProjection(unittest.TestCase):
         pynn.run(None)
         pynn.simulator.state.projections = []
 
+    def test_projection_view(self):
+        synapse = pynn.standardmodels.synapses.StaticSynapse(weight=32)
+        proj = pynn.Projection(pynn.PopulationView(self.pop3, [1]),
+                               pynn.PopulationView(self.pop4, [2]),
+                               pynn.AllToAllConnector(),
+                               synapse_type=synapse)
+        self.assertEqual(proj.get("weight", format="list"), [(0, 0, 32)])
+
 
 if __name__ == '__main__':
     unittest.main()
