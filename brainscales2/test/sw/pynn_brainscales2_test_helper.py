@@ -3,6 +3,7 @@
 import os
 import tempfile
 import unittest
+from unittest import mock
 import numpy
 import pynn_brainscales.brainscales2 as pynn
 from dlens_vx_v2 import halco, hal, lola, sta
@@ -49,6 +50,19 @@ class TestHelper(unittest.TestCase):
             numpy.array_equal(pop.get("leak_i_bias"), [666, 420]))
         pynn.run(None)
         pynn.end()
+
+    @mock.patch.dict(os.environ, {"HXCOMM_ENABLE_ZERO_MOCK": "1"}, clear=True)
+    def test_nightly_calib_path(self):
+        expected_path = "/wang/data/calibration/hicann-dls-sr-hx/zeromock/" \
+            "stable/latest/spiking_cocolist.bin"
+        tested_path = pynn.helper.nightly_calib_path()
+        self.assertEqual(expected_path, str(tested_path))
+
+    @mock.patch.dict(os.environ, {"HXCOMM_ENABLE_ZERO_MOCK": "1"}, clear=True)
+    def test_nightly_coco_extraction(self):
+        atomic, inject = pynn.helper.filtered_cocos_from_nightly()
+        self.assertTrue(atomic is not None)
+        self.assertTrue(inject is not None)
 
 
 if __name__ == '__main__':

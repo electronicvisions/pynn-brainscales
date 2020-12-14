@@ -1,5 +1,6 @@
 from typing import Dict
-from dlens_vx_v2 import sta, halco, lola
+from pathlib import Path
+from dlens_vx_v2 import sta, halco, lola, hxcomm
 
 
 def coco_from_file(path: str) -> dict:
@@ -37,3 +38,26 @@ def filter_non_atomic_neuron(coco: dict) -> dict:
     other_cocos = {coord: container for (coord, container) in coco.items()
                    if not isinstance(coord, halco.AtomicNeuronOnDLS)}
     return other_cocos
+
+
+def nightly_calib_path() -> Path:
+    """
+    Find path for calibration automatically from environment.
+    Set by Slurm when allocating resources.
+    """
+    # TODO: opening a connection is architecturally wrong, cf. issue #3868
+    with hxcomm.ManagedConnection() as connection:
+        identifier = connection.get_unique_identifier()
+        path = f"/wang/data/calibration/hicann-dls-sr-hx/{identifier}/stable/"\
+            "latest/spiking_cocolist.bin"
+        return Path(path)
+
+
+def filtered_cocos_from_nightly() -> (dict, dict):
+    """
+    Extract atomic and non-atomic coco lists from nightly calibration
+    """
+    coco = coco_from_file(nightly_calib_path())
+    atomic_coco = filter_atomic_neuron(coco)
+    inject_coco = filter_non_atomic_neuron(coco)
+    return atomic_coco, inject_coco
