@@ -41,6 +41,12 @@ class TestPoissonInput(unittest.TestCase):
 
         self.spiketrain1 = pop1.get_data("spikes").segments[0].spiketrains[0]
         self.spiketrain2 = pop2.get_data("spikes").segments[0].spiketrains[0]
+        pynn.reset()
+
+        self.rate3 = 10e3
+        src.set(rate=self.rate3)
+        pynn.run(self.runtime)
+        self.spiketrain3 = pop1.get_data("spikes").segments[1].spiketrains[0]
         pynn.end()
 
     def test_timeframe(self):
@@ -49,10 +55,7 @@ class TestPoissonInput(unittest.TestCase):
         'start' + 'duration'.
         """
         self.assertGreaterEqual(self.spiketrain1[0], self.bg_props["start"])
-        self.assertGreaterEqual(self.spiketrain2[0], self.bg_props["start"])
         self.assertLessEqual(self.spiketrain1[-1], self.bg_props["start"]
-                             + self.bg_props["duration"])
-        self.assertLessEqual(self.spiketrain2[-1], self.bg_props["start"]
                              + self.bg_props["duration"])
 
     def test_length(self):
@@ -60,11 +63,16 @@ class TestPoissonInput(unittest.TestCase):
         Check if neuron spikes as often as expected by the stated background
         properties.
         """
-        expected_length = self.bg_props["duration"] / 1000 * \
+        expected_length1 = self.bg_props["duration"] / 1000 * \
             self.bg_props["rate"]
-        dev = 5 * np.sqrt(expected_length)
+        dev1 = 5 * np.sqrt(expected_length1)
         measured_length1 = len(self.spiketrain1)
-        self.assertLessEqual(abs(measured_length1 - expected_length), dev)
+        self.assertLessEqual(abs(measured_length1 - expected_length1), dev1)
+
+        expected_length3 = self.bg_props["duration"] / 1000 * self.rate3
+        dev3 = 5 * np.sqrt(expected_length3)
+        measured_length3 = len(self.spiketrain3)
+        self.assertLessEqual(abs(measured_length3 - expected_length3), dev3)
 
     def test_equality(self):
         """

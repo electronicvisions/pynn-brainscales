@@ -2,7 +2,6 @@
 
 from typing import Optional, Set, Tuple, Final, List, Dict, Union
 import numpy as np
-from pyNN.parameters import Sequence
 from pyNN.common import IDMixin, Connection
 from pyNN.common.control import BaseState
 from pynn_brainscales.brainscales2.standardmodels.cells import HXNeuron, \
@@ -201,19 +200,6 @@ class ConnectionConfigurationBuilder:
             weight = connection.weight
             receptor_type = connection.projection.receptor_type
 
-            if isinstance(connection.presynaptic_cell.celltype,
-                          SpikeSourcePoisson):
-                # pylint: disable=protected-access
-                if getattr(pre, "spike_times") == Sequence([]):
-                    start = pre.celltype.parameter_space["start"]
-                    rate = pre.celltype.parameter_space["rate"]
-                    duration = pre.celltype.parameter_space["duration"]
-                    # generate spike train for external Poisson source
-                    num_spikes = np.random.poisson(
-                        int(duration / 1000. * rate))
-                    pre.spike_times = Sequence(np.random.rand(num_spikes)
-                                               * duration + start)
-
             # In case of PopulationView use grandparent index,
             # else use presynaptic_index of connection
             try:
@@ -222,8 +208,11 @@ class ConnectionConfigurationBuilder:
             except AttributeError:
                 index_base_pop = connection.presynaptic_index
 
-            spiketimes = pre.celltype.parameter_space["spike_times"][
-                index_base_pop].value
+            if isinstance(pre.celltype, SpikeSourcePoisson):
+                spiketimes = pre.celltype.get_spike_times()[index_base_pop]
+            else:
+                spiketimes = pre.celltype.parameter_space["spike_times"][
+                    index_base_pop].value
             external_connection = np.array(
                 [(pre, post, weight, receptor_type, spiketimes)],
                 dtype=self._external_connections.dtype)

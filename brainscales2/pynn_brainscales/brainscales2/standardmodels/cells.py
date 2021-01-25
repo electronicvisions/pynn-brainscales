@@ -1,8 +1,11 @@
 import inspect
 import numbers
 from typing import List, Dict, ClassVar, Final, Optional, Union
-from pyNN.parameters import Sequence, ArrayParameter
+import numpy as np
+
+from pyNN.parameters import ArrayParameter
 from pyNN.standardmodels import cells, build_translations, StandardCellType
+
 from dlens_vx_v2 import lola, hal, halco
 
 
@@ -201,28 +204,77 @@ class SpikeSourcePoisson(cells.SpikeSourcePoisson):
     """
     Spike source, generating spikes according to a Poisson process.
     """
+
     def __init__(self, start, rate, duration):
-        self.default_parameters.update({"spike_times": Sequence([])})
-        self.units.update({"spike_times": "ms"})
 
         parameters = {"start": start,
                       "rate": rate,
-                      "duration": duration,
-                      "spike_times": Sequence([])}
+                      "duration": duration}
         super(cells.SpikeSourcePoisson, self).__init__(**parameters)
 
     translations = build_translations(
         ('start', 'start'),
         ('rate', 'rate'),
         ('duration', 'duration'),
-        ('spike_times', 'spike_times'),
     )
+
+    # Add internal members for the creation of spike trains.
+    # 'spike_times' memorizes a fixed Poisson stimulus (for each neuron in the
+    # population). 'used_parameters' stores the parameters which were used to
+    # generate these spike trains
+    _spike_times: Optional[List[np.ndarray]] = None
+    _used_parameters: Optional[Dict[str, np.ndarray]] = None
 
     # TODO: implement L2-based read-out injected spikes
     recordable = []
 
     def can_record(self, variable: str) -> bool:
         return variable in self.recordable
+
+    def get_spike_times(self) -> List[np.ndarray]:
+        """
+        When this function is called for the first time, the spike times for a
+        Poisson stimulation are calculated and saved, so that all neurons
+        connected to it receive the same stimulation. When a parameter was
+        changed (compared to the last calculation of the spike time), the times
+        are recalculated.
+
+        :return: (unsorted) spike times for each neuron in the population.
+        """
+
+        # generate empty arrays for '_spike_times' and '_used_paramters' if
+        # spike times are calculated for the first time
+        if self._spike_times is None:
+            # Get number of neurons in population from 'start' parameter
+            pop_size = self.parameter_space["start"].shape[0]
+
+            self._used_parameters = dict(start=np.zeros(pop_size),
+                                         rate=np.zeros(pop_size),
+                                         duration=np.zeros(pop_size))
+            self._spike_times = [np.array([])] * pop_size
+
+        # Recalculate spike times for which at least one parameter changed
+        param_space = self.parameter_space
+        change = (param_space["start"] != self._used_parameters["start"]) | \
+            (param_space["rate"] != self._used_parameters["rate"]) | \
+            (param_space["duration"] != self._used_parameters["duration"])
+
+        for neuron_idx in np.where(change)[0]:
+            start = self.parameter_space["start"][neuron_idx]
+            rate = self.parameter_space["rate"][neuron_idx]
+            duration = self.parameter_space["duration"][neuron_idx]
+
+            rate_in_per_ms = rate / 1000  # Convert rate from 1/s in 1/ms
+            num_spikes = np.random.poisson(int(duration * rate_in_per_ms))
+            self._spike_times[neuron_idx] = start + \
+                np.random.rand(num_spikes) * duration
+
+        # Save parameters which were used to generate the spike trains
+        self._used_parameters["start"] = self.parameter_space["start"]
+        self._used_parameters["rate"] = self.parameter_space["rate"]
+        self._used_parameters["duration"] = self.parameter_space["duration"]
+
+        return self._spike_times
 
 
 class SpikeSourceArray(cells.SpikeSourceArray):
