@@ -8,7 +8,8 @@ try {
 	]
 
 	Map<String, Object> pipelineDeploymentOptions = [
-		container          : [app: "dls"]
+		container              : [app: "dls"],
+		configureInstallOptions: "--build-profile=release_with_debug"
 	] << commonPipelineOptions
 
 	Map<String, Object> pipelineNoDeploymentOptions = [
