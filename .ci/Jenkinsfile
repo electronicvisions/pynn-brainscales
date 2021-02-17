@@ -14,7 +14,8 @@ try {
 
 	Map<String, Object> pipelineNoDeploymentOptions = [
 		// upstream PyNN depends on h5py...
-		container          : [app: "dls"],
+		container              : [app: "dls"],
+		configureInstallOptions: "--build-profile=ci"
 	] << commonPipelineOptions
 
 	// Additional options for hardware testing in "no deployment" and not triggered by Gerrit case
