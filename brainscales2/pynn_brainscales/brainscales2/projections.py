@@ -4,6 +4,7 @@ from copy import deepcopy
 import pyNN.common
 from pyNN.common import Population
 from pyNN.space import Space
+import numpy as np
 from pynn_brainscales.brainscales2.standardmodels.synapses import StaticSynapse
 from pynn_brainscales.brainscales2 import simulator
 import pygrenade_vx as grenade
@@ -125,22 +126,33 @@ class Projection(pyNN.common.Projection):
                              projection: Projection,
                              builder: grenade.NetworkBuilder) \
             -> grenade.ProjectionDescriptor:
+
+        # check if pre/post population is a PopulationView
+        pre_is_view = hasattr(projection.pre, "grandparent")
+        post_is_view = hasattr(projection.post, "grandparent")
+
         # get pre- and post-synaptic population descriptor
         pre = projection.pre.grandparent if \
-            hasattr(projection.pre, "grandparent") \
-            else projection.pre
+            pre_is_view else projection.pre
         post = projection.post.grandparent if \
-            hasattr(projection.post, "grandparent") \
-            else projection.post
+            post_is_view else projection.post
+
         population_pre = grenade.PopulationDescriptor(
             populations.index(pre))
         population_post = grenade.PopulationDescriptor(
             populations.index(post))
+
+        # get the mask or a full dummy mask
+        pre_mask = projection.pre.mask if pre_is_view \
+            else np.arange(len(pre))
+        post_mask = projection.post.mask if post_is_view \
+            else np.arange(len(post))
+
         # get connections
         connections: grenade.Projection.Connections = [
             grenade.Projection.Connection(
-                conn.presynaptic_index,
-                conn.postsynaptic_index,
+                pre_mask[conn.presynaptic_index],
+                post_mask[conn.postsynaptic_index],
                 int(conn.weight))
             for conn in projection.connections]
         # get receptor type
