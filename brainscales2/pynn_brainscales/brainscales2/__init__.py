@@ -108,6 +108,11 @@ def end():
         population.write_data(io_file, variables)
     simulator.state.write_on_end = []
 
+    if simulator.state.conn_manager is not None:
+        simulator.state.conn_manager.__exit__()
+        simulator.state.conn_manager = None
+        assert simulator.state.conn is not None
+        simulator.state.conn = None
     # remove instance singleton
     simulator.state = None
 

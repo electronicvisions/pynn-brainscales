@@ -139,6 +139,8 @@ class State(BaseState):
         self.enable_neuron_bypass = False
         self.log = logger.get("pyNN.brainscales2")
         self.injected_config = None
+        self.conn_manager = None
+        self.conn = None
 
     def run_until(self, tstop):
         self.run(tstop - self.t)
@@ -489,17 +491,21 @@ class State(BaseState):
             [int(runtime
                  * int(hal.Timer.Value.fpga_clock_cycles_per_us) * 1000)]
 
-        with hxcomm.ManagedConnection() as conn:
-            try:
-                sta.run(conn, init_builder.done())
+        if self.conn_manager is None:
+            self.conn_manager = hxcomm.ManagedConnection()
+            assert self.conn is None
+            self.conn = self.conn_manager.__enter__()
 
-                outputs = grenade.run(
-                    conn, config, network_graph, inputs, playback_hooks)
+        try:
+            sta.run(self.conn, init_builder.done())
 
-            except RuntimeError:
-                # perform post-mortem read out of status
-                self._perform_post_fail_analysis(conn)
-                raise
+            outputs = grenade.run(
+                self.conn, config, network_graph, inputs, playback_hooks)
+
+        except RuntimeError:
+            # perform post-mortem read out of status
+            self._perform_post_fail_analysis(self.conn)
+            raise
 
         # make list 'spikes' of tupel (neuron id, spike time)
         self.spikes = self._get_spikes(network_graph, outputs)
