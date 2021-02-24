@@ -8,6 +8,7 @@ from pyNN.parameters import ArrayParameter
 from pyNN.standardmodels import cells, build_translations, StandardCellType
 from pyNN.common import Population
 from pynn_brainscales.brainscales2 import simulator
+from pynn_brainscales.brainscales2.recording import Recorder
 from dlens_vx_v2 import lola, hal, halco
 import pygrenade_vx as grenade
 
@@ -226,36 +227,47 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
     def add_to_network_graph(population: Population,
                              builder: grenade.NetworkBuilder) \
             -> grenade.PopulationDescriptor:
+        # pyNN is more performant when operating on integer cell ids
+        pop_cells_int = np.asarray(population.all_cells, dtype=np.int)
+
         # get neuron coordinates
         coords: List[halco.AtomicNeuronOnDLS] = [
             simulator.state.neuron_placement.id2atomicneuron(coord) for coord
-            in population.all_cells
+            in population.all_cells  # pop_cells_int is slower here
         ]
         # get recorder configuration
         enable_record_spikes = np.zeros((len(coords)), dtype=bool)
         if "spikes" in population.recorder.recorded:
             enable_record_spikes = np.isin(
-                population.all_cells,
+                pop_cells_int,
                 list(population.recorder.recorded["spikes"]))
-        readout_source = None
-        if simulator.state.madc_recorder is not None:
-            readout_source = simulator.state.madc_recorder.readout_source \
-                if simulator.state.madc_recorder.cell_id in population \
-                .all_cells else None
         # create grenade population
         gpopulation = grenade.Population(coords, enable_record_spikes)
         # add to builder
         descriptor = builder.add(gpopulation)
+
+        # Terminate early if we don't record
+        if simulator.state.madc_recorder is None:
+            return descriptor
+
+        # MADC enabled, but nothing to record in this population
+        if not (set(population.recorder.recorded)
+                & set(Recorder.madc_variables)):
+            return descriptor
+
+        # Find the recorded cell
+        readout_cell_idxs = np.where(pop_cells_int
+                                     == int(simulator.state.
+                                            madc_recorder.cell_id))[0]
+
         # add MADC recording
-        if readout_source:
-            madc_recording = grenade.MADCRecording()
-            madc_recording.population = descriptor
-            madc_recording.source = readout_source
-            index = np.where(population.all_cells
-                             == simulator.state.madc_recorder.cell_id)
-            assert len(index) == 1
-            madc_recording.index = index[0]
-            builder.add(madc_recording)
+        assert len(readout_cell_idxs) == 1, "Number of readout cells != 1."
+        madc_recording = grenade.MADCRecording()
+        madc_recording.population = descriptor
+        madc_recording.source = simulator.state.madc_recorder.readout_source
+        madc_recording.index = readout_cell_idxs[0]
+        builder.add(madc_recording)
+
         return descriptor
 
     @staticmethod
