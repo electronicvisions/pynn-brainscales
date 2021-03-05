@@ -17,6 +17,7 @@ class TestProjection(unittest.TestCase):
         self.pop4 = pynn.Population(3, pynn.cells.HXNeuron())
 
     def tearDown(self):
+        pynn.run(None)
         pynn.end()
 
     def test_delay(self):
@@ -30,16 +31,18 @@ class TestProjection(unittest.TestCase):
     def test_weight(self):
         proj = pynn.Projection(self.pop1, self.pop2, pynn.AllToAllConnector())
         self.assertEqual(proj.get("weight", format="array"), 0)
+        pynn.run(None)
+        pynn.simulator.state.projections = []
         synapse = pynn.standardmodels.synapses.StaticSynapse(weight=32)
         proj = pynn.Projection(self.pop1, self.pop2, pynn.AllToAllConnector(),
                                synapse_type=synapse)
         self.assertEqual(proj.get("weight", format="array"), 32)
-        proj.set(weight=60.5)
-        self.assertEqual(proj.get("weight", format="array"), 60)
-        proj.set(weight=70)
-        self.assertEqual(proj.get("weight", format="list"), [(0, 0, 70)])
+        proj.set(weight=42.5)
+        self.assertEqual(proj.get("weight", format="array"), 42)
+        proj.set(weight=43)
+        self.assertEqual(proj.get("weight", format="list"), [(0, 0, 43)])
         with self.assertRaises(ValueError):
-            proj.set(weight=16129)
+            proj.set(weight=64)
         with self.assertRaises(ValueError):
             proj.set(weight=-1)
 

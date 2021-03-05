@@ -106,8 +106,8 @@ class NeuronPlacement:
 class State(BaseState):
     """Represent the simulator state."""
 
-    max_weight: Final[int] = halco.SynapseRowOnSynram.size \
-        * lola.SynapseMatrix.Weight.max
+    # TODO support larger weights, ISSUE #3873
+    max_weight: Final[int] = lola.SynapseMatrix.Weight.max
 
     # pylint: disable=invalid-name
     # TODO: replace by calculation (cf. feature #3594)
