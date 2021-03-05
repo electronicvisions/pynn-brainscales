@@ -31,7 +31,6 @@ class TestSpikeRecording(unittest.TestCase):
         pops.append(pynn.Population(pop_size, pynn.cells.HXNeuron()))
         pops.append(pynn.Population(pop_size, pynn.cells.HXNeuron()))
         pops.append(pynn.Population(pop_size, pynn.cells.HXNeuron()))
-        all_neurons = pynn.Assembly(*pops)
 
         # Once record whole population, once subset and once no neurons
         pops[0].record(['spikes'])
@@ -40,8 +39,9 @@ class TestSpikeRecording(unittest.TestCase):
         # Spike input
         input_pop = pynn.Population(1, pynn.cells.SpikeSourceArray(
             spike_times=np.arange(0.1, runtime, runtime / 10)))
-        pynn.Projection(input_pop, all_neurons, pynn.AllToAllConnector(),
-                        synapse_type=StaticSynapse(weight=63))
+        for pop in pops:
+            pynn.Projection(input_pop, pop, pynn.AllToAllConnector(),
+                            synapse_type=StaticSynapse(weight=63))
 
         pynn.run(runtime)
 
@@ -50,9 +50,6 @@ class TestSpikeRecording(unittest.TestCase):
                          pop_size)
         self.assertEqual(len(pops[1].get_data().segments[0].spiketrains), 1)
         self.assertEqual(len(pops[2].get_data().segments[0].spiketrains), 0)
-
-        self.assertEqual(len(all_neurons.get_data().segments[0].spiketrains),
-                         pop_size + 1)
 
     def test_timing_of_spikes(self):
         """
