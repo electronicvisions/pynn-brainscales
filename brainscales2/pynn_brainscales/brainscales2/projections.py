@@ -155,7 +155,7 @@ class Projection(pyNN.common.Projection):
                 post_mask[conn.postsynaptic_index],
                 int(conn.weight))
             for conn in projection.connections]
-        # get receptor type
+
         if projection.receptor_type == "excitatory":
             receptor_type = grenade.Projection.ReceptorType.excitatory
         elif projection.receptor_type == "inhibitory":
@@ -164,10 +164,10 @@ class Projection(pyNN.common.Projection):
             raise NotImplementedError(
                 "grenade.Projection.RecetorType does "
                 + f"not support {projection.receptor_type}.")
-        # create grenade projection
+
         gprojection = grenade.Projection(
             receptor_type, connections, population_pre, population_post)
-        # add to builder
+
         return builder.add(gprojection)
 
 
