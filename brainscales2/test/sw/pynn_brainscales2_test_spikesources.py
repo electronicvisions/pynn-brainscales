@@ -11,10 +11,11 @@ class TestSpikeSources(unittest.TestCase):
     def setUp(self):
         pynn.setup()
 
+        self.pops_in = dict()
+
+        # SpikeSourceArray
         self.spike_times = [0.01, 0.03, 0.05, 0.07, 0.09]
         self.spike_times2 = [0.01, 0.03, 0.05, 0.07, 0.09, 0.1]
-
-        self.pops_in = dict()
 
         self.pops_in['in1'] = pynn.Population(
             1,
@@ -95,6 +96,18 @@ class TestSpikeSources(unittest.TestCase):
                     np.array(self.spike_times)])
         )
 
+        # SpikeSourcePoisson
+        poisson_properties = dict(rate=1e4, start=0, duration=10)
+        self.pops_in['poisson1'] = pynn.Population(
+            1,
+            pynn.cells.SpikeSourcePoisson(**poisson_properties)
+        )
+        self.pops_in['poisson2'] = pynn.Population(
+            2,
+            pynn.cells.SpikeSourcePoisson(**poisson_properties)
+        )
+
+        # Target Populations
         self.pops = []
         self.pops.append(pynn.Population(1, pynn.cells.HXNeuron()))
         self.pops.append(pynn.Population(2, pynn.cells.HXNeuron()))
@@ -127,6 +140,8 @@ class TestSpikeSources(unittest.TestCase):
 
     def test_accessors(self):
         pops_in = self.pops_in
+
+        # SpikeSourceArray
         self.assertEqual(
             pops_in['in1'].get("spike_times"),
             parameters.Sequence(self.spike_times)
