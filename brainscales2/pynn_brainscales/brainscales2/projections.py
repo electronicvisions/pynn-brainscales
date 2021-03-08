@@ -2,9 +2,8 @@ from __future__ import annotations
 from typing import List
 from copy import deepcopy
 import pyNN.common
-from pyNN.common import Population
+from pyNN.common import Population, PopulationView, Assembly
 from pyNN.space import Space
-import numpy as np
 from pynn_brainscales.brainscales2.standardmodels.synapses import StaticSynapse
 from pynn_brainscales.brainscales2 import simulator
 import pygrenade_vx as grenade
@@ -99,16 +98,13 @@ class Projection(pyNN.common.Projection):
             assert pre_ind < self._simulator.state.id_counter
         assert postsynaptic_index < self._simulator.state.id_counter
 
-        presynaptic_cells = self.pre[presynaptic_indices]
-        postsynaptic_cell = self.post[postsynaptic_index]
-
-        for pre_cell in presynaptic_cells:
+        for pre_index in presynaptic_indices:
             filtered_connection_parameters = deepcopy(connection_parameters)
             for key, value in connection_parameters.items():
                 if not isinstance(value, float) or isinstance(value, int) \
                         and len(value) > 0:
                     filtered_connection_parameters[key] = \
-                        value[self.pre.id_to_index(pre_cell)]
+                        value[pre_index]
 
             if filtered_connection_parameters["weight"] < 0 \
                     or filtered_connection_parameters["weight"] \
@@ -117,7 +113,7 @@ class Projection(pyNN.common.Projection):
                     "The weight must be positive and smaller than {}."
                     .format(self._simulator.state.max_weight))
 
-            connection = Connection(self, pre_cell, postsynaptic_cell,
+            connection = Connection(self, pre_index, postsynaptic_index,
                                     **filtered_connection_parameters)
             self.connections.append(connection)
 
@@ -127,11 +123,16 @@ class Projection(pyNN.common.Projection):
                              builder: grenade.NetworkBuilder) \
             -> grenade.ProjectionDescriptor:
 
-        # check if pre/post population is a PopulationView
-        pre_is_view = hasattr(projection.pre, "grandparent")
-        post_is_view = hasattr(projection.post, "grandparent")
+        if isinstance(projection.pre, Assembly):
+            raise NotImplementedError("Assemblies are not supported yet")
+        if isinstance(projection.post, Assembly):
+            raise NotImplementedError("Assemblies are not supported yet")
 
-        # get pre- and post-synaptic population descriptor
+        # grenade has no concept of pop views, we therefore need to
+        # get pre- and post-synaptic population descriptor of the parent in
+        # case of pop views
+        pre_is_view = isinstance(projection.pre, PopulationView)
+        post_is_view = isinstance(projection.post, PopulationView)
         pre = projection.pre.grandparent if \
             pre_is_view else projection.pre
         post = projection.post.grandparent if \
@@ -142,17 +143,10 @@ class Projection(pyNN.common.Projection):
         population_post = grenade.PopulationDescriptor(
             populations.index(post))
 
-        # get the mask or a full dummy mask
-        pre_mask = projection.pre.mask if pre_is_view \
-            else np.arange(len(pre))
-        post_mask = projection.post.mask if post_is_view \
-            else np.arange(len(post))
-
-        # get connections
         connections: grenade.Projection.Connections = [
             grenade.Projection.Connection(
-                pre_mask[conn.presynaptic_index],
-                post_mask[conn.postsynaptic_index],
+                conn.pop_pre_index,
+                conn.pop_post_index,
                 int(conn.weight))
             for conn in projection.connections]
 
@@ -178,14 +172,22 @@ class Connection(pyNN.common.Connection):
     and other attributes.
     """
 
-    def __init__(self, projection, pre_cell, post_cell, **parameters):
+    def __init__(self, projection, pre_index, post_index, **parameters):
         self.projection = projection
-        # TODO: understand why lookup via int is faster, cf. #3749
-        self.presynaptic_index = projection.pre.id_to_index(int(pre_cell))
-        self.postsynaptic_index = projection.post.id_to_index(int(post_cell))
-        self.presynaptic_cell = \
-            pre_cell.parent.all_cells[self.presynaptic_index]
-        self.postsynaptic_cell = post_cell
+        self.presynaptic_index = pre_index
+
+        if isinstance(projection.pre, PopulationView):
+            self.pop_pre_index = \
+                projection.pre.index_in_grandparent([pre_index])[0]
+        else:
+            self.pop_pre_index = pre_index
+
+        self.postsynaptic_index = post_index
+        if isinstance(projection.post, PopulationView):
+            self.pop_post_index = \
+                projection.post.index_in_grandparent([post_index])[0]
+        else:
+            self.pop_post_index = post_index
         self._weight = parameters["weight"]
         if parameters["delay"] != 0:
             raise ValueError("Setting the delay unequal 0 is not supported.")
