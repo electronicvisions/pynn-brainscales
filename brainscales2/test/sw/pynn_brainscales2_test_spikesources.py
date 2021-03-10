@@ -116,39 +116,53 @@ class TestSpikeSources(unittest.TestCase):
         pynn.run(None)
         pynn.end()
 
-    def test_onetooneconnector(self):
+    # FIXME connector related tests need to be separated due to issue #3874
+    def test_poppop1to1(self):
         for pop in self.pops:
             for pop_in in self.pops_in.values():
                 pynn.Projection(pop_in, pop, pynn.OneToOneConnector())
-                pynn.run(None)
-                pynn.simulator.state.projections = []
+
+    def test_viewpop1to1(self):
+        for pop in self.pops:
+            for pop_in in self.pops_in.values():
                 pynn.Projection(pynn.PopulationView(pop_in, [0]),
                                 pop,
                                 pynn.OneToOneConnector())
-                pynn.run(None)
-                pynn.simulator.state.projections = []
+
+    def test_popview1to1(self):
+        for pop in self.pops:
+            for pop_in in self.pops_in.values():
                 pynn.Projection(pop_in,
                                 pynn.PopulationView(pop, [0]),
                                 pynn.OneToOneConnector())
-                pynn.run(None)
-                pynn.simulator.state.projections = []
 
-    def test_alltoallconnector(self):
+    def test_poppopalltoall(self):
         for pop in self.pops:
             for pop_in in self.pops_in.values():
                 pynn.Projection(pop_in, pop, pynn.AllToAllConnector())
-                pynn.run(None)
-                pynn.simulator.state.projections = []
+
+    def test_viewpopalltoall(self):
+        for pop in self.pops:
+            for pop_in in self.pops_in.values():
                 pynn.Projection(pynn.PopulationView(pop_in, [0]),
                                 pop,
                                 pynn.AllToAllConnector())
-                pynn.run(None)
-                pynn.simulator.state.projections = []
+
+    def test_popviewalltoall(self):
+        for pop in self.pops:
+            for pop_in in self.pops_in.values():
                 pynn.Projection(pop_in,
                                 pynn.PopulationView(pop, [0]),
                                 pynn.AllToAllConnector())
-                pynn.run(None)
-                pynn.simulator.state.projections = []
+
+    @unittest.skip("This throws a c++ assert, see issue #3874")
+    def test_identicalprojection(self):
+        for pop in self.pops:
+            for pop_in in self.pops_in.values():
+                pynn.Projection(pop_in, pop, pynn.OneToOneConnector())
+                pynn.Projection(pynn.PopulationView(pop_in, [0]),
+                                pop,
+                                pynn.OneToOneConnector())
 
     def test_accessors(self):
         pops_in = self.pops_in

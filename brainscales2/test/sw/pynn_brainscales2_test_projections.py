@@ -17,8 +17,13 @@ class TestProjection(unittest.TestCase):
         self.pop4 = pynn.Population(3, pynn.cells.HXNeuron())
 
     def tearDown(self):
-        pynn.run(None)
         pynn.end()
+
+    @unittest.expectedFailure
+    def test_identical_connection(self):
+        pynn.Projection(self.pop1, self.pop2, pynn.AllToAllConnector())
+        pynn.Projection(self.pop1, self.pop2, pynn.AllToAllConnector())
+        pynn.run(None)
 
     def test_delay(self):
         proj = pynn.Projection(self.pop1, self.pop2, pynn.AllToAllConnector())
@@ -27,9 +32,10 @@ class TestProjection(unittest.TestCase):
         self.assertEqual(proj.get("delay", format="array"), [0])
         with self.assertRaises(ValueError):
             proj.set(delay=1)
+        pynn.run(None)
 
     def test_weight(self):
-        proj = pynn.Projection(self.pop1, self.pop2, pynn.AllToAllConnector())
+        proj = pynn.Projection(self.pop1, self.pop1, pynn.AllToAllConnector())
         self.assertEqual(proj.get("weight", format="array"), 0)
         pynn.run(None)
         pynn.simulator.state.projections = []
@@ -58,6 +64,7 @@ class TestProjection(unittest.TestCase):
         connection_list = [(0, 0, 32), (1, 0, 32), (2, 0, 32),
                            (0, 1, 32), (1, 1, 32), (2, 1, 32)]
         self.assertEqual(proj.get("weight", format="list"), connection_list)
+        pynn.run(None)
 
 
 if __name__ == '__main__':
