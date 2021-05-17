@@ -1,18 +1,17 @@
 # PyNN for BrainScaleS-2
 
-The software in this repository has been developed by staff and students
-of Heidelberg University as part of the research carried out by the
-Electronic Vision(s) group at the Kirchhoff-Institute for Physics.
-The research is funded by Heidelberg University, the State of
-Baden-Württemberg, the European Union Sixth Framework Programme no.
-15879 (FACETS), the Seventh Framework Programme under grant agreements
-no 604102 (HBP), 269921 (BrainScaleS), 243914 (Brain-i-Nets), the
-Horizon 2020 Framework Programme under grant agreement 720270, 785907, 945539 (HBP) as
-well as from the Manfred Stärk Foundation.
 
-This repository contains
+This repository contains the implementation of [PyNN](https://github.com/NeuralEnsemble/PyNN) for BrainScaleS-2.
+PyNN is a simulator-independent language for building spiking neural networks.
+The neuromorphic BrainScaleS-2 system allows for the emulation of such spiking neural networks.
 
-* PyNN -- the backend implementation for BrainScaleS-2 of this simulator-independent language for building spiking neural network models
+The following resources help you getting started with PyNN for BrainScaleS-2:
+
+- [documentation files](doc/index.rst) or the build version of the [documentation on github](https://electronicvisions.github.io/documentation-brainscales2/)
+- [BrainScaleS-2 demos](https://github.com/electronicvisions/brainscales2-demos)
+- example scripts in the `brainscales2/examples` folder
+- [PyNN documentation](http://neuralensemble.org/docs/PyNN/index.html)
+
 
 ## How to build
 ### Build- and runtime dependencies
@@ -103,3 +102,14 @@ License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301
 USA
 ```
+
+## Funding
+The software in this repository has been developed by staff and students
+of Heidelberg University as part of the research carried out by the
+Electronic Vision(s) group at the Kirchhoff-Institute for Physics.
+The research is funded by Heidelberg University, the State of
+Baden-Württemberg, the European Union Sixth Framework Programme no.
+15879 (FACETS), the Seventh Framework Programme under grant agreements
+no 604102 (HBP), 269921 (BrainScaleS), 243914 (Brain-i-Nets), the
+Horizon 2020 Framework Programme under grant agreement 720270, 785907, 945539 (HBP) as
+well as from the Manfred Stärk Foundation.
