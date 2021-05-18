@@ -17,6 +17,7 @@ def options(opt):
     opt.load('pytest')
     opt.load('pylint')
     opt.load('pycodestyle')
+    opt.load('doxygen')
 
 
 def configure(cfg):
@@ -25,6 +26,7 @@ def configure(cfg):
     cfg.load('pytest')
     cfg.load('pylint')
     cfg.load('pycodestyle')
+    cfg.load('doxygen')
 
 
 def build(bld):
@@ -77,6 +79,18 @@ def build(bld):
         use = ['pynn_brainscales2_examples'],
         pylint_config = join(get_toplevel_path(), "code-format", "pylintrc"),
         pycodestyle_config = join(get_toplevel_path(), "code-format", "pycodestyle"),
+    )
+
+    bld(
+        target = 'doxygen_pynn-brainscales2',
+        features = 'doxygen',
+        doxyfile = bld.root.make_node(os.path.join(get_toplevel_path(), "code-format", "doxyfile")),
+        doxy_inputs = 'pynn_brainscales',
+        install_path = 'doc/pynn-brainscales2',
+        pars = {
+            "PROJECT_NAME": "\"PyNN.brainscales2\"",
+            "OUTPUT_DIRECTORY": os.path.join(get_toplevel_path(), "build", "pynn-brainscales2", "doc")
+        },
     )
 
     bld.add_post_fun(summary)
