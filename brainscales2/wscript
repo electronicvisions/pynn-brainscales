@@ -89,7 +89,8 @@ def build(bld):
         install_path = 'doc/pynn-brainscales2',
         pars = {
             "PROJECT_NAME": "\"PyNN.brainscales2\"",
-            "OUTPUT_DIRECTORY": os.path.join(get_toplevel_path(), "build", "pynn-brainscales2", "doc")
+            "OUTPUT_DIRECTORY": os.path.join(get_toplevel_path(), "build", "pynn-brainscales2", "doc"),
+            "PYTHON_DOCSTRING": "NO",
         },
     )
 
