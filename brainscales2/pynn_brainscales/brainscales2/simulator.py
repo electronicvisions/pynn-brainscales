@@ -464,13 +464,13 @@ class State(BaseState):
         self.running = True
 
         # generate chip initialization
-        builder1, _ = sta.ExperimentInit().generate()
+        init_builder, _ = sta.ExperimentInit().generate()
 
         # injected configuration pre non realtime
         tmpdumper = sta.DumperDone()
         tmpdumper.values = list(self.injected_config.pre_non_realtime.items())
         config = grenade.convert_to_chip(tmpdumper)
-        builder1.merge_back(sta.convert_to_builder(tmpdumper))
+        builder1 = sta.convert_to_builder(tmpdumper)
 
         # generate common static configuration
         builder1, config = self._configure_common(builder1, config)
@@ -485,7 +485,22 @@ class State(BaseState):
         # injected configuration post non realtime
         tmpdumper = sta.DumperDone()
         tmpdumper.values = list(self.injected_config.post_non_realtime.items())
-        builder1.merge_back(sta.convert_to_builder(tmpdumper))
+        pre_realtime = sta.convert_to_builder(tmpdumper)
+
+        # injected configuration pre realtime
+        tmpdumper = sta.DumperDone()
+        tmpdumper.values = list(self.injected_config.pre_realtime
+                                .items())
+        pre_realtime.merge_back(sta.convert_to_builder(tmpdumper))
+
+        # injected configuration post realtime
+        tmpdumper = sta.DumperDone()
+        tmpdumper.values = list(self.injected_config.post_realtime
+                                .items())
+        post_realtime = sta.convert_to_builder(tmpdumper)
+
+        playback_hooks = grenade.ExecutionInstancePlaybackHooks(
+            builder1, pre_realtime, post_realtime)
 
         if runtime is None:
             return
@@ -503,31 +518,14 @@ class State(BaseState):
             [int(runtime
                  * int(hal.Timer.Value.fpga_clock_cycles_per_us) * 1000)]
 
-        program1 = builder1.done()
         with hxcomm.ManagedConnection() as conn:
             try:
-                sta.run(conn, program1)
-
-                # injected configuration pre realtime
-                tmpdumper = sta.DumperDone()
-                tmpdumper.values = list(self.injected_config.pre_realtime
-                                        .items())
-                sta.run(conn, sta.convert_to_builder(tmpdumper).done())
+                sta.run(conn, init_builder.done())
 
                 outputs = grenade.run(
-                    conn, config, network_graph, inputs)
-
-                # injected configuration post realtime
-                tmpdumper = sta.DumperDone()
-                tmpdumper.values = list(self.injected_config.post_realtime
-                                        .items())
-                sta.run(conn, sta.convert_to_builder(tmpdumper).done())
+                    conn, config, network_graph, inputs, playback_hooks)
 
             except RuntimeError:
-                # Link up messages for all links are expected.
-                self._check_link_notifications(
-                    program1.highspeed_link_notifications,
-                    halco.PhyStatusOnFPGA.size)
                 # perform post-mortem read out of status
                 self._perform_post_fail_analysis(conn)
                 raise
@@ -538,10 +536,6 @@ class State(BaseState):
         # make two list for madc samples: times, madc_samples
         self.times, self.madc_samples = self._get_v(
             network_graph, outputs)
-
-        # warn if unexpected highspeed link notifications have been received.
-        self._check_link_notifications(program1.highspeed_link_notifications,
-                                       halco.PhyStatusOnFPGA.size)
 
 
 # state is instantiated in setup()
