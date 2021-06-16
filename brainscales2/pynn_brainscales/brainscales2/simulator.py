@@ -362,35 +362,6 @@ class State(BaseState):
 
         return builder, config
 
-    def _check_link_notifications(self, link_notifications,
-                                  n_expected_notifications):
-        """
-        Check for unexpected link notifications and log accordingly.
-        When turning the link on, a link up message is expected.
-
-        :param link_notifications: List of link notifications
-        :param n_expected_notifications: Number of expected link up messages
-        """
-        notis_per_phy = dict()
-        for noti in link_notifications:
-            if n_expected_notifications > 0 and noti.link_up and \
-                    noti.phy not in notis_per_phy.keys():
-                # one link up message per phy is expected (when turned on)
-                pass
-            else:
-                # everything else is not expected
-                self.log.WARN(noti)
-            notis_per_phy[noti.phy] = noti
-
-        if len(notis_per_phy) < n_expected_notifications:
-            self.log.ERROR("Not all configured highspeed links sent link "
-                           + "notifications.")
-
-        if len(notis_per_phy) == halco.PhyStatusOnFPGA.size and \
-                all(not noti.link_up for noti in notis_per_phy.values()):
-            self.log.ERROR("All configured highspeed links down at "
-                           + "the end of the experiment.")
-
     def _perform_post_fail_analysis(self, connection):
         """
         Read out and log FPGA status containers in a post-mortem program.
