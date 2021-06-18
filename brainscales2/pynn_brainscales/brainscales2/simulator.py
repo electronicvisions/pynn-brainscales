@@ -436,9 +436,6 @@ class State(BaseState):
             self.t += runtime
         self.running = True
 
-        # generate chip initialization
-        init_builder, _ = sta.ExperimentInit().generate()
-
         # injected configuration pre non realtime
         tmpdumper = sta.DumperDone()
         tmpdumper.values = list(self.injected_config.pre_non_realtime.items())
@@ -490,8 +487,6 @@ class State(BaseState):
             self.conn = self.conn_manager.__enter__()
 
         try:
-            sta.run(self.conn, init_builder.done())
-
             outputs = grenade.run(
                 self.conn, config, network_graph, inputs, playback_hooks)
 
