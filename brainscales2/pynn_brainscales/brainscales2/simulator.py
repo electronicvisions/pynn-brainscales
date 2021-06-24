@@ -478,13 +478,6 @@ class State(BaseState):
         if runtime is None:
             return
 
-        # wait 20000 us for capmem voltages to stabilize
-        initial_wait = 20000  # us
-        builder1.write(halco.TimerOnDLS(), hal.Timer())
-        builder1.block_until(halco.TimerOnDLS(), int(
-            initial_wait * int(hal.Timer.Value.fpga_clock_cycles_per_us)))
-        builder1.block_until(halco.BarrierOnFPGA(), hal.Barrier())
-
         # generate external spike trains
         inputs = self._generate_inputs(network_graph)
         inputs.runtime = \
