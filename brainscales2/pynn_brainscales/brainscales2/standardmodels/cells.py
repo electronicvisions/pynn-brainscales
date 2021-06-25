@@ -372,7 +372,8 @@ class SpikeSourcePoisson(cells.SpikeSourcePoisson, NetworkAddableCell):
                                builder: grenade.InputGenerator):
 
         spiketimes = population.celltype.get_spike_times()
-        spiketimes = np.sort(spiketimes, axis=1)
+        spiketimes = [np.sort(spiketimes_neuron) for spiketimes_neuron
+                      in spiketimes]
         descriptor = grenade.PopulationDescriptor(
             simulator.state.populations.index(population))
         builder.add(spiketimes, descriptor)

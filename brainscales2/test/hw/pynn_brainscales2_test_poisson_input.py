@@ -30,11 +30,14 @@ class TestPoissonInput(unittest.TestCase):
         pop1.record(["spikes"])
         pop2.record(["spikes"])
         src = pynn.Population(
-            1, pynn.cells.SpikeSourcePoisson(**self.bg_props))
+            2, pynn.cells.SpikeSourcePoisson(**self.bg_props))
+        # The second Poisson neuron is not connected to any target population
+        # and just exists to test that Populations with more than one neuron
+        # are created correctly.
 
-        pynn.Projection(src, pop1, pynn.AllToAllConnector(),
+        pynn.Projection(src, pop1, pynn.OneToOneConnector(),
                         synapse_type=StaticSynapse(weight=63))
-        pynn.Projection(src, pop2, pynn.AllToAllConnector(),
+        pynn.Projection(src, pop2, pynn.OneToOneConnector(),
                         synapse_type=StaticSynapse(weight=63))
 
         pynn.run(self.runtime)
