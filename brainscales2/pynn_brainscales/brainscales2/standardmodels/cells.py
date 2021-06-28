@@ -228,7 +228,7 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
                              builder: grenade.NetworkBuilder) \
             -> grenade.PopulationDescriptor:
         # pyNN is more performant when operating on integer cell ids
-        pop_cells_int = np.asarray(population.all_cells, dtype=np.int)
+        pop_cells_int = np.asarray(population.all_cells, dtype=int)
 
         # get neuron coordinates
         coords: List[halco.AtomicNeuronOnDLS] = [
