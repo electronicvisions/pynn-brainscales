@@ -31,8 +31,8 @@ shopt -s expand_aliases
 alias c="singularity exec --app dls /containers/stable/latest"
 
 # 2) Add the cross-compiler and toolchain for the embedded processor to your environment
-     If you don't have access to the module, you may build it as noted here:
-     https://github.com/electronicvisions/oppulance
+#    If you don't have access to the module, you may build it as noted here:
+#    https://github.com/electronicvisions/oppulance
 module load ppu-toolchain
 
 # 2) Prepare a fresh workspace and change directory into it
