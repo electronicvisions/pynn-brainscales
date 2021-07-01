@@ -66,8 +66,7 @@ class TestPlacement(unittest.TestCase):
 class TestDefaultPlacement(unittest.TestCase):
 
     def test_number_of_neurons(self):
-        # TODO: grenade routing backend does not support 512 neurons?
-        for n_neurons in [1, 16, 32, 64, 128, 256]:
+        for n_neurons in [1, 16, 32, 64, 128, 256, 512]:
             with self.subTest(n_neurons=n_neurons):
                 pynn.setup()
                 pynn.Population(n_neurons, pynn.cells.HXNeuron())
