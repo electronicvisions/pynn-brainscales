@@ -436,15 +436,18 @@ class State(BaseState):
             self.t += runtime
         self.running = True
 
-        # injected configuration pre non realtime
-        tmpdumper = sta.DumperDone()
-        tmpdumper.values = list(self.injected_config.pre_non_realtime.items())
-        config = grenade.convert_to_chip(tmpdumper)
-        builder1 = sta.convert_to_builder(tmpdumper)
+        config = grenade.ChipConfig()
+        builder1 = sta.PlaybackProgramBuilder()
 
         # generate common static configuration
         builder1, config = self._configure_common(builder1, config)
         builder1, config = self._configure_routing(builder1, config)
+
+        # injected configuration pre non realtime
+        tmpdumper = sta.DumperDone()
+        tmpdumper.values = list(self.injected_config.pre_non_realtime.items())
+        config = grenade.convert_to_chip(tmpdumper, config)
+        builder1.merge_back(sta.convert_to_builder(tmpdumper))
 
         # generate network graph
         network_graph = self._generate_network_graph()
