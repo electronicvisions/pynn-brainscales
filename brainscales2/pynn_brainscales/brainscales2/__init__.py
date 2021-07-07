@@ -101,6 +101,9 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
     simulator.state.injected_config = \
         extra_params.get('injected_config', InjectedConfiguration())
     simulator.state.prepare_static_config()
+    simulator.state.conn = extra_params.get('connection', None)
+    simulator.state.conn_comes_from_outside = \
+        (simulator.state.conn is not None)
 
 
 def end():
@@ -110,7 +113,8 @@ def end():
         population.write_data(io_file, variables)
     simulator.state.write_on_end = []
 
-    if simulator.state.conn_manager is not None:
+    if not simulator.state.conn_comes_from_outside and \
+       simulator.state.conn_manager is not None:
         simulator.state.conn_manager.__exit__()
         simulator.state.conn_manager = None
         assert simulator.state.conn is not None

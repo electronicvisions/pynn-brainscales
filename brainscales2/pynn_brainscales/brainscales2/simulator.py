@@ -142,6 +142,7 @@ class State(BaseState):
         self.injected_config = None
         self.conn_manager = None
         self.conn = None
+        self.conn_comes_from_outside = False
         self.grenade_network = None
         self.grenade_network_graph = None
         self.grenade_chip_config = None
@@ -544,7 +545,8 @@ class State(BaseState):
 
         inputs.runtime = [runtime_in_clocks]
 
-        if self.conn_manager is None:
+        if not self.conn_comes_from_outside and \
+           self.conn_manager is None:
             self.conn_manager = hxcomm.ManagedConnection()
             assert self.conn is None
             self.conn = self.conn_manager.__enter__()
