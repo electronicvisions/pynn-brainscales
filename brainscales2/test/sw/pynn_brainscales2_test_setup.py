@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import unittest
-from dlens_vx_v2 import halco, lola
+from dlens_vx_v2 import halco, lola, sta
 import pynn_brainscales.brainscales2 as pynn
 
 
@@ -65,6 +65,36 @@ class TestpyNNSetup(unittest.TestCase):
             post_non_realtime={halco.AtomicNeuronOnDLS(): lola.AtomicNeuron()},
             pre_realtime={halco.AtomicNeuronOnDLS(): lola.AtomicNeuron()},
             post_realtime={halco.AtomicNeuronOnDLS(): lola.AtomicNeuron()}))
+        pynn.run(None)
+        pynn.end()
+
+    @staticmethod
+    def test_injected_builder():
+        pynn.setup(injected_config=pynn.InjectedConfiguration(
+            pre_non_realtime=sta.PlaybackProgramBuilder()))
+        pynn.run(None)
+        pynn.end()
+
+        pynn.setup(injected_config=pynn.InjectedConfiguration(
+            post_non_realtime=sta.PlaybackProgramBuilder()))
+        pynn.run(None)
+        pynn.end()
+
+        pynn.setup(injected_config=pynn.InjectedConfiguration(
+            pre_realtime=sta.PlaybackProgramBuilder()))
+        pynn.run(None)
+        pynn.end()
+
+        pynn.setup(injected_config=pynn.InjectedConfiguration(
+            post_realtime=sta.PlaybackProgramBuilder()))
+        pynn.run(None)
+        pynn.end()
+
+        pynn.setup(injected_config=pynn.InjectedConfiguration(
+            pre_non_realtime=sta.PlaybackProgramBuilder(),
+            post_non_realtime=sta.PlaybackProgramBuilder(),
+            pre_realtime=sta.PlaybackProgramBuilder(),
+            post_realtime=sta.PlaybackProgramBuilder()))
         pynn.run(None)
         pynn.end()
 

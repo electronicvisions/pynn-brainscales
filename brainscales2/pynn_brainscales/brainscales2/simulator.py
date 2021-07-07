@@ -495,11 +495,21 @@ class State(BaseState):
         builder1, config = self._configure_common(builder1, config)
         builder1, config = self._configure_routing(builder1, config)
 
+        def add_configuration(
+                builder: sta.PlaybackProgramBuilder,
+                additional_configuration: Union[
+                    Dict[halco.Coordinate, hal.Container],
+                    sta.PlaybackProgramBuilder]):
+            if isinstance(additional_configuration,
+                          sta.PlaybackProgramBuilder):
+                builder.merge_back(additional_configuration)
+            else:
+                tmpdumper = sta.DumperDone()
+                tmpdumper.values = list(additional_configuration.items())
+                builder.merge_back(sta.convert_to_builder(tmpdumper))
+
         # injected configuration pre non realtime
-        tmpdumper = sta.DumperDone()
-        tmpdumper.values = list(self.injected_config.pre_non_realtime.items())
-        config = grenade.convert_to_chip(tmpdumper, config)
-        builder1.merge_back(sta.convert_to_builder(tmpdumper))
+        add_configuration(builder1, self.injected_config.pre_non_realtime)
 
         self.grenade_chip_config = config
 
@@ -507,22 +517,15 @@ class State(BaseState):
         self._reset_changed_since_last_run()
 
         # injected configuration post non realtime
-        tmpdumper = sta.DumperDone()
-        tmpdumper.values = list(self.injected_config.post_non_realtime.items())
-        pre_realtime = sta.convert_to_builder(tmpdumper)
+        pre_realtime = sta.PlaybackProgramBuilder()
+        add_configuration(pre_realtime, self.injected_config.post_non_realtime)
 
         # injected configuration pre realtime
-        tmpdumper = sta.DumperDone()
-        tmpdumper.values = list(self.injected_config.pre_realtime
-                                .items())
-        pre_realtime.merge_back(
-            sta.convert_to_builder(tmpdumper))
+        add_configuration(pre_realtime, self.injected_config.pre_realtime)
 
         # injected configuration post realtime
-        tmpdumper = sta.DumperDone()
-        tmpdumper.values = list(self.injected_config.post_realtime
-                                .items())
-        post_realtime = sta.convert_to_builder(tmpdumper)
+        post_realtime = sta.PlaybackProgramBuilder()
+        add_configuration(post_realtime, self.injected_config.post_realtime)
 
         self.injection_pre_static_config = builder1
         self.injection_pre_realtime = pre_realtime
