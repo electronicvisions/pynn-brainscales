@@ -59,6 +59,7 @@ c ./waf install
 # 8) If you run programs outside waf, you'll need to add ./lib and ./bin to your path specifications
 export SINGULARITYENV_PREPEND_PATH=`pwd`/bin:$SINGULARITYENV_PREPEND_PATH
 export SINGULARITYENV_LD_LIBRARY_PATH=`pwd`/lib:$SINGULARITYENV_LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=`pwd`/lib:$LD_LIBRARY_PATH
 export PYTHONPATH=`pwd`/lib:$PYTHONPATH
 export PATH=`pwd`/bin:$PATH
 
