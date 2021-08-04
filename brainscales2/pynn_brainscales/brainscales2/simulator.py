@@ -141,6 +141,8 @@ class State(BaseState):
         self.injected_config = None
         self.conn_manager = None
         self.conn = None
+        self.grenade_network = None
+        self.grenade_network_graph = None
 
     def run_until(self, tstop):
         self.run(tstop - self.t)
@@ -156,6 +158,8 @@ class State(BaseState):
         self.enable_neuron_bypass = False
         self.neuron_placement = None
         self.injected_config = None
+        self.grenade_network = None
+        self.grenade_network_graph = None
 
         self.reset()
 
@@ -401,14 +405,22 @@ class State(BaseState):
                 self.populations, proj, network_builder)
         network = network_builder.done()
 
+        # return early, if we don't need to route again
+        if self.grenade_network is not None and \
+                not grenade.requires_routing(network, self.grenade_network):
+            assert self.grenade_network_graph is not None
+            return self.grenade_network_graph
+
+        self.grenade_network = network
+
         # route network
         routing_result = grenade.build_routing(network)
 
         # build network graph
-        network_graph = grenade.build_network_graph(
-            network, routing_result)
+        self.grenade_network_graph = grenade.build_network_graph(
+            self.grenade_network, routing_result)
 
-        return network_graph
+        return self.grenade_network_graph
 
     def _generate_inputs(self, network_graph: grenade.NetworkGraph) \
             -> grenade.IODataMap:
