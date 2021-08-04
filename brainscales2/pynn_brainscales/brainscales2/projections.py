@@ -64,6 +64,7 @@ class Projection(pyNN.common.Projection):
         self.connections = []
         connector.connect(self)
         self._simulator.state.projections.append(self)
+        self.changed_since_last_run = True
 
     def __len__(self):
         """Return the total number of local connections."""
@@ -175,6 +176,7 @@ class Connection(pyNN.common.Connection):
     def __init__(self, projection, pre_index, post_index, **parameters):
         self.projection = projection
         self.presynaptic_index = pre_index
+        self.changed_since_last_run = True
 
         if isinstance(projection.pre, PopulationView):
             self.pop_pre_index = \
@@ -201,6 +203,7 @@ class Connection(pyNN.common.Connection):
             raise ValueError("The weight must be in the interval [0, {}]."
                              .format(simulator.state.max_weight))
         self._weight = new_weight
+        self.projection.changed_since_last_run = True
 
     def _get_weight(self):
         return self._weight
@@ -209,6 +212,7 @@ class Connection(pyNN.common.Connection):
         if new_delay != 0:
             raise ValueError("Setting the delay unequal 0 is not supported.")
         self._delay = new_delay
+        self.projection.changed_since_last_run = True
 
     def _get_delay(self):
         return self._delay

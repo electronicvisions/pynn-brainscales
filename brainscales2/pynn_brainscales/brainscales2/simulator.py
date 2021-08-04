@@ -1,3 +1,4 @@
+import itertools
 from typing import Optional, Final, List, Dict, Union
 import numpy as np
 from pyNN.common import IDMixin, Population, Projection
@@ -395,6 +396,16 @@ class State(BaseState):
         """
         Generate placed and routed executable network graph representation.
         """
+        # check if populations, recorders or projections changed
+        changed_since_last_run = any(
+            elem.changed_since_last_run for elem in itertools.chain(
+                iter(self.populations),
+                iter(self.recorders),
+                iter(self.projections)))
+        if not changed_since_last_run:
+            if self.grenade_network_graph is not None:
+                return self.grenade_network_graph
+
         # generate network
         network_builder = grenade.NetworkBuilder()
         for pop in self.populations:
@@ -421,6 +432,18 @@ class State(BaseState):
             self.grenade_network, routing_result)
 
         return self.grenade_network_graph
+
+    def _reset_changed_since_last_run(self):
+        """
+        Reset changed_since_last_run flag to track incremental changes for the
+        next run.
+        """
+        for pop in self.populations:
+            pop.changed_since_last_run = False
+        for recorder in self.recorders:
+            recorder.changed_since_last_run = False
+        for proj in self.projections:
+            proj.changed_since_last_run = False
 
     def _generate_inputs(self, network_graph: grenade.NetworkGraph) \
             -> grenade.IODataMap:
@@ -466,6 +489,9 @@ class State(BaseState):
 
         # configure populations and recorders
         config = self._configure_recorders_populations(config)
+
+        # reset dirty-flags
+        self._reset_changed_since_last_run()
 
         # injected configuration post non realtime
         tmpdumper = sta.DumperDone()

@@ -18,8 +18,10 @@ class Recorder(pyNN.recording.Recorder):
 
     def __init__(self, population, file=None):
         super(Recorder, self).__init__(population, file=file)
+        self.changed_since_last_run = True
 
     def record(self, variables, ids, sampling_interval=None):
+        self.changed_since_last_run = True
         # MADC based recording is only possible for one neuron on a chip
         # it is therefore checked for population size one and no multi
         # assignment before the parent record function is called which modifies

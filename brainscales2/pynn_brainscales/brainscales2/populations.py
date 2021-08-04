@@ -17,6 +17,7 @@ class Population(pyNN.common.Population):
     _assembly_class = Assembly
     all_cells: np.ndarray
     _mask_local: np.ndarray
+    changed_since_last_run = True
 
     def _create_cells(self):
         id_range = np.arange(self._simulator.state.id_counter,
@@ -57,6 +58,7 @@ class Population(pyNN.common.Population):
 
     def _set_parameters(self, parameter_space):
         """parameter_space should contain native parameters"""
+        self.changed_since_last_run = True
         parameter_space.evaluate(simplify=False)
         for name, value in parameter_space.items():
             self.celltype.parameter_space[name] = value
@@ -86,6 +88,7 @@ class PopulationView(pyNN.common.PopulationView):
 
     def _set_parameters(self, parameter_space):
         """parameter_space should contain native parameters"""
+        self.parent.changed_since_last_run = True
         parameter_space.evaluate(simplify=False)
         for name, value in parameter_space.items():
             self.celltype.parameter_space[name][self.mask] = value
