@@ -99,6 +99,7 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
                          simulator.NeuronPlacement.default_permutation))
     simulator.state.injected_config = \
         extra_params.get('injected_config', InjectedConfiguration())
+    simulator.state.prepare_static_config()
 
 
 def end():

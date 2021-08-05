@@ -144,6 +144,10 @@ class State(BaseState):
         self.conn = None
         self.grenade_network = None
         self.grenade_network_graph = None
+        self.grenade_chip_config = None
+        self.injection_pre_static_config = None
+        self.injection_pre_realtime = None
+        self.injection_post_realtime = None
 
     def run_until(self, tstop):
         self.run(tstop - self.t)
@@ -161,6 +165,10 @@ class State(BaseState):
         self.injected_config = None
         self.grenade_network = None
         self.grenade_network_graph = None
+        self.grenade_chip_config = None
+        self.injection_pre_static_config = None
+        self.injection_pre_realtime = None
+        self.injection_post_realtime = None
 
         self.reset()
 
@@ -279,6 +287,9 @@ class State(BaseState):
 
         for recorder in self.recorders:
             population = recorder.population
+            if not (population.changed_since_last_run
+                    or recorder.changed_since_last_run):
+                continue
             assert isinstance(population.celltype, (HXNeuron,
                                                     SpikeSourceArray,
                                                     SpikeSourcePoisson))
@@ -459,18 +470,23 @@ class State(BaseState):
                 population, input_generator)
         return input_generator.done()
 
-    def run(self, runtime: Optional[float]):
-        """
-        Performs a hardware run for `runtime` milliseconds.
-        If runtime is `None`, we only perform preparatory steps.
-        """
-        if runtime is None:
-            self.log.INFO("User requested 'None' runtime: "
-                          + "no hardware run performed.")
-        else:
-            self.t += runtime
-        self.running = True
+    def _generate_playback_hooks(self):
+        assert self.injection_pre_static_config is not None
+        assert self.injection_pre_realtime is not None
+        assert self.injection_post_realtime is not None
+        pre_static_config = sta.PlaybackProgramBuilder()
+        pre_realtime = sta.PlaybackProgramBuilder()
+        post_realtime = sta.PlaybackProgramBuilder()
+        pre_static_config.copy_back(
+            self.injection_pre_static_config)
+        pre_realtime.copy_back(
+            self.injection_pre_realtime)
+        post_realtime.copy_back(
+            self.injection_post_realtime)
+        return grenade.ExecutionInstancePlaybackHooks(
+            pre_static_config, pre_realtime, post_realtime)
 
+    def prepare_static_config(self):
         config = grenade.ChipConfig()
         builder1 = sta.PlaybackProgramBuilder()
 
@@ -484,11 +500,7 @@ class State(BaseState):
         config = grenade.convert_to_chip(tmpdumper, config)
         builder1.merge_back(sta.convert_to_builder(tmpdumper))
 
-        # generate network graph
-        network_graph = self._generate_network_graph()
-
-        # configure populations and recorders
-        config = self._configure_recorders_populations(config)
+        self.grenade_chip_config = config
 
         # reset dirty-flags
         self._reset_changed_since_last_run()
@@ -502,7 +514,8 @@ class State(BaseState):
         tmpdumper = sta.DumperDone()
         tmpdumper.values = list(self.injected_config.pre_realtime
                                 .items())
-        pre_realtime.merge_back(sta.convert_to_builder(tmpdumper))
+        pre_realtime.merge_back(
+            sta.convert_to_builder(tmpdumper))
 
         # injected configuration post realtime
         tmpdumper = sta.DumperDone()
@@ -510,8 +523,30 @@ class State(BaseState):
                                 .items())
         post_realtime = sta.convert_to_builder(tmpdumper)
 
-        playback_hooks = grenade.ExecutionInstancePlaybackHooks(
-            builder1, pre_realtime, post_realtime)
+        self.injection_pre_static_config = builder1
+        self.injection_pre_realtime = pre_realtime
+        self.injection_post_realtime = post_realtime
+
+    def run(self, runtime: Optional[float]):
+        """
+        Performs a hardware run for `runtime` milliseconds.
+        If runtime is `None`, we only perform preparatory steps.
+        """
+        if runtime is None:
+            self.log.INFO("User requested 'None' runtime: "
+                          + "no hardware run performed.")
+        else:
+            self.t += runtime
+        self.running = True
+
+        # generate network graph
+        network_graph = self._generate_network_graph()
+
+        # configure populations and recorders
+        self.grenade_chip_config = self._configure_recorders_populations(
+            self.grenade_chip_config)
+
+        self._reset_changed_since_last_run()
 
         if runtime is None:
             return
@@ -529,7 +564,8 @@ class State(BaseState):
 
         try:
             outputs = grenade.run(
-                self.conn, config, network_graph, inputs, playback_hooks)
+                self.conn, self.grenade_chip_config, network_graph,
+                inputs, self._generate_playback_hooks())
 
         except RuntimeError:
             # perform post-mortem read out of status
