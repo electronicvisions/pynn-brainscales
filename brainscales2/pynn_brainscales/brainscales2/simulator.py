@@ -427,20 +427,21 @@ class State(BaseState):
                 self.populations, proj, network_builder)
         network = network_builder.done()
 
-        # return early, if we don't need to route again
-        if self.grenade_network is not None and \
-                not grenade.requires_routing(network, self.grenade_network):
-            assert self.grenade_network_graph is not None
-            return self.grenade_network_graph
+        # route network if required
+        routing_result = None
+        if self.grenade_network is None \
+                or grenade.requires_routing(network, self.grenade_network):
+            routing_result = grenade.build_routing(network)
 
         self.grenade_network = network
 
-        # route network
-        routing_result = grenade.build_routing(network)
-
-        # build network graph
-        self.grenade_network_graph = grenade.build_network_graph(
-            self.grenade_network, routing_result)
+        # build or update network graph
+        if routing_result is not None:
+            self.grenade_network_graph = grenade.build_network_graph(
+                self.grenade_network, routing_result)
+        else:
+            grenade.update_network_graph(
+                self.grenade_network_graph, self.grenade_network)
 
         return self.grenade_network_graph
 
