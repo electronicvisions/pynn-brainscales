@@ -66,6 +66,14 @@ class TestProjection(unittest.TestCase):
         self.assertEqual(proj.get("weight", format="list"), connection_list)
         pynn.run(None)
 
+    def test_set_one_to_one(self):
+        proj = pynn.Projection(self.pop3, self.pop3, pynn.OneToOneConnector())
+        proj.set(weight=32)
+        connection_list = [(0, 0, 32), (1, 1, 32)]
+        self.assertEqual(proj.get("weight", format="list"), connection_list)
+        pynn.run(None)
+        pynn.simulator.state.projections = []
+
 
 if __name__ == '__main__':
     unittest.main()

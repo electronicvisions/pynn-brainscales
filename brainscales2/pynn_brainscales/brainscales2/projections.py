@@ -78,12 +78,10 @@ class Projection(pyNN.common.Projection):
     def _set_attributes(self, parameter_space):
         parameter_space.evaluate(mask=(slice(None), self.post._mask_local))
         for name, value in parameter_space.items():
-            for pre in self.pre:
-                pre = self.pre.id_to_index(pre)
-                for post in self.post:
-                    post = self.post.id_to_index(post)
-                    setattr(self.connections[pre + len(self.pre) * post],
-                            name, float(value[pre][post]))
+            for connection in self.connections:
+                setattr(connection, name, float(value[
+                    connection.presynaptic_index][
+                        connection.postsynaptic_index]))
 
     def _set_initial_value_array(self, variable, initial_value):
         raise NotImplementedError
