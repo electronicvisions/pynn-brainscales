@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import List
 from copy import deepcopy
+import numpy as np
 import pyNN.common
 from pyNN.common import Population, PopulationView, Assembly
 from pyNN.space import Space
@@ -142,12 +143,11 @@ class Projection(pyNN.common.Projection):
         population_post = grenade.PopulationDescriptor(
             populations.index(post))
 
-        connections: grenade.Projection.Connections = [
-            grenade.Projection.Connection(
-                conn.pop_pre_index,
-                conn.pop_post_index,
-                int(conn.weight))
-            for conn in projection.connections]
+        connections = np.empty((len(projection.connections), 3), dtype=int)
+        for i, conn in enumerate(projection.connections):
+            connections[i, 0] = conn.pop_pre_index
+            connections[i, 1] = conn.pop_post_index
+            connections[i, 2] = int(conn.weight)
 
         if projection.receptor_type == "excitatory":
             receptor_type = grenade.Projection.ReceptorType.excitatory
@@ -158,7 +158,8 @@ class Projection(pyNN.common.Projection):
                 "grenade.Projection.RecetorType does "
                 + f"not support {projection.receptor_type}.")
 
-        gprojection = grenade.Projection(
+        gprojection = grenade.Projection()
+        gprojection.from_numpy(
             receptor_type, connections, population_pre, population_post)
 
         return builder.add(gprojection)
