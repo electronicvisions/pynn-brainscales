@@ -2,7 +2,7 @@ from abc import abstractmethod, ABC
 import inspect
 import numbers
 import numpy as np
-from typing import List, Dict, ClassVar, Final, Optional, Union
+from typing import List, Dict, ClassVar, Final, Optional, Union, Callable
 
 from pyNN.parameters import ArrayParameter
 from pyNN.standardmodels import cells, build_translations, StandardCellType
@@ -85,6 +85,8 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
         [name for name, _ in inspect.getmembers(lola.AtomicNeuron())
          if(not(name.startswith("_")) and name.islower())]
 
+    _hw_entity_setters: ClassVar[Dict[str, Callable]]
+
     _coco_inject: Optional[Dict[halco.AtomicNeuronOnDLS, lola.AtomicNeuron]]
     # needed to restore after coco was injected
     _user_provided_parameters: Optional[Dict[str, Union[int, bool]]]
@@ -153,43 +155,65 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
     def can_record(self, variable: str) -> bool:
         return variable in self.recordable
 
-    @staticmethod
-    def create_hw_entity(pynn_parameters: dict) -> lola.AtomicNeuron:
+    @classmethod
+    def _generate_hw_entity_setters(cls) -> None:
         """
-        Builds a Lola Neuron with the values from the dict 'pynn_parameters'.
+        Builds setters for creation of Lola Neuron.
         """
 
-        neuron = lola.AtomicNeuron()
-        neuron_members = HXNeuron.ATOMIC_NEURON_MEMBERS
+        cls._hw_entity_setters = dict()
 
-        for param in pynn_parameters:
+        for param in cls.get_default_values():
             member = ""
             cut = 0
-            for mem in neuron_members:  # slice
+            for mem in cls.ATOMIC_NEURON_MEMBERS:  # slice
                 start_index = param.find(mem)
                 if start_index == 0:
                     cut = start_index + len(mem) + 1
                     member = mem
             attr = param[cut:]
 
-            # enable to hand over integers in pynn_parameters
-            if isinstance(pynn_parameters[param], numbers.Real):
-                pynn_parameters[param] = \
-                    int(pynn_parameters[param])
+            def generate_setter(member, attr, param):
+                if param == "readout_source":
+                    def setter(neuron, value):
+                        # enable to hand over integers in value
+                        # pyNN internally stores all numerical values as float,
+                        # we need to get back the int to cast back to an enum.
+                        if isinstance(value, numbers.Real):
+                            value = int(value)
+                        # set initial values
+                        real_member = getattr(neuron, member)
+                        setattr(real_member, attr,
+                                hal.NeuronConfig.ReadoutSource(value))
+                        setattr(neuron, member, real_member)
+                else:
+                    def setter(neuron, value):
+                        # enable to hand over integers in value
+                        # pyNN internally stores all numerical values as float,
+                        # we need to get back the int to cast back to an enum.
+                        if isinstance(value, numbers.Real):
+                            value = int(value)
+                        # set initial values
+                        real_member = getattr(neuron, member)
+                        # PyNN uses lazyarrays for value storage; need to
+                        # restore original type
+                        val = type(getattr(real_member, attr))(value)
+                        setattr(real_member, attr, val)
+                        setattr(neuron, member, real_member)
+                return setter
+            cls._hw_entity_setters[param] = \
+                generate_setter(member, attr, param)
 
-            # set initial values
-            real_member = getattr(neuron, member)
-            if param == "readout_source":
-                setattr(real_member, attr,
-                        hal.NeuronConfig.ReadoutSource(
-                            pynn_parameters[param]))
-            else:
-                # PyNN uses lazyarrays for value storage; need to restore
-                # original type
-                val = type(getattr(real_member,
-                                   attr))(pynn_parameters[param])
-                setattr(real_member, attr, val)
-            setattr(neuron, member, real_member)
+    @classmethod
+    def create_hw_entity(cls, pynn_parameters: dict) -> lola.AtomicNeuron:
+        """
+        Builds a Lola Neuron with the values from the dict 'pynn_parameters'.
+        """
+
+        neuron = lola.AtomicNeuron()
+        for param in pynn_parameters:
+            cls._hw_entity_setters[param](
+                neuron, pynn_parameters[param])
 
         return neuron
 
@@ -280,6 +304,7 @@ HXNeuron.default_initial_values = HXNeuron.get_default_values()
 HXNeuron.default_parameters = HXNeuron.default_initial_values
 # pylint: disable=protected-access
 HXNeuron.translations = HXNeuron._create_translation()
+HXNeuron._generate_hw_entity_setters()  # pylint: disable=protected-access
 
 
 class SpikeSourcePoisson(cells.SpikeSourcePoisson, NetworkAddableCell):
