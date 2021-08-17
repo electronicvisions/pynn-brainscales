@@ -136,8 +136,8 @@ class Projection(pyNN.common.Projection):
     @staticmethod
     def add_to_network_graph(populations: List[Population],
                              projection: Projection,
-                             builder: grenade.NetworkBuilder) \
-            -> grenade.ProjectionDescriptor:
+                             builder: grenade.logical_network.NetworkBuilder) \
+            -> grenade.logical_network.ProjectionDescriptor:
 
         if isinstance(projection.pre, Assembly):
             raise NotImplementedError("Assemblies are not supported yet")
@@ -154,9 +154,9 @@ class Projection(pyNN.common.Projection):
         post = projection.post.grandparent if \
             post_has_grandparent else projection.post
 
-        population_pre = grenade.PopulationDescriptor(
+        population_pre = grenade.logical_network.PopulationDescriptor(
             populations.index(pre))
-        population_post = grenade.PopulationDescriptor(
+        population_post = grenade.logical_network.PopulationDescriptor(
             populations.index(post))
 
         connections = np.empty((len(projection.connections), 3), dtype=int)
@@ -166,15 +166,17 @@ class Projection(pyNN.common.Projection):
             connections[i, 2] = int(abs(conn.weight))
 
         if projection.receptor_type == "excitatory":
-            receptor_type = grenade.Projection.ReceptorType.excitatory
+            receptor_type = \
+                grenade.logical_network.Projection.ReceptorType.excitatory
         elif projection.receptor_type == "inhibitory":
-            receptor_type = grenade.Projection.ReceptorType.inhibitory
+            receptor_type = \
+                grenade.logical_network.Projection.ReceptorType.inhibitory
         else:
             raise NotImplementedError(
                 "grenade.Projection.RecetorType does "
                 + f"not support {projection.receptor_type}.")
 
-        gprojection = grenade.Projection()
+        gprojection = grenade.logical_network.Projection()
         gprojection.from_numpy(
             receptor_type, connections, population_pre, population_post)
 
@@ -226,10 +228,7 @@ class Connection(pyNN.common.Connection):
             raise pyNN.errors.ConnectionError(
                 "Weights must be positive for "
                 "conductance-based and/or excitatory synapses")
-        if abs(parameters["weight"]) > simulator.state.max_weight:
-            raise ValueError("The absolute weight must be <= {}."
-                             .format(simulator.state.max_weight))
-        self._weight = parameters["weight"]
+        self._set_weight(parameters["weight"])
         if parameters["delay"] != 0:
             raise ValueError("Setting the delay unequal 0 is not supported.")
         self._delay = parameters["delay"]
@@ -246,9 +245,6 @@ class Connection(pyNN.common.Connection):
             raise pyNN.errors.ConnectionError(
                 "Weights must be positive for "
                 "conductance-based and/or excitatory synapses")
-        if abs(new_weight) > simulator.state.max_weight:
-            raise ValueError("The absolute weight must be <= {}."
-                             .format(simulator.state.max_weight))
         self._weight = new_weight
         self.projection.changed_since_last_run = True
 

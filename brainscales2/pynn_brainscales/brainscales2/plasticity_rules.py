@@ -40,7 +40,7 @@ class Timer:
     period = property(_get_period, _set_period)
     num_periods = property(_get_num_periods, _set_num_periods)
 
-    def to_grenade(self) -> grenade.PlasticityRule.Timer:
+    def to_grenade(self) -> grenade.logical_network.PlasticityRule.Timer:
         def to_ppu_cycles(value: float) -> int:
             # TODO (Issue #3993): calculate frequency from chip config
             result = float(value)
@@ -49,7 +49,7 @@ class Timer:
             result = result * 2  # 250MHz vs. 125MHz
             return grenade.PlasticityRule.Timer.Value(int(round(result)))
 
-        timer = grenade.PlasticityRule.Timer()
+        timer = grenade.logical_network.PlasticityRule.Timer()
         timer.start = to_ppu_cycles(self.start)
         timer.period = to_ppu_cycles(self.period)
         timer.num_periods = int(self.num_periods)
@@ -121,13 +121,14 @@ class PlasticityRule:
         {}
         """)
 
-    def add_to_network_graph(self, builder: grenade.NetworkBuilder) \
-            -> grenade.PlasticityRuleDescriptor:
-        plasticity_rule = grenade.PlasticityRule()
+    def add_to_network_graph(self, builder: grenade.logical_network
+                             .NetworkBuilder) \
+            -> grenade.logical_network.PlasticityRuleDescriptor:
+        plasticity_rule = grenade.logical_network.PlasticityRule()
         plasticity_rule.timer = self.timer.to_grenade()
         plasticity_rule.kernel = self.generate_kernel()
         plasticity_rule.projections = [
-            grenade.ProjectionDescriptor(
+            grenade.logical_network.ProjectionDescriptor(
                 self._simulator.state.projections.index(proj))
             for proj in self._projections
         ]

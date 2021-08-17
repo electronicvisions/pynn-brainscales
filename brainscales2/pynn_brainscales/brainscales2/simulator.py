@@ -1,7 +1,7 @@
 import time
 import itertools
 from copy import copy
-from typing import Optional, Final, List, Dict, Union, Set
+from typing import Optional, Final, List, Dict, Union, Set, Tuple
 import numpy as np
 from pyNN.common import IDMixin, Population, Projection
 from pyNN.common.control import BaseState
@@ -185,9 +185,6 @@ class BackgroundSpikeSourcePlacement:
 class State(BaseState):
     """Represent the simulator state."""
 
-    # TODO support larger weights, ISSUE #3873
-    max_weight: Final[int] = lola.SynapseMatrix.Weight.max
-
     # pylint: disable=invalid-name
     # TODO: replace by calculation (cf. feature #3594)
     dt: Final[float] = 3.4e-05  # average time between two MADC samples
@@ -233,6 +230,7 @@ class State(BaseState):
         self.conn_comes_from_outside = False
         self.grenade_network = None
         self.grenade_network_graph = None
+        self.grenade_logical_network_graph = None
         self.grenade_chip_config = None
         self.injection_pre_static_config = None
         self.injection_pre_realtime = None
@@ -266,6 +264,7 @@ class State(BaseState):
         self.inside_realtime_end_read = dict()
         self.post_realtime_read = dict()
         self.grenade_network = None
+        self.grenade_logical_network_graph = None
         self.grenade_network_graph = None
         self.grenade_chip_config = None
         self.injection_pre_static_config = None
@@ -436,7 +435,9 @@ class State(BaseState):
                         enable_spike_output=cell_id in spike_rec_indexes)
         return config
 
-    def _generate_network_graph(self) -> grenade.NetworkGraph:
+    def _generate_network_graphs(self) \
+            -> Tuple[grenade.logical_network.NetworkGraph,
+                     grenade.NetworkGraph]:
         """
         Generate placed and routed executable network graph representation.
         """
@@ -448,11 +449,13 @@ class State(BaseState):
                 iter(self.projections),
                 iter(self.plasticity_rules)))
         if not changed_since_last_run:
-            if self.grenade_network_graph is not None:
-                return self.grenade_network_graph
+            if self.grenade_network_graph is not None and self\
+                    .grenade_logical_network_graph is not None:
+                return (self.grenade_logical_network_graph,
+                        self.grenade_network_graph)
 
         # generate network
-        network_builder = grenade.NetworkBuilder()
+        network_builder = grenade.logical_network.NetworkBuilder()
         for pop in self.populations:
             pop.celltype.add_to_network_graph(
                 pop, network_builder)
@@ -462,6 +465,9 @@ class State(BaseState):
         for plasticity_rule in self.plasticity_rules:
             plasticity_rule.add_to_network_graph(network_builder)
         network = network_builder.done()
+        network_graph = grenade.logical_network.build_network_graph(network)
+        self.grenade_logical_network_graph = network_graph
+        network = network_graph.hardware_network
 
         # route network if required
         routing_result = None
@@ -479,7 +485,7 @@ class State(BaseState):
             grenade.update_network_graph(
                 self.grenade_network_graph, self.grenade_network)
 
-        return self.grenade_network_graph
+        return (self.grenade_logical_network_graph, self.grenade_network_graph)
 
     def _reset_changed_since_last_run(self):
         """
@@ -495,15 +501,18 @@ class State(BaseState):
         for plasticity_rule in self.plasticity_rules:
             plasticity_rule.changed_since_last_run = False
 
-    def _generate_inputs(self, network_graph: grenade.NetworkGraph) \
+    def _generate_inputs(
+            self, network_graph: grenade.logical_network.NetworkGraph,
+            hardware_network_graph: grenade.NetworkGraph) \
             -> grenade.IODataMap:
         """
         Generate external input events from the routed network graph
         representation.
         """
-        if network_graph.event_input_vertex is None:
+        if hardware_network_graph.event_input_vertex is None:
             return grenade.IODataMap()
-        input_generator = grenade.InputGenerator(network_graph)
+        input_generator = grenade.logical_network.InputGenerator(
+            network_graph, hardware_network_graph)
         for population in self.populations:
             population.celltype.add_to_input_generator(
                 population, input_generator)
@@ -697,7 +706,7 @@ class State(BaseState):
         self.running = True
 
         # generate network graph
-        network_graph = self._generate_network_graph()
+        logical_network, hardware_network = self._generate_network_graphs()
 
         # configure populations and recorders
         self.grenade_chip_config = self._configure_recorders_populations(
@@ -711,7 +720,7 @@ class State(BaseState):
             return
 
         # generate external spike trains
-        inputs = self._generate_inputs(network_graph)
+        inputs = self._generate_inputs(logical_network, hardware_network)
         runtime_in_clocks = int(
             runtime * int(hal.Timer.Value.fpga_clock_cycles_per_us) * 1000)
         if runtime_in_clocks > hal.Timer.Value.max:
@@ -733,7 +742,7 @@ class State(BaseState):
             time_after_preparations - time_begin))
 
         outputs = grenade.run(
-            self.conn, self.grenade_chip_config, network_graph,
+            self.conn, self.grenade_chip_config, hardware_network,
             inputs, self._generate_playback_hooks())
 
         self.log.DEBUG("run(): Execution finished in {:.3f}s".format(
@@ -741,11 +750,11 @@ class State(BaseState):
         time_after_hw_run = time.time()
 
         # make list 'spikes' of tupel (neuron id, spike time)
-        self.spikes = self._get_spikes(network_graph, outputs)
+        self.spikes = self._get_spikes(hardware_network, outputs)
 
         # make two list for madc samples: times, madc_samples
         self.times, self.madc_samples = self._get_v(
-            network_graph, outputs)
+            hardware_network, outputs)
 
         self.pre_realtime_read = self._get_pre_realtime_read()
         self.post_realtime_read = self._get_post_realtime_read()

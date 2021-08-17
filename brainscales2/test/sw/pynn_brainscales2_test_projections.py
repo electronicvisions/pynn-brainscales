@@ -46,8 +46,6 @@ class TestProjection(unittest.TestCase):
         self.assertEqual(proj.get("weight", format="array"), 42)
         proj.set(weight=43)
         self.assertEqual(proj.get("weight", format="list"), [(0, 0, 43)])
-        with self.assertRaises(ValueError):
-            proj.set(weight=64)
         with self.assertRaises(pynn.errors.ConnectionError):
             proj.set(weight=-1)
 
