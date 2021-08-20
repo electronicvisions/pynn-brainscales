@@ -269,9 +269,21 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
             enable_record_spikes = np.isin(
                 pop_cells_int,
                 list(population.recorder.recorded["spikes"]))
+        # create neurons
+        neurons: List[grenade.logical_network.Population.Neuron] = [
+            grenade.logical_network.Population.Neuron(
+                halco.LogicalNeuronOnDLS(halco.LogicalNeuronCompartments(
+                    {halco.CompartmentOnLogicalNeuron():
+                     [halco.AtomicNeuronOnLogicalNeuron()]}), atomic_neuron),
+                {halco.CompartmentOnLogicalNeuron():
+                 grenade.logical_network.Population.Neuron.Compartment(
+                     grenade.logical_network.Population
+                     .Neuron.Compartment.SpikeMaster(
+                         0, enable_record_spikes[i]), [receptors])})
+            for i, atomic_neuron in enumerate(coords)
+        ]
         # create grenade population
-        gpopulation = grenade.logical_network.Population(
-            coords, [receptors] * len(coords), enable_record_spikes)
+        gpopulation = grenade.logical_network.Population(neurons)
         # add to builder
         descriptor = builder.add(gpopulation)
 
@@ -294,7 +306,10 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
         madc_recording = grenade.logical_network.MADCRecording()
         madc_recording.population = descriptor
         madc_recording.source = simulator.state.madc_recorder.readout_source
-        madc_recording.index = readout_cell_idxs[0]
+        madc_recording.neuron_on_population = readout_cell_idxs[0]
+        madc_recording.compartment_on_neuron = \
+            halco.CompartmentOnLogicalNeuron()
+        madc_recording.atomic_neuron_on_compartment = 0
         builder.add(madc_recording)
 
         return descriptor

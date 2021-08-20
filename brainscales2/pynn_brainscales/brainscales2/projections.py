@@ -159,11 +159,13 @@ class Projection(pyNN.common.Projection):
         population_post = grenade.logical_network.PopulationDescriptor(
             populations.index(post))
 
-        connections = np.empty((len(projection.connections), 3), dtype=int)
+        connections = np.empty((len(projection.connections), 5), dtype=int)
         for i, conn in enumerate(projection.connections):
             connections[i, 0] = conn.pop_pre_index
-            connections[i, 1] = conn.pop_post_index
-            connections[i, 2] = int(abs(conn.weight))
+            connections[i, 1] = 0
+            connections[i, 2] = conn.pop_post_index
+            connections[i, 3] = 0
+            connections[i, 4] = int(abs(conn.weight))
 
         if projection.receptor_type == "excitatory":
             receptor_type = \
