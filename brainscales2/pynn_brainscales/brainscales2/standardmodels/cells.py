@@ -302,8 +302,7 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
 
 HXNeuron.default_initial_values = HXNeuron.get_default_values()
 HXNeuron.default_parameters = HXNeuron.default_initial_values
-# pylint: disable=protected-access
-HXNeuron.translations = HXNeuron._create_translation()
+HXNeuron.translations = HXNeuron._create_translation()  # pylint: disable=protected-access
 HXNeuron._generate_hw_entity_setters()  # pylint: disable=protected-access
 
 
