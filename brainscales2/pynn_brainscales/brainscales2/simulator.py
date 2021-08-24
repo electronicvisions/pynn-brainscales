@@ -25,11 +25,12 @@ class ID(int, IDMixin):
 
 
 class NeuronPlacement:
-    # TODO: support multi compartment issue #3750
     """
-    Tracks assignment of pyNN IDs of HXNeuron based populations to the
-    corresponding hardware entity, i.e. AtomicNeuronOnDLS. Default constructed
-    with 1 to 1 permutation.
+    Tracks the assignment of pyNN IDs to LogicalNeuronOnDLS.
+
+    This tracking is needed for all neuron types which are placed in the
+    neuron array. By default the anchor of the neurons are placed in increasing
+    order of the hardware enumeration.
 
     :param neuron_id: Look up table for permutation. Index: HW related
                     population neuron enumeration. Value: HW neuron

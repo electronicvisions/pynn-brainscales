@@ -30,7 +30,7 @@ class Population(pyNN.common.Population):
         for cell_id in self.all_cells:
             cell_id.parent = self
 
-        if hasattr(self.celltype, "create_hw_entity"):
+        if hasattr(self.celltype, "logical_compartments"):
             simulator.state.neuron_placement.register_neuron(
                 self.all_cells, self.celltype.logical_compartments)
             coords = simulator.state.neuron_placement.\
