@@ -9,7 +9,7 @@ from pyNN.standardmodels import cells, build_translations, StandardCellType
 from pyNN.common import Population
 from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.recording import Recorder
-from dlens_vx_v2 import lola, hal, halco
+from dlens_vx_v2 import lola, hal, halco, sta
 import pygrenade_vx as grenade
 
 
@@ -304,6 +304,97 @@ HXNeuron.default_initial_values = HXNeuron.get_default_values()
 HXNeuron.default_parameters = HXNeuron.default_initial_values
 HXNeuron.translations = HXNeuron._create_translation()  # pylint: disable=protected-access
 HXNeuron._generate_hw_entity_setters()  # pylint: disable=protected-access
+
+
+class SpikeSourcePoissonOnChip(StandardCellType, NetworkAddableCell):
+    """
+    Spike source, generating spikes according to a Poisson process.
+    """
+
+    def __init__(self, rate, seed):
+
+        parameters = {"rate": rate, "seed": seed}
+        super().__init__(**parameters)
+
+    translations = build_translations(
+        ('rate', 'rate'),
+        ('seed', 'seed'),
+    )
+
+    _simulator = simulator
+    _padi_bus: Optional[halco.PADIBusOnPADIBusBlock] = None
+
+    background_source_clock_frequency: ClassVar[float]
+
+    # TODO: implement L2-based read-out
+    recordable = []
+
+    def can_record(self, variable: str) -> bool:
+        return variable in self.recordable
+
+    @staticmethod
+    def add_to_network_graph(population: Population,
+                             builder: grenade.NetworkBuilder) \
+            -> grenade.PopulationDescriptor:
+        # register hardware utilisation
+        if not population.celltype._padi_bus:
+            simulator.state.background_spike_source_placement.register_id(
+                list(population.all_cells))
+            population.celltype._padi_bus = simulator.state \
+                .background_spike_source_placement.id2source(
+                    list(population.all_cells))
+        # calculate period and rate from rate[Hz]
+        assert np.all(population.celltype.parameter_space["rate"]
+                      == population.celltype.parameter_space["rate"][0])
+        assert np.all(population.celltype.parameter_space["seed"]
+                      == population.celltype.parameter_space["seed"][0])
+        hwrate = population.celltype.parameter_space["rate"][0] \
+            * population.size
+        if hwrate > SpikeSourcePoissonOnChip.background_source_clock_frequency:
+            raise RuntimeError(
+                "The chosen Poisson rate can not be realized on"
+                " hardware. The product of rate and number of neurons is too"
+                " high in this population.")
+        rate = hal.BackgroundSpikeSource.Rate(int(round(
+            hal.BackgroundSpikeSource.Rate.max * hwrate
+            / SpikeSourcePoissonOnChip.background_source_clock_frequency)))
+        prob = (rate.value() + 1) / hal.BackgroundSpikeSource.Rate.size
+        period = hal.BackgroundSpikeSource.Period(
+            int(round(SpikeSourcePoissonOnChip
+                .background_source_clock_frequency / hwrate * prob) - 1))
+        # create grenade population
+        config = \
+            grenade.BackgroundSpikeSourcePopulation.Config()
+        config.period = period
+        config.rate = rate
+        config.seed = hal.BackgroundSpikeSource.Seed(
+            population.celltype.parameter_space["seed"][0])
+        config.enable_random = True
+        # we need both hemispheres because of possibly arbitrary connection
+        # targets
+        gpopulation = grenade.BackgroundSpikeSourcePopulation(
+            population.size,
+            {halco.HemisphereOnDLS(0): population.celltype._padi_bus,
+             halco.HemisphereOnDLS(1): population.celltype._padi_bus},
+            config
+        )
+        return builder.add(gpopulation)
+
+    @staticmethod
+    def add_to_input_generator(
+            population: Population,
+            builder: grenade.InputGenerator):
+        pass
+
+
+SpikeSourcePoissonOnChip.background_source_clock_frequency = \
+    sta.DigitalInit() \
+    .adplls[sta.DigitalInit().pll_clock_output_block.get_clock_output(
+        halco.PLLClockOutputOnDLS.phy_ref_clk).select_adpll] \
+    .calculate_output_frequency(
+        sta.DigitalInit().pll_clock_output_block.get_clock_output(
+            halco.PLLClockOutputOnDLS.phy_ref_clk
+        ).select_adpll_output) / 2.  # spl1_clk
 
 
 class SpikeSourcePoisson(cells.SpikeSourcePoisson, NetworkAddableCell):

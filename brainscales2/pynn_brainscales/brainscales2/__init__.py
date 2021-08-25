@@ -75,6 +75,14 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
                            results in the first neuron of the first HXNeuron
                            population to be assigned to
                            AtomicNeuronOnDLS(Enum(2)) and so forth.
+        backgroundPermutation: List providing lookup for custom pyNN background
+                               spike source to hardware entity.
+                               Index: HW related population source
+                               enumeration. Value: HW source enumeration. Can
+                               be shorter than total HW source count. E.g.
+                               [2,3] results in the first population to be
+                               assigned to PADIBusOnPADIBusBlock(2) and so
+                               forth.
         enable_neuron_bypass: Enable neuron bypass mode: neurons forward spikes
                               arriving at the synaptic input (i.e. no leaky
                               integration is happening); defaults to False.
@@ -98,6 +106,11 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
     simulator.state.neuron_placement = simulator.NeuronPlacement(
         extra_params.get("neuronPermutation",
                          simulator.NeuronPlacement.default_permutation))
+    simulator.state.background_spike_source_placement = \
+        simulator.BackgroundSpikeSourcePlacement(
+            extra_params.get("backgroundPermutation",
+                             simulator.BackgroundSpikeSourcePlacement
+                             .default_permutation))
     simulator.state.injected_config = \
         extra_params.get('injected_config', InjectedConfiguration())
     simulator.state.prepare_static_config()

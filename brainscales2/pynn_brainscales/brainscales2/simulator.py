@@ -4,7 +4,7 @@ import numpy as np
 from pyNN.common import IDMixin, Population, Projection
 from pyNN.common.control import BaseState
 from pynn_brainscales.brainscales2.standardmodels.cells import HXNeuron, \
-    SpikeSourceArray, SpikeSourcePoisson
+    SpikeSourceArray, SpikeSourcePoisson, SpikeSourcePoissonOnChip
 from dlens_vx_v2 import hal, halco, sta, hxcomm, lola, logger
 import pygrenade_vx as grenade
 
@@ -104,6 +104,82 @@ class NeuronPlacement:
         return permutation
 
 
+class BackgroundSpikeSourcePlacement:
+    """
+    Tracks assignment of pyNN IDs of SpikeSourcePoissonOnChip based populations
+    to the corresponding hardware entity, i.e. BackgroundSpikeSourceOnDLS. We
+    use one source on each hemisphere to ensure arbitrary routing works.
+    Default constructed with reversed 1 to 1 permutation to yield better
+    distribution for small networks.
+
+    :cvar default_permutation: Default permutation, where allocation is ordered
+                               to start at the highest-enum PADI-bus to reduce
+                               overlap with allocated neurons.
+    """
+    _pb_2_id: Dict[halco.PADIBusOnPADIBusBlock, List[ID]]
+    _permutation: List[halco.PADIBusOnPADIBusBlock]
+    _max_num_entries: Final[int] = halco.PADIBusOnPADIBusBlock.size
+    default_permutation: Final[List[int]] = list(reversed(range(
+        halco.PADIBusOnPADIBusBlock.size)))
+
+    def __init__(self, permutation: List[int] = None):
+        """
+        :param permutation: Look up table for permutation. Index: HW related
+                            population neuron enumeration. Value: HW neuron
+                            enumeration.
+        """
+
+        if permutation is None:
+            permutation = self.default_permutation
+        self._pb_2_id = dict()
+        self._permutation = self._check_and_transform(permutation)
+
+    def register_id(self, neuron_id: Union[List[ID], ID]):
+        """
+        Register a new ID to placement
+
+        :param neuron_id: pyNN neuron ID to be registered
+        """
+        if not (hasattr(neuron_id, "__iter__")
+                and hasattr(neuron_id, "__len__")):
+            neuron_id = [neuron_id]
+        if len(self._pb_2_id) + 1 > len(self._permutation):
+            raise ValueError(
+                f"Cannot register more than {len(self._permutation)} ID sets")
+        self._pb_2_id[self._permutation[len(self._pb_2_id)]] = neuron_id
+
+    def id2source(self, neuron_id: Union[List[ID], ID]) \
+            -> halco.PADIBusOnPADIBusBlock:
+        """
+        Get hardware coordinate from pyNN ID
+
+        :param neuron_id: pyNN neuron ID
+        """
+        for padi_bus in self._pb_2_id:
+            if all(i in self._pb_2_id[padi_bus] for i in neuron_id):
+                return padi_bus
+        raise RuntimeError("No ID found.")
+
+    @staticmethod
+    def _check_and_transform(lut: list) -> list:
+
+        cell_id_size = BackgroundSpikeSourcePlacement._max_num_entries
+        if len(lut) > cell_id_size:
+            raise ValueError("Too many elements in HW LUT.")
+        if len(lut) > len(set(lut)):
+            raise ValueError("Non unique entries in HW LUT.")
+        permutation = []
+        for idx in lut:
+            if not 0 <= idx < cell_id_size:
+                raise ValueError(
+                    f"BackgroundSpikeSourcePermutation list entry {idx} out of"
+                    + f" range. Needs to be in range [0, {cell_id_size - 1}]"
+                )
+            coord = halco.PADIBusOnPADIBusBlock(idx)
+            permutation.append(coord)
+        return permutation
+
+
 class State(BaseState):
     """Represent the simulator state."""
 
@@ -130,6 +206,7 @@ class State(BaseState):
         self.min_delay = 0
         self.max_delay = 0
         self.neuron_placement = None
+        self.background_spike_source_placement = None
         self.populations: List[Population] = []
         self.recorders = set([])
         self.madc_recorder = None
@@ -163,6 +240,7 @@ class State(BaseState):
         self.segment_counter = -1
         self.enable_neuron_bypass = False
         self.neuron_placement = None
+        self.background_spike_source_placement = None
         self.injected_config = None
         self.grenade_network = None
         self.grenade_network_graph = None
@@ -344,7 +422,8 @@ class State(BaseState):
             population = recorder.population
             assert isinstance(population.celltype, (HXNeuron,
                                                     SpikeSourceArray,
-                                                    SpikeSourcePoisson))
+                                                    SpikeSourcePoisson,
+                                                    SpikeSourcePoissonOnChip))
             if isinstance(population.celltype, HXNeuron):
 
                 # retrieve for which neurons what kind of recording is active
