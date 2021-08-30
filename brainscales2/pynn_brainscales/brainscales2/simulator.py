@@ -557,9 +557,15 @@ class State(BaseState):
 
         # generate external spike trains
         inputs = self._generate_inputs(network_graph)
-        inputs.runtime = \
-            [int(runtime
-                 * int(hal.Timer.Value.fpga_clock_cycles_per_us) * 1000)]
+        runtime_in_clocks = int(
+            runtime * int(hal.Timer.Value.fpga_clock_cycles_per_us) * 1000)
+        if runtime_in_clocks > hal.Timer.Value.max:
+            max_runtime = hal.Timer.Value.max /\
+                1000 / int(hal.Timer.Value.fpga_clock_cycles_per_us)
+            raise ValueError(f"Runtime of {runtime} to long. "
+                             f"Maximum supported runtime {max_runtime}")
+
+        inputs.runtime = [runtime_in_clocks]
 
         if self.conn_manager is None:
             self.conn_manager = hxcomm.ManagedConnection()
