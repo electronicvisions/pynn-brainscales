@@ -380,29 +380,6 @@ class State(BaseState):
 
         return builder, config
 
-    def _perform_post_fail_analysis(self, connection):
-        """
-        Read out and log FPGA status containers in a post-mortem program.
-        """
-        builder = sta.PlaybackProgramBuilder()
-
-        # perform stat readout at the end of the experiment
-        ticket_arq = builder.read(halco.HicannARQStatusOnFPGA())
-
-        tickets_phy = []
-        for coord in halco.iter_all(halco.PhyStatusOnFPGA):
-            tickets_phy.append(builder.read(coord))
-
-        builder.block_until(halco.BarrierOnFPGA(), hal.Barrier.omnibus)
-        sta.run(connection, builder.done())
-
-        error_msg = "_perform_post_fail_analysis(): "
-        error_msg += "Experiment failed, reading post-mortem status."
-        error_msg += str(ticket_arq.get())
-        for ticket_phy in tickets_phy:
-            error_msg += str(ticket_phy.get()) + "\n"
-        self.log.ERROR(error_msg)
-
     def _generate_network_graph(self) -> grenade.NetworkGraph:
         """
         Generate placed and routed executable network graph representation.
@@ -572,15 +549,9 @@ class State(BaseState):
             assert self.conn is None
             self.conn = self.conn_manager.__enter__()
 
-        try:
-            outputs = grenade.run(
-                self.conn, self.grenade_chip_config, network_graph,
-                inputs, self._generate_playback_hooks())
-
-        except RuntimeError:
-            # perform post-mortem read out of status
-            self._perform_post_fail_analysis(self.conn)
-            raise
+        outputs = grenade.run(
+            self.conn, self.grenade_chip_config, network_graph,
+            inputs, self._generate_playback_hooks())
 
         # make list 'spikes' of tupel (neuron id, spike time)
         self.spikes = self._get_spikes(network_graph, outputs)
