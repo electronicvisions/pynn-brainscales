@@ -156,6 +156,19 @@ class Projection(pyNN.common.Projection):
 
         return builder.add(gprojection)
 
+    @property
+    def placed_connections(self):
+        """
+        Query the last routing run for placement of this projection.
+        """
+        if self._simulator.state.grenade_network_graph is None:
+            raise RuntimeError(
+                "placed_connections requires a previous routing run"
+                ", which is executed on pynn.run().")
+        return self._simulator.state.grenade_network_graph \
+            .get_placed_connections(grenade.ProjectionDescriptor(
+                self._simulator.state.projections.index(self)))
+
 
 class Connection(pyNN.common.Connection):
     """
