@@ -92,15 +92,11 @@ class Recorder(pyNN.recording.Recorder):
     def _get_spiketimes(ids):
         """Returns a dict containing the neuron_id and its spiketimes."""
         all_spiketimes = {}
-        if len(simulator.state.spikes) > 0:
-            neuron_hw_enums = simulator.state.spikes[:, 0]
-            spiketimes = simulator.state.spikes[:, 1]
-            for cell_id in ids:
-                neuron_idx = simulator.state.neuron_placement.id2hwenum(
-                    cell_id)
-                result_indices = np.where(neuron_hw_enums == neuron_idx)
-                spikes = spiketimes[result_indices]
-                all_spiketimes[cell_id] = spikes
+        for cell_id in ids:
+            neuron_idx = simulator.state.neuron_placement.id2hwenum(
+                cell_id)
+            if neuron_idx in simulator.state.spikes:
+                all_spiketimes[cell_id] = simulator.state.spikes[neuron_idx]
         return all_spiketimes
 
     # pylint: disable=unused-argument

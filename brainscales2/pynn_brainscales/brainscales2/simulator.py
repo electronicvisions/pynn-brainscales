@@ -181,18 +181,18 @@ class State(BaseState):
 
     @staticmethod
     def _get_spikes(network_graph: grenade.NetworkGraph,
-                    outputs: grenade.IODataMap) -> np.ndarray:
+                    outputs: grenade.IODataMap) -> Dict[int, np.ndarray]:
         """
         Get spikes indexed via neuron IDs.
         :param network_graph: Network graph to use for lookup of
                               spike label <-> ID relation
         :param outputs: All outputs of a single execution to extract
                         spikes from
-        :return: Spikes as (time, ID) as numpy array
+        :return: Spikes as dict with atomic neuron enum value as key and
+                 numpy array of times as value
         """
-        times, neurons = grenade.extract_neuron_spikes(
+        return grenade.extract_neuron_spikes(
             outputs, network_graph)
-        return np.array((neurons, times)).T
 
     @staticmethod
     def _get_v(network_graph: grenade.NetworkGraph,
