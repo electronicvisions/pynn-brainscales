@@ -1,5 +1,5 @@
 import itertools
-from typing import Optional, Final, List, Dict, Union
+from typing import Optional, Final, List, Dict, Union, Set
 import numpy as np
 from pyNN.common import IDMixin, Population, Projection
 from pyNN.common.control import BaseState
@@ -250,7 +250,8 @@ class State(BaseState):
                             neuron_id: ID,
                             parameters: dict,
                             readout_source:
-                            Optional[hal.NeuronConfig.ReadoutSource]) \
+                            Optional[hal.NeuronConfig.ReadoutSource],
+                            enable_spike_output: bool) \
             -> grenade.ChipConfig:
         """
         Places Neuron in Population "pop" on chip and configures spike and
@@ -264,7 +265,7 @@ class State(BaseState):
         # configure spike recording
         atomic_neuron.event_routing.analog_output = \
             atomic_neuron.EventRouting.AnalogOutputMode.normal
-        atomic_neuron.event_routing.enable_digital = True
+        atomic_neuron.event_routing.enable_digital = enable_spike_output
         if self.enable_neuron_bypass:
             # disable threshold comparator
             atomic_neuron.threshold.enable = False
@@ -282,30 +283,78 @@ class State(BaseState):
 
         return config
 
+    def _recorders_populations_changed(self) -> Set[Population]:
+        """
+        Collect populations which configurations were changed.
+
+        This includes changes in:
+            - neuron parameters
+            - recorder settings
+            - out-going synaptic connections
+
+        :return: Populations which were subject to a change mentioned above.
+        """
+        changed = set()
+        for recorder in self.recorders:
+            population = recorder.population
+            if (population.changed_since_last_run
+                    or recorder.changed_since_last_run):
+                changed.add(population)
+        for projection in self.projections:
+            pre_has_grandparent = hasattr(projection.pre, "grandparent")
+            pre = projection.pre.grandparent if \
+                pre_has_grandparent else projection.pre
+            if projection.changed_since_last_run:
+                changed.add(pre)
+        return changed
+
+    def _spike_source_indices(self) -> Dict[Population, Set[ID]]:
+        """
+        Collect all neurons which serve as a spike source.
+
+        Check each projection and collect populations and their neurons which
+        serve as spike sources.
+
+        :return: Sets cell ids of neurons which serve as spike sources.
+                 These sets are organized in populations which they belong to.
+        """
+        spike_source_indices = dict()
+        for projection in self.projections:
+            pre_has_grandparent = hasattr(projection.pre, "grandparent")
+            pre = projection.pre.grandparent if \
+                pre_has_grandparent else projection.pre
+            for connection in projection.connections:
+                if pre not in spike_source_indices:
+                    spike_source_indices.update({pre: set()})
+                spike_source_indices[pre].add(
+                    pre.all_cells[connection.pop_pre_index])
+        return spike_source_indices
+
     def _configure_recorders_populations(self,
                                          config: grenade.ChipConfig) \
             -> grenade.ChipConfig:
 
+        changed = self._recorders_populations_changed()
+        if not changed:
+            return config
+        spike_source_indices = self._spike_source_indices()
         for recorder in self.recorders:
-            population = recorder.population
-            if not (population.changed_since_last_run
-                    or recorder.changed_since_last_run):
+            if recorder.population not in changed:
                 continue
+            population = recorder.population
             assert isinstance(population.celltype, (HXNeuron,
                                                     SpikeSourceArray,
                                                     SpikeSourcePoisson))
             if isinstance(population.celltype, HXNeuron):
 
                 # retrieve for which neurons what kind of recording is active
-                spike_rec_indexes = []
+                spike_rec_indexes = set()
                 madc_recording_id = None
                 readout_source = Optional[hal.NeuronConfig.ReadoutSource]
                 for parameter, cell_ids in recorder.recorded.items():
                     for cell_id in cell_ids:
-                        # we always record spikes at the moment
-                        spike_rec_indexes.append(cell_id)
                         if parameter == "spikes":
-                            pass
+                            spike_rec_indexes.add(cell_id)
                         elif parameter in recorder.madc_variables:
                             assert self.madc_recorder is not None and \
                                 cell_id == self.madc_recorder.cell_id
@@ -313,6 +362,9 @@ class State(BaseState):
                             readout_source = self.madc_recorder.readout_source
                         else:
                             raise NotImplementedError
+                if population in spike_source_indices:
+                    spike_rec_indexes = spike_rec_indexes.union(
+                        spike_source_indices[population])
                 for cell_id, parameters in zip(
                         population.all_cells,
                         population.celltype.parameter_space):
@@ -324,7 +376,8 @@ class State(BaseState):
                         config,
                         cell_id,
                         parameters,
-                        readout_source=this_source)
+                        readout_source=this_source,
+                        enable_spike_output=cell_id in spike_rec_indexes)
         return config
 
     @staticmethod
