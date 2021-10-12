@@ -19,7 +19,6 @@ class TestProjection(unittest.TestCase):
     def tearDown(self):
         pynn.end()
 
-    @unittest.expectedFailure
     def test_identical_connection(self):
         pynn.Projection(self.pop1, self.pop2, pynn.AllToAllConnector())
         pynn.Projection(self.pop1, self.pop2, pynn.AllToAllConnector())
