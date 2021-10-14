@@ -12,7 +12,7 @@ def coco_from_file(path: str) -> dict:
     dumper = sta.DumperDone()
     with open(path, 'rb') as fd:
         data = fd.read()
-    sta.from_binary(dumper, data)
+    sta.from_portablebinary(dumper, data)
     return dict(dumper.tolist())
 
 
@@ -49,7 +49,7 @@ def nightly_calib_path() -> Path:
     with hxcomm.ManagedConnection() as connection:
         identifier = connection.get_unique_identifier()
         path = f"/wang/data/calibration/hicann-dls-sr-hx/{identifier}/stable/"\
-            "latest/spiking_cocolist.bin"
+            "latest/spiking_cocolist.pbin"
         return Path(path)
 
 

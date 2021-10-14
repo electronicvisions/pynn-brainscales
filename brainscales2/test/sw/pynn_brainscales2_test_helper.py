@@ -31,7 +31,7 @@ class TestHelper(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             filename = os.path.join(tempdir, "dump")
             with open(filename, "wb") as fd:
-                fd.write(sta.to_binary(builder.done()))
+                fd.write(sta.to_portablebinary(builder.done()))
             full_coco = pynn.helper.coco_from_file(filename)
         self.assertTrue(an_coord0 in full_coco)
         self.assertTrue(an_coord1 in full_coco)
@@ -54,7 +54,7 @@ class TestHelper(unittest.TestCase):
     @mock.patch.dict(os.environ, {"HXCOMM_ENABLE_ZERO_MOCK": "1"}, clear=True)
     def test_nightly_calib_path(self):
         expected_path = "/wang/data/calibration/hicann-dls-sr-hx/zeromock/" \
-            "stable/latest/spiking_cocolist.bin"
+            "stable/latest/spiking_cocolist.pbin"
         tested_path = pynn.helper.nightly_calib_path()
         self.assertEqual(expected_path, str(tested_path))
 
