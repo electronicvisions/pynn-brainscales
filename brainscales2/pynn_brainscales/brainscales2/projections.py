@@ -7,6 +7,7 @@ from pyNN.common import Population, PopulationView, Assembly
 from pyNN.space import Space
 from pynn_brainscales.brainscales2.standardmodels.synapses import StaticSynapse
 from pynn_brainscales.brainscales2 import simulator
+from pynn_brainscales.brainscales2.plasticity_rules import PlasticityRule
 import pygrenade_vx as grenade
 
 
@@ -74,6 +75,21 @@ class Projection(pyNN.common.Projection):
 
         self._simulator.state.projections.append(self)
         self.changed_since_last_run = True
+
+    def __setattr__(self, name, value):
+        # Handle (de-)registering of projection in plasticity rule.
+        # A plasticity rule can be applied to multiple projections
+        # and then serve handles to all in the kernel code, for which
+        # registration here is required.
+        if name == "synapse_type":
+            if hasattr(self, name):
+                if isinstance(self.synapse_type, PlasticityRule):
+                    self.synapse_type._remove_projection(self)
+            super().__setattr__(name, value)
+            if isinstance(self.synapse_type, PlasticityRule):
+                self.synapse_type._add_projection(self)
+        else:
+            super().__setattr__(name, value)
 
     def __len__(self):
         """Return the total number of local connections."""
@@ -161,6 +177,8 @@ class Projection(pyNN.common.Projection):
         gprojection = grenade.Projection()
         gprojection.from_numpy(
             receptor_type, connections, population_pre, population_post)
+        gprojection.enable_is_required_dense_in_order = \
+            isinstance(projection.synapse_type, PlasticityRule)
 
         return builder.add(gprojection)
 

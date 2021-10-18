@@ -213,6 +213,7 @@ class State(BaseState):
         self.recorders = set([])
         self.madc_recorder = None
         self.projections: List[Projection] = []
+        self.plasticity_rules: List["PlasticityRule"] = []
         self.id_counter = 0
         self.current_sources = []
         self.segment_counter = -1
@@ -242,6 +243,7 @@ class State(BaseState):
         self.populations = []
         self.madc_recorder = None
         self.projections = []
+        self.plasticity_rules = []
         self.id_counter = 0
         self.current_sources = []
         self.segment_counter = -1
@@ -440,12 +442,13 @@ class State(BaseState):
         """
         Generate placed and routed executable network graph representation.
         """
-        # check if populations, recorders or projections changed
+        # check if populations, recorders, projections or plasticity changed
         changed_since_last_run = any(
             elem.changed_since_last_run for elem in itertools.chain(
                 iter(self.populations),
                 iter(self.recorders),
-                iter(self.projections)))
+                iter(self.projections),
+                iter(self.plasticity_rules)))
         if not changed_since_last_run:
             if self.grenade_network_graph is not None:
                 return self.grenade_network_graph
@@ -458,6 +461,8 @@ class State(BaseState):
         for proj in self.projections:
             proj.add_to_network_graph(
                 self.populations, proj, network_builder)
+        for plasticity_rule in self.plasticity_rules:
+            plasticity_rule.add_to_network_graph(network_builder)
         network = network_builder.done()
 
         # route network if required
@@ -489,6 +494,8 @@ class State(BaseState):
             recorder.changed_since_last_run = False
         for proj in self.projections:
             proj.changed_since_last_run = False
+        for plasticity_rule in self.plasticity_rules:
+            plasticity_rule.changed_since_last_run = False
 
     def _generate_inputs(self, network_graph: grenade.NetworkGraph) \
             -> grenade.IODataMap:

@@ -15,6 +15,8 @@ from pynn_brainscales.brainscales2.standardmodels import cells, synapses
 from pynn_brainscales.brainscales2.populations import Population, \
     PopulationView, Assembly
 from pynn_brainscales.brainscales2.projections import Projection
+from pynn_brainscales.brainscales2.plasticity_rules import Timer, \
+    PlasticityRule
 from pynn_brainscales.brainscales2 import helper
 from dlens_vx_v3 import lola, hal, halco, sta
 import pygrenade_vx as grenade
