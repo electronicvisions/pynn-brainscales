@@ -106,11 +106,10 @@ class Projection(pyNN.common.Projection):
                     filtered_connection_parameters[key] = \
                         value[pre_index]
 
-            if filtered_connection_parameters["weight"] < 0 \
-                    or filtered_connection_parameters["weight"] \
+            if abs(filtered_connection_parameters["weight"]) \
                     > self._simulator.state.max_weight:
                 raise ValueError(
-                    "The weight must be positive and smaller than {}."
+                    "The absolute weight must be smaller than {}."
                     .format(self._simulator.state.max_weight))
 
             connection = Connection(self, pre_index, postsynaptic_index,
@@ -147,7 +146,7 @@ class Projection(pyNN.common.Projection):
         for i, conn in enumerate(projection.connections):
             connections[i, 0] = conn.pop_pre_index
             connections[i, 1] = conn.pop_post_index
-            connections[i, 2] = int(conn.weight)
+            connections[i, 2] = int(abs(conn.weight))
 
         if projection.receptor_type == "excitatory":
             receptor_type = grenade.Projection.ReceptorType.excitatory

@@ -266,7 +266,7 @@ inh_stim_pop = pynn.Population(1, SpikeSourceArray(spike_times=inh_spiketimes))
 
 pynn.Projection(inh_stim_pop, stimulated_p,
                 pynn.AllToAllConnector(),
-                synapse_type=StaticSynapse(weight=63),
+                synapse_type=StaticSynapse(weight=-63),
                 receptor_type="inhibitory")
 
 # You may play around with the parameters in this experiment to achieve
