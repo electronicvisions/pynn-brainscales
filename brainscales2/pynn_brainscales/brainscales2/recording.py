@@ -78,6 +78,7 @@ class Recorder(pyNN.recording.Recorder):
         pass
 
     def _reset(self):
+        self.changed_since_last_run = True
         # only MADC record setting needs to be reset for BSS back end. As it's
         # a global state we check if a record parameters is MADC based
         for variable in self.recorded:
