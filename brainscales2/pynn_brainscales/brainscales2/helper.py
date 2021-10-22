@@ -1,3 +1,4 @@
+import urllib
 from typing import Dict
 from pathlib import Path
 from dlens_vx_v2 import sta, halco, lola, hxcomm
@@ -40,24 +41,54 @@ def filter_non_atomic_neuron(coco: dict) -> dict:
     return other_cocos
 
 
-def nightly_calib_path() -> Path:
+def get_unique_identifier() -> str:
     """
-    Find path for calibration automatically from environment.
+    Retrieve the unique identifier of the current chip.
+
     Set by Slurm when allocating resources.
     """
     # TODO: opening a connection is architecturally wrong, cf. issue #3868
     with hxcomm.ManagedConnection() as connection:
         identifier = connection.get_unique_identifier()
-        path = f"/wang/data/calibration/hicann-dls-sr-hx/{identifier}/stable/"\
-            "latest/spiking_cocolist.pbin"
-        return Path(path)
+    return identifier
+
+
+def nightly_calib_path() -> Path:
+    """
+    Find path for nightly calibration.
+    """
+    identifier = get_unique_identifier()
+    path = f"/wang/data/calibration/hicann-dls-sr-hx/{identifier}/stable/"\
+        "latest/spiking_cocolist.pbin"
+    return Path(path)
+
+
+def nightly_calib_url() -> str:
+    """
+    Find url for nightly calibration.
+    """
+    identifier = get_unique_identifier()
+    return "https://openproject.bioai.eu/data_calibration/" \
+           f"hicann-dls-sr-hx/{identifier}/stable/latest/" \
+           "spiking_cocolist.pbin"
 
 
 def filtered_cocos_from_nightly() -> (dict, dict):
     """
-    Extract atomic and non-atomic coco lists from nightly calibration
+    Extract atomic and non-atomic coco lists from nightly calibration.
     """
-    coco = coco_from_file(nightly_calib_path())
+
+    # First check local filesystem if calibration does not exist try to
+    # download it
+    if nightly_calib_path().exists():
+        coco = coco_from_file(nightly_calib_path())
+    else:
+        try:
+            coco = urllib.request.urlopen(nightly_calib_url()).read()
+        except urllib.error.URLError:
+            raise RuntimeError('Could not find a nightly calibration for '
+                               f'setup "{get_unique_identifier}".')
+
     atomic_coco = filter_atomic_neuron(coco)
     inject_coco = filter_non_atomic_neuron(coco)
     return atomic_coco, inject_coco
