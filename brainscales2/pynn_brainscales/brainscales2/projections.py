@@ -130,12 +130,12 @@ class Projection(pyNN.common.Projection):
         # grenade has no concept of pop views, we therefore need to
         # get pre- and post-synaptic population descriptor of the parent in
         # case of pop views
-        pre_is_view = isinstance(projection.pre, PopulationView)
-        post_is_view = isinstance(projection.post, PopulationView)
+        pre_has_grandparent = hasattr(projection.pre, "grandparent")
+        post_has_grandparent = hasattr(projection.post, "grandparent")
         pre = projection.pre.grandparent if \
-            pre_is_view else projection.pre
+            pre_has_grandparent else projection.pre
         post = projection.post.grandparent if \
-            post_is_view else projection.post
+            post_has_grandparent else projection.post
 
         population_pre = grenade.PopulationDescriptor(
             populations.index(pre))
