@@ -87,7 +87,7 @@ def filtered_cocos_from_nightly() -> (dict, dict):
             coco = urllib.request.urlopen(nightly_calib_url()).read()
         except urllib.error.URLError:
             raise RuntimeError('Could not find a nightly calibration for '
-                               f'setup "{get_unique_identifier}".')
+                               f'setup "{get_unique_identifier()}".')
 
     atomic_coco = filter_atomic_neuron(coco)
     inject_coco = filter_non_atomic_neuron(coco)
