@@ -626,11 +626,8 @@ class State(BaseState):
         # reset dirty-flags
         self._reset_changed_since_last_run()
 
-        # injected configuration post non realtime
-        pre_realtime = sta.PlaybackProgramBuilder()
-        add_configuration(pre_realtime, self.injected_config.post_non_realtime)
-
         # injected configuration pre realtime
+        pre_realtime = sta.PlaybackProgramBuilder()
         add_configuration(pre_realtime, self.injected_config.pre_realtime)
 
         # injected configuration post realtime

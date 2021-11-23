@@ -38,8 +38,6 @@ class InjectedConfiguration():
 
     :param pre_non_realtime: Injection written prior to
                               the non realtime configuration.
-    :param post_non_realtime: Injection written after the
-                               the non realtime configuration.
     :param pre_realtime: Injection written prior to
                           the realtime configuration.
     :param post_realtime: Injection written after the
@@ -48,9 +46,6 @@ class InjectedConfiguration():
     # TODO: replace hal.Container with union over hal and lola containers
     pre_non_realtime: Union[Dict[halco.Coordinate,
                                  hal.Container], sta.PlaybackProgramBuilder] \
-        = field(default_factory=dict)
-    post_non_realtime: Union[Dict[halco.Coordinate,
-                                  hal.Container], sta.PlaybackProgramBuilder] \
         = field(default_factory=dict)
     pre_realtime: Union[Dict[halco.Coordinate,
                              hal.Container],

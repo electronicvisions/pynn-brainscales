@@ -45,12 +45,6 @@ class TestpyNNSetup(unittest.TestCase):
         pynn.end()
 
         pynn.setup(injected_config=pynn.InjectedConfiguration(
-            post_non_realtime={halco.AtomicNeuronOnDLS():
-                               lola.AtomicNeuron()}))
-        pynn.run(None)
-        pynn.end()
-
-        pynn.setup(injected_config=pynn.InjectedConfiguration(
             pre_realtime={halco.AtomicNeuronOnDLS(): lola.AtomicNeuron()}))
         pynn.run(None)
         pynn.end()
@@ -62,7 +56,6 @@ class TestpyNNSetup(unittest.TestCase):
 
         pynn.setup(injected_config=pynn.InjectedConfiguration(
             pre_non_realtime={halco.AtomicNeuronOnDLS(): lola.AtomicNeuron()},
-            post_non_realtime={halco.AtomicNeuronOnDLS(): lola.AtomicNeuron()},
             pre_realtime={halco.AtomicNeuronOnDLS(): lola.AtomicNeuron()},
             post_realtime={halco.AtomicNeuronOnDLS(): lola.AtomicNeuron()}))
         pynn.run(None)
@@ -72,11 +65,6 @@ class TestpyNNSetup(unittest.TestCase):
     def test_injected_builder():
         pynn.setup(injected_config=pynn.InjectedConfiguration(
             pre_non_realtime=sta.PlaybackProgramBuilder()))
-        pynn.run(None)
-        pynn.end()
-
-        pynn.setup(injected_config=pynn.InjectedConfiguration(
-            post_non_realtime=sta.PlaybackProgramBuilder()))
         pynn.run(None)
         pynn.end()
 
@@ -92,7 +80,6 @@ class TestpyNNSetup(unittest.TestCase):
 
         pynn.setup(injected_config=pynn.InjectedConfiguration(
             pre_non_realtime=sta.PlaybackProgramBuilder(),
-            post_non_realtime=sta.PlaybackProgramBuilder(),
             pre_realtime=sta.PlaybackProgramBuilder(),
             post_realtime=sta.PlaybackProgramBuilder()))
         pynn.run(None)
