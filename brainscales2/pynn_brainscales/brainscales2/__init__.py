@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Dict, Union
-from pyNN import common, space
+from pyNN import common, space, errors
 from pyNN.recording import get_io
 from pyNN.common.control import DEFAULT_MAX_DELAY, DEFAULT_MIN_DELAY
 from pyNN.connectors import AllToAllConnector, OneToOneConnector, \

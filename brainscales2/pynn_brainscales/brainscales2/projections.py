@@ -105,13 +105,6 @@ class Projection(pyNN.common.Projection):
                         and len(value) > 0:
                     filtered_connection_parameters[key] = \
                         value[pre_index]
-
-            if abs(filtered_connection_parameters["weight"]) \
-                    > self._simulator.state.max_weight:
-                raise ValueError(
-                    "The absolute weight must be smaller than {}."
-                    .format(self._simulator.state.max_weight))
-
             connection = Connection(self, pre_index, postsynaptic_index,
                                     **filtered_connection_parameters)
             self.connections.append(connection)
@@ -188,6 +181,17 @@ class Connection(pyNN.common.Connection):
                 projection.post.index_in_grandparent([post_index])[0]
         else:
             self.pop_post_index = post_index
+        assert not self.projection.post.conductance_based
+        if ((parameters["weight"] < 0)
+                and (self.projection.receptor_type != "inhibitory")) or \
+                ((parameters["weight"] > 0)
+                 and (self.projection.receptor_type != "excitatory")):
+            raise pyNN.errors.ConnectionError(
+                "Weights must be positive for "
+                "conductance-based and/or excitatory synapses")
+        if abs(parameters["weight"]) > simulator.state.max_weight:
+            raise ValueError("The absolute weight must be <= {}."
+                             .format(simulator.state.max_weight))
         self._weight = parameters["weight"]
         if parameters["delay"] != 0:
             raise ValueError("Setting the delay unequal 0 is not supported.")
@@ -197,8 +201,16 @@ class Connection(pyNN.common.Connection):
 
     def _set_weight(self, new_weight):
         new_weight = round(new_weight)
-        if new_weight < 0 or new_weight > simulator.state.max_weight:
-            raise ValueError("The weight must be in the interval [0, {}]."
+        assert not self.projection.post.conductance_based
+        if ((new_weight < 0)
+                and (self.projection.receptor_type != "inhibitory")) or \
+                ((new_weight > 0)
+                 and (self.projection.receptor_type != "excitatory")):
+            raise pyNN.errors.ConnectionError(
+                "Weights must be positive for "
+                "conductance-based and/or excitatory synapses")
+        if abs(new_weight) > simulator.state.max_weight:
+            raise ValueError("The absolute weight must be <= {}."
                              .format(simulator.state.max_weight))
         self._weight = new_weight
         self.projection.changed_since_last_run = True

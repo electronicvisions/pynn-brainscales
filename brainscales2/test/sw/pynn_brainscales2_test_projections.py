@@ -48,7 +48,7 @@ class TestProjection(unittest.TestCase):
         self.assertEqual(proj.get("weight", format="list"), [(0, 0, 43)])
         with self.assertRaises(ValueError):
             proj.set(weight=64)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(pynn.errors.ConnectionError):
             proj.set(weight=-1)
 
         proj = pynn.Projection(self.pop3, self.pop4, pynn.AllToAllConnector(),
@@ -63,6 +63,34 @@ class TestProjection(unittest.TestCase):
         connection_list = [(0, 0, 32), (1, 0, 32), (2, 0, 32),
                            (0, 1, 32), (1, 1, 32), (2, 1, 32)]
         self.assertEqual(proj.get("weight", format="list"), connection_list)
+        pynn.run(None)
+
+    def test_weight_sign(self):
+        synapse_exc = pynn.standardmodels.synapses.StaticSynapse(weight=32)
+        synapse_inh = pynn.standardmodels.synapses.StaticSynapse(weight=-32)
+        proj_exc = pynn.Projection(
+            self.pop1, self.pop1, pynn.AllToAllConnector(),
+            receptor_type="excitatory", synapse_type=synapse_exc)
+        proj_inh = pynn.Projection(
+            self.pop1, self.pop1, pynn.AllToAllConnector(),
+            receptor_type="inhibitory", synapse_type=synapse_inh)
+
+        # wrong sign on construction
+        with self.assertRaises(pynn.errors.ConnectionError):
+            pynn.Projection(
+                self.pop1, self.pop1, pynn.AllToAllConnector(),
+                receptor_type="excitatory", synapse_type=synapse_inh)
+        with self.assertRaises(pynn.errors.ConnectionError):
+            pynn.Projection(
+                self.pop1, self.pop1, pynn.AllToAllConnector(),
+                receptor_type="inhibitory", synapse_type=synapse_exc)
+
+        # wrong sign on set()
+        with self.assertRaises(pynn.errors.ConnectionError):
+            proj_exc.set(weight=-32)
+        with self.assertRaises(pynn.errors.ConnectionError):
+            proj_inh.set(weight=32)
+
         pynn.run(None)
 
     def test_set_one_to_one(self):
