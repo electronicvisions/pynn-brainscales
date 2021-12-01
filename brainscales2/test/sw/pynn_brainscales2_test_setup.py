@@ -37,6 +37,10 @@ class TestpyNNSetup(unittest.TestCase):
         with self.assertRaises(ValueError):
             pynn.setup(neuronPermutation=[-1])
 
+    def test_unhandled_parameter(self):
+        with self.assertRaises(KeyError):
+            pynn.setup(foo=True)
+
     @staticmethod
     def test_injected_config():
         pynn.setup(injected_config=pynn.InjectedConfiguration(

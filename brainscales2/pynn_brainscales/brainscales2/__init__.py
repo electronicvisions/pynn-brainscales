@@ -87,8 +87,8 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
     # global instance singleton
     simulator.state = simulator.State()
 
-    max_delay = extra_params.get('max_delay', DEFAULT_MAX_DELAY)
-    enable_neuron_bypass = extra_params.get('enable_neuron_bypass', False)
+    max_delay = extra_params.pop('max_delay', DEFAULT_MAX_DELAY)
+    enable_neuron_bypass = extra_params.pop('enable_neuron_bypass', False)
     common.setup(timestep, min_delay, **extra_params)
     simulator.state.clear()
     if min_delay == "auto":
@@ -99,19 +99,23 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
     simulator.state.max_delay = max_delay
     simulator.state.enable_neuron_bypass = enable_neuron_bypass
     simulator.state.neuron_placement = simulator.NeuronPlacement(
-        extra_params.get("neuronPermutation",
+        extra_params.pop("neuronPermutation",
                          simulator.NeuronPlacement.default_permutation))
     simulator.state.background_spike_source_placement = \
         simulator.BackgroundSpikeSourcePlacement(
-            extra_params.get("backgroundPermutation",
+            extra_params.pop("backgroundPermutation",
                              simulator.BackgroundSpikeSourcePlacement
                              .default_permutation))
     simulator.state.injected_config = \
-        extra_params.get('injected_config', InjectedConfiguration())
+        extra_params.pop('injected_config', InjectedConfiguration())
     simulator.state.prepare_static_config()
-    simulator.state.conn = extra_params.get('connection', None)
+    simulator.state.conn = extra_params.pop('connection', None)
     simulator.state.conn_comes_from_outside = \
         (simulator.state.conn is not None)
+
+    if extra_params:
+        raise KeyError("unhandled extra_params in call to pynn.setup(...):"
+                       f"{extra_params}")
 
 
 def end():
