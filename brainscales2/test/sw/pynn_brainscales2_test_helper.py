@@ -64,6 +64,13 @@ class TestHelper(unittest.TestCase):
         self.assertTrue(atomic is not None)
         self.assertTrue(inject is not None)
 
+    def test_coco_from_file(self):
+        path = "/wang/data/calibration/hicann-dls-sr-hx/zeromock/" \
+            "stable/latest/spiking_cocolist.pbin"
+        atomic, inject = pynn.helper.filtered_cocos_from_file(path)
+        self.assertTrue(atomic is not None)
+        self.assertTrue(inject is not None)
+
 
 if __name__ == '__main__':
     unittest.main()

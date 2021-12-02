@@ -92,3 +92,11 @@ def filtered_cocos_from_nightly() -> (dict, dict):
     atomic_coco = filter_atomic_neuron(coco)
     inject_coco = filter_non_atomic_neuron(coco)
     return atomic_coco, inject_coco
+
+
+def filtered_cocos_from_file(calib: Path) -> (dict, dict):
+    """
+    Extract atomic and non-atomic coco lists from calibration file.
+    """
+    coco = coco_from_file(calib)
+    return filter_atomic_neuron(coco), filter_non_atomic_neuron(coco)
