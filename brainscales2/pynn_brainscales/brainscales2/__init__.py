@@ -17,6 +17,7 @@ from pynn_brainscales.brainscales2.populations import Population, \
 from pynn_brainscales.brainscales2.projections import Projection
 from pynn_brainscales.brainscales2 import helper
 from dlens_vx_v2 import hal, halco, sta
+import pygrenade_vx as grenade
 import pylogging as logger
 
 
@@ -211,3 +212,23 @@ def get_pre_realtime_read() -> Dict[halco.Coordinate, hal.Container]:
         raise RuntimeError("Pre-realtime reads are only available with valid"
                            " simulator.")
     return simulator.state.pre_realtime_read
+
+
+def get_backend_statistics() -> grenade.NetworkGraphStatistics:
+    """
+    Get statistics of placement and routing like amount of time spent and
+    number of hardware entities used.
+    :raises RuntimeError: If the simulator is not active, i.e. pynn.setup()
+                          was not called.
+    :raises RuntimeError: If the routing and placement step were not
+                          performed, i.e. pynn.run() was not called.
+    :return: Statistics object.
+    """
+    if not simulator.state:
+        raise RuntimeError(
+            "Backend statistics are only available for active simulator.")
+    if not simulator.state.grenade_network_graph:
+        raise RuntimeError(
+            "Backend statistics are only available after first mapping and"
+            " routing execution, which happens in pynn.run().")
+    return grenade.extract_statistics(simulator.state.grenade_network_graph)
