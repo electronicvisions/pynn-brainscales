@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Dict, Union
+from typing import Dict, Union, Set
 from pyNN import common, space, errors
 from pyNN.recording import get_io
 from pyNN.common.control import DEFAULT_MAX_DELAY, DEFAULT_MIN_DELAY
@@ -56,6 +56,19 @@ class InjectedConfiguration():
         field(default_factory=dict)
 
 
+@dataclass
+class InjectedReadout():
+    """User defined injected readout
+
+    :param pre_realtime: Injection of reads after the
+                           the pre_realtime configuration.
+    :param post_realtime: Injection of reads after the
+                           the post_realtime configuration.
+    """
+    pre_realtime: Set[halco.Coordinate] = field(default_factory=set)
+    post_realtime: Set[halco.Coordinate] = field(default_factory=set)
+
+
 # TODO: handle the delays (cf. feature #3657)
 def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
           **extra_params):
@@ -82,6 +95,7 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
                               arriving at the synaptic input (i.e. no leaky
                               integration is happening); defaults to False.
         injected_config: Optional user defined injected configuration.
+        injected_readout: Optional user defined injected readout.
     """
 
     # global instance singleton
@@ -108,6 +122,8 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
                              .default_permutation))
     simulator.state.injected_config = \
         extra_params.pop('injected_config', InjectedConfiguration())
+    simulator.state.injected_readout = \
+        extra_params.pop('injected_readout', InjectedReadout())
     simulator.state.prepare_static_config()
     simulator.state.conn = extra_params.pop('connection', None)
     simulator.state.conn_comes_from_outside = \
@@ -163,3 +179,27 @@ connect = common.build_connect(Projection, FixedProbabilityConnector,
 set = common.set
 
 record = common.build_record(simulator)
+
+
+def get_post_realtime_read() -> Dict[halco.Coordinate, hal.Container]:
+    """
+    Get injected read results of after post_realtime section.
+    :return: Dictionary with coordinates as keys and read container as
+             values.
+    """
+    if not simulator.state:
+        raise RuntimeError("Post-realtime reads are only available with valid"
+                           " simulator.")
+    return simulator.state.post_realtime_read
+
+
+def get_pre_realtime_read() -> Dict[halco.Coordinate, hal.Container]:
+    """
+    Get injected read results of after pre_realtime section.
+    :return: Dictionary with coordinates as keys and read container as
+             values.
+    """
+    if not simulator.state:
+        raise RuntimeError("Pre-realtime reads are only available with valid"
+                           " simulator.")
+    return simulator.state.pre_realtime_read

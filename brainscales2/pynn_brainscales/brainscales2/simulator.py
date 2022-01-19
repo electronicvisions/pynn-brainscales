@@ -217,6 +217,11 @@ class State(BaseState):
         self.enable_neuron_bypass = False
         self.log = logger.get("pyNN.brainscales2")
         self.injected_config = None
+        self.injected_readout = None
+        self.pre_realtime_tickets = None
+        self.post_realtime_tickets = None
+        self.pre_realtime_read = dict()
+        self.post_realtime_read = dict()
         self.conn_manager = None
         self.conn = None
         self.conn_comes_from_outside = False
@@ -241,7 +246,12 @@ class State(BaseState):
         self.enable_neuron_bypass = False
         self.neuron_placement = None
         self.background_spike_source_placement = None
+        self.injected_readout = None
         self.injected_config = None
+        self.pre_realtime_tickets = None
+        self.post_realtime_tickets = None
+        self.pre_realtime_read = dict()
+        self.post_realtime_read = dict()
         self.grenade_network = None
         self.grenade_network_graph = None
         self.grenade_chip_config = None
@@ -592,10 +602,70 @@ class State(BaseState):
             self.injection_pre_static_config)
         pre_realtime.copy_back(
             self.injection_pre_realtime)
+        self._prepare_pre_realtime_read(pre_realtime)
         post_realtime.copy_back(
             self.injection_post_realtime)
+        self._prepare_post_realtime_read(post_realtime)
         return grenade.ExecutionInstancePlaybackHooks(
             pre_static_config, pre_realtime, post_realtime)
+
+    def _prepare_pre_realtime_read(self, builder: sta.PlaybackProgramBuilder):
+        """
+        Prepare injected readout after pre_realtime configuration and before
+        realtime experiment section. This generates tickets to access the read
+        information and ensures completion via a barrier.
+        :param builder: Builder to append instructions to.
+        """
+        if not self.injected_readout.pre_realtime:
+            return
+        self.pre_realtime_tickets = {coord: builder.read(coord) for coord in
+                                     self.injected_readout.pre_realtime}
+        barrier = hal.Barrier()
+        barrier.enable_omnibus = True
+        barrier.enable_jtag = True
+        builder.block_until(halco.BarrierOnFPGA(), barrier)
+
+    def _prepare_post_realtime_read(self, builder: sta.PlaybackProgramBuilder):
+        """
+        Prepare injected readout after post_realtime configuration.
+        This generates tickets to access the read information and ensures
+        completion via a barrier.
+        :param builder: Builder to append instructions to.
+        """
+        if not self.injected_readout.post_realtime:
+            return
+        self.post_realtime_tickets = {coord: builder.read(coord) for coord in
+                                      self.injected_readout.post_realtime}
+        barrier = hal.Barrier()
+        barrier.enable_omnibus = True
+        barrier.enable_jtag = True
+        builder.block_until(halco.BarrierOnFPGA(), barrier)
+
+    def _get_pre_realtime_read(self) -> Dict[halco.Coordinate, hal.Container]:
+        """
+        Redeem tickets of injected readout after pre_realtime section to get
+        information after execution.
+        :return: Dictionary with coordinates as keys and read container as
+                 values.
+        """
+        if not self.pre_realtime_tickets:
+            return dict()
+        cocos = {coord: ticket.get() for coord, ticket in
+                 self.pre_realtime_tickets.items()}
+        return cocos
+
+    def _get_post_realtime_read(self) -> Dict[halco.Coordinate, hal.Container]:
+        """
+        Redeem tickets of injected readout after post_realtime section to get
+        information after execution.
+        :return: Dictionary with coordinates as keys and read container as
+                 values.
+        """
+        if not self.post_realtime_tickets:
+            return dict()
+        cocos = {coord: ticket.get() for coord, ticket in
+                 self.post_realtime_tickets.items()}
+        return cocos
 
     def prepare_static_config(self):
         config = grenade.ChipConfig()
@@ -696,6 +766,9 @@ class State(BaseState):
         # make two list for madc samples: times, madc_samples
         self.times, self.madc_samples = self._get_v(
             network_graph, outputs)
+
+        self.pre_realtime_read = self._get_pre_realtime_read()
+        self.post_realtime_read = self._get_post_realtime_read()
 
 
 # state is instantiated in setup()
