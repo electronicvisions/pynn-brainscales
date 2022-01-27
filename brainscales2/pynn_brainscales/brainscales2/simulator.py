@@ -280,8 +280,12 @@ class State(BaseState):
         :return: Spikes as dict with atomic neuron enum value as key and
                  numpy array of times as value
         """
-        return grenade.extract_neuron_spikes(
+        spikes = grenade.extract_neuron_spikes(
             outputs, network_graph)
+        if not spikes:
+            return dict()
+        assert len(spikes) == 1  # only one batch
+        return spikes[0]
 
     @staticmethod
     def _get_v(network_graph: grenade.NetworkGraph,
