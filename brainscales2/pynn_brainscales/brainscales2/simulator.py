@@ -621,6 +621,12 @@ class State(BaseState):
         # injected configuration pre non realtime
         add_configuration(builder1, self.injected_config.pre_non_realtime)
 
+        if not isinstance(self.injected_config.pre_non_realtime,
+                          sta.PlaybackProgramBuilder):
+            tmpdumper = sta.DumperDone()
+            tmpdumper.values = list(
+                self.injected_config.pre_non_realtime.items())
+            config = grenade.convert_to_chip(tmpdumper, config)
         self.grenade_chip_config = config
 
         # reset dirty-flags
