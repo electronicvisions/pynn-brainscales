@@ -4,17 +4,27 @@ from pathlib import Path
 from dlens_vx_v2 import sta, halco, lola, hxcomm
 
 
+def coco_from_portable_binary(data: bytes) -> dict:
+    """
+    Convert portable binary data to coco.
+
+    :param data: Coco list in portable binary format.
+    :return: Dictionary of coco list.
+    """
+    dumper = sta.DumperDone()
+    sta.from_portablebinary(dumper, data)
+    return dict(dumper.tolist())
+
+
 def coco_from_file(path: str) -> dict:
     """
     Extract coco dict from file dump
 
     :param path: path to file containing coco dump.
     """
-    dumper = sta.DumperDone()
     with open(path, 'rb') as fd:
         data = fd.read()
-    sta.from_portablebinary(dumper, data)
-    return dict(dumper.tolist())
+    return coco_from_portable_binary(data)
 
 
 def filter_atomic_neuron(coco: dict) -> Dict[halco.AtomicNeuronOnDLS,
@@ -84,7 +94,9 @@ def filtered_cocos_from_nightly() -> (dict, dict):
         coco = coco_from_file(nightly_calib_path())
     else:
         try:
-            coco = urllib.request.urlopen(nightly_calib_url()).read()
+            data = urllib.request.urlopen(nightly_calib_url()).read()
+            coco = coco_from_portable_binary(data)
+
         except urllib.error.URLError:
             raise RuntimeError('Could not find a nightly calibration for '
                                f'setup "{get_unique_identifier()}".')
