@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import time
 from typing import Dict, Union, Set
 from pyNN import common, space, errors
 from pyNN.recording import get_io
@@ -97,6 +98,7 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
         injected_config: Optional user defined injected configuration.
         injected_readout: Optional user defined injected readout.
     """
+    time_begin = time.time()
 
     # global instance singleton
     simulator.state = simulator.State()
@@ -133,9 +135,13 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
         raise KeyError("unhandled extra_params in call to pynn.setup(...):"
                        f"{extra_params}")
 
+    simulator.state.log.DEBUG("setup(): Completed in {:.3f}s".format(
+        time.time() - time_begin))
+
 
 def end():
     """Do any necessary cleaning up before exiting."""
+    time_begin = time.time()
     for (population, variables, filename) in simulator.state.write_on_end:
         io_file = get_io(filename)
         population.write_data(io_file, variables)
@@ -147,6 +153,8 @@ def end():
         simulator.state.conn_manager = None
         assert simulator.state.conn is not None
         simulator.state.conn = None
+    simulator.state.log.DEBUG("end(): Completed in {:.3f}s".format(
+        time.time() - time_begin))
     # remove instance singleton
     simulator.state = None
 

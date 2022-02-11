@@ -1,3 +1,4 @@
+import time
 import itertools
 from typing import Optional, Final, List, Dict, Union, Set
 import numpy as np
@@ -7,6 +8,7 @@ from pynn_brainscales.brainscales2.standardmodels.cells import HXNeuron, \
     SpikeSourceArray, SpikeSourcePoisson, SpikeSourcePoissonOnChip
 from dlens_vx_v2 import hal, halco, sta, hxcomm, lola, logger
 import pygrenade_vx as grenade
+import pylogging as logger
 
 
 name = "HX"  # for use in annotating output data
@@ -726,6 +728,7 @@ class State(BaseState):
         Performs a hardware run for `runtime` milliseconds.
         If runtime is `None`, we only perform preparatory steps.
         """
+        time_begin = time.time()
         if runtime is None:
             self.log.INFO("User requested 'None' runtime: "
                           + "no hardware run performed.")
@@ -743,6 +746,8 @@ class State(BaseState):
         self._reset_changed_since_last_run()
 
         if runtime is None:
+            self.log.DEBUG("run(): Completed in {:.3f}s".format(
+                time.time() - time_begin))
             return
 
         # generate external spike trains
@@ -763,9 +768,17 @@ class State(BaseState):
             assert self.conn is None
             self.conn = self.conn_manager.__enter__()
 
+        time_after_preparations = time.time()
+        self.log.DEBUG("run(): Preparations finished in {:.3f}s".format(
+            time_after_preparations - time_begin))
+
         outputs = grenade.run(
             self.conn, self.grenade_chip_config, network_graph,
             inputs, self._generate_playback_hooks())
+
+        self.log.DEBUG("run(): Execution finished in {:.3f}s".format(
+            time.time() - time_after_preparations))
+        time_after_hw_run = time.time()
 
         # make list 'spikes' of tupel (neuron id, spike time)
         self.spikes = self._get_spikes(network_graph, outputs)
@@ -776,6 +789,11 @@ class State(BaseState):
 
         self.pre_realtime_read = self._get_pre_realtime_read()
         self.post_realtime_read = self._get_post_realtime_read()
+
+        self.log.DEBUG("run(): Postprocessing finished in {:.3f}s".format(
+            time.time() - time_after_hw_run))
+        self.log.DEBUG("run(): Completed in {:.3f}s".format(
+            time.time() - time_begin))
 
 
 # state is instantiated in setup()
