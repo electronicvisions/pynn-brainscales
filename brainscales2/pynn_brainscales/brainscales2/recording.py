@@ -104,8 +104,8 @@ class Recorder(pyNN.recording.Recorder):
     @staticmethod
     def _get_all_signals(variable, ids, clear=False):
         if variable in Recorder.madc_variables:
-            signals = np.array(list(zip(simulator.state.times,
-                                        simulator.state.madc_samples)))
+            signals = np.stack(
+                (simulator.state.times, simulator.state.madc_samples)).T
         else:
             raise ValueError("Only implemented for membrane potential 'v' and"
                              + "technical parameters: '{exc,inh}_synin', "
