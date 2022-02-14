@@ -298,9 +298,12 @@ class State(BaseState):
                         samples from
         :return: Times and sample values as numpy array
         """
-        times, samples = grenade.extract_madc_samples(
+        samples = grenade.extract_madc_samples(
             outputs, network_graph)
-        return times, samples
+        if not samples:
+            return np.array([], dtype=np.float32), np.array([], dtype=np.int32)
+        assert len(samples) == 1  # only one batch
+        return samples[0]
 
     @staticmethod
     def _configure_common(builder: sta.PlaybackProgramBuilder,
