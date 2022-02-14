@@ -684,6 +684,21 @@ class State(BaseState):
         builder1, config = self._configure_common(builder1, config)
         builder1, config = self._configure_routing(builder1, config)
 
+        # injected configuration pre non realtime
+        if not isinstance(self.injected_config.pre_non_realtime,
+                          sta.PlaybackProgramBuilder):
+            tmpdumper = sta.DumperDone()
+            tmpdumper.values = list(
+                self.injected_config.pre_non_realtime.items())
+            config = grenade.convert_to_chip(tmpdumper, config)
+            builder1.merge_back(sta.convert_to_builder(tmpdumper))
+        else:
+            builder1.merge_back(self.injected_config.pre_non_realtime)
+        self.grenade_chip_config = config
+
+        # reset dirty-flags
+        self._reset_changed_since_last_run()
+
         def add_configuration(
                 builder: sta.PlaybackProgramBuilder,
                 additional_configuration: Union[
@@ -696,20 +711,6 @@ class State(BaseState):
                 tmpdumper = sta.DumperDone()
                 tmpdumper.values = list(additional_configuration.items())
                 builder.merge_back(sta.convert_to_builder(tmpdumper))
-
-        # injected configuration pre non realtime
-        add_configuration(builder1, self.injected_config.pre_non_realtime)
-
-        if not isinstance(self.injected_config.pre_non_realtime,
-                          sta.PlaybackProgramBuilder):
-            tmpdumper = sta.DumperDone()
-            tmpdumper.values = list(
-                self.injected_config.pre_non_realtime.items())
-            config = grenade.convert_to_chip(tmpdumper, config)
-        self.grenade_chip_config = config
-
-        # reset dirty-flags
-        self._reset_changed_since_last_run()
 
         # injected configuration pre realtime
         pre_realtime = sta.PlaybackProgramBuilder()
