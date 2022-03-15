@@ -33,7 +33,7 @@ class Population(pyNN.common.Population):
             simulator.state.neuron_placement.register_id(self.all_cells)
             coords = simulator.state. \
                 neuron_placement.id2atomicneuron(self.all_cells)
-            self.celltype.apply_coco(coords)
+            self.celltype.apply_config(coords)
 
         parameter_space = self.celltype.parameter_space
         parameter_space.shape = (self.size,)

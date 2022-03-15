@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import unittest
+import numpy
 from dlens_vx_v2 import halco, lola, sta
 import pynn_brainscales.brainscales2 as pynn
 
@@ -86,6 +87,22 @@ class TestpyNNSetup(unittest.TestCase):
             pre_non_realtime=sta.PlaybackProgramBuilder(),
             pre_realtime=sta.PlaybackProgramBuilder(),
             post_realtime=sta.PlaybackProgramBuilder()))
+        pynn.run(None)
+        pynn.end()
+
+    def test_initial_config(self):
+        # pylint: disable=no-member
+        config = lola.Chip()
+        an_coord0 = halco.AtomicNeuronOnDLS(halco.common.Enum(0))
+        an_coord1 = halco.AtomicNeuronOnDLS(halco.common.Enum(1))
+        backend_c = halco.CommonNeuronBackendConfigOnDLS(halco.common.Enum(0))
+        config.neuron_block.atomic_neurons[an_coord0].leak.i_bias = 666
+        config.neuron_block.atomic_neurons[an_coord1].leak.i_bias = 420
+        config.neuron_block.backends[backend_c].clock_scale_fast = 3
+        pynn.setup(initial_config=config)
+        pop = pynn.Population(2, pynn.cells.HXNeuron())
+        self.assertTrue(
+            numpy.array_equal(pop.get("leak_i_bias"), [666, 420]))
         pynn.run(None)
         pynn.end()
 

@@ -45,15 +45,10 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
     lola.AtomicNeuron. Parameter hierarchy is flattened. Defaults to "silent"
     neuron.
 
-    :param coco_inject: Optional coordinate container pair (coco) injection as
-                        a mapping of AtomicNeuronOnDLS to AtomicNeuron.
-                        Can be used, e.g. to apply calibration results. If
-                        provided default values are replaced with coco entries.
-                        Values are applied according to neuron placement.
     :param parameters: Mapping of parameters and corresponding values, e.g.
                        dict. Either 1-dimensional or population size
-                       dimensions. Default as well as coco values are
-                       overwritten for specified parameters.
+                       dimensions. Default values are overwritten for specified
+                       parameters.
     """
 
     # exc_synin, inh_synin and adaptation are technical voltages
@@ -87,15 +82,13 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
 
     _hw_entity_setters: ClassVar[Dict[str, Callable]]
 
-    _coco_inject: Optional[Dict[halco.AtomicNeuronOnDLS, lola.AtomicNeuron]]
-    # needed to restore after coco was injected
+    # needed to restore after chip config was applied
     _user_provided_parameters: Optional[Dict[str, Union[int, bool]]]
 
-    def __init__(self, coco_inject: Optional[dict] = None, **parameters):
+    def __init__(self, **parameters):
         """
         `parameters` should be a mapping object, e.g. a dict
         """
-        self._coco_inject = coco_inject
         self._user_provided_parameters = parameters
         super().__init__(**parameters)
 
@@ -217,14 +210,14 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
 
         return neuron
 
-    def apply_coco(self, coords: List[halco.AtomicNeuronOnDLS]):
+    def apply_config(self, coords: List[halco.AtomicNeuronOnDLS]):
         """
-        Extract and apply coco according to provided atomic neuron list
+        Extract and apply config according to provided chip object
 
         :param coords: List of coordinates to look up coco. Needs
                        same order and dimensions as parameter_space.
         """
-        if self._coco_inject is None:
+        if simulator.state.initial_config is None:
             # no coco provided -> skip
             return
 
@@ -234,8 +227,9 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
         param_dict = {}
         for coord in coords:
             try:
-                param_per_neuron.append(
-                    self.get_values(self._coco_inject[coord]))
+                param_per_neuron.append(self.get_values(
+                    simulator.state.initial_config.
+                    neuron_block.atomic_neurons[coord]))
             except KeyError:
                 raise KeyError(f"No coco entry for {coord}")
         # "fuse" entries of individual parameters to one large dict of arrays

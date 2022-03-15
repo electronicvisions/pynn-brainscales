@@ -233,6 +233,7 @@ class State(BaseState):
         self.injection_pre_static_config = None
         self.injection_pre_realtime = None
         self.injection_post_realtime = None
+        self.initial_config = None
 
     def run_until(self, tstop):
         self.run(tstop - self.t)
@@ -260,6 +261,7 @@ class State(BaseState):
         self.injection_pre_static_config = None
         self.injection_pre_realtime = None
         self.injection_post_realtime = None
+        self.initial_config = None
 
         self.reset()
 
@@ -653,27 +655,15 @@ class State(BaseState):
         return cocos
 
     def prepare_static_config(self):
-        config = lola.Chip()
+        if self.initial_config is None:
+            config = lola.Chip()
+        else:
+            config = self.initial_config
         builder1 = sta.PlaybackProgramBuilder()
 
         # generate common static configuration
         config = self._configure_common(config)
         config = self._configure_routing(config)
-
-        # injected configuration pre non realtime
-        if not isinstance(self.injected_config.pre_non_realtime,
-                          sta.PlaybackProgramBuilder):
-            tmpdumper = sta.DumperDone()
-            tmpdumper.values = list(
-                self.injected_config.pre_non_realtime.items())
-            config = sta.convert_to_chip(tmpdumper, config)
-            builder1.merge_back(sta.convert_to_builder(tmpdumper))
-        else:
-            builder1.merge_back(self.injected_config.pre_non_realtime)
-        self.grenade_chip_config = config
-
-        # reset dirty-flags
-        self._reset_changed_since_last_run()
 
         def add_configuration(
                 builder: sta.PlaybackProgramBuilder,
@@ -687,6 +677,13 @@ class State(BaseState):
                 tmpdumper = sta.DumperDone()
                 tmpdumper.values = list(additional_configuration.items())
                 builder.merge_back(sta.convert_to_builder(tmpdumper))
+
+        # injected configuration pre non realtime
+        add_configuration(builder1, self.injected_config.pre_non_realtime)
+
+        self.grenade_chip_config = config
+        # reset dirty-flags
+        self._reset_changed_since_last_run()
 
         # injected configuration pre realtime
         pre_realtime = sta.PlaybackProgramBuilder()

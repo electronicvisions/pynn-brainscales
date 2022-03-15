@@ -16,7 +16,7 @@ from pynn_brainscales.brainscales2.populations import Population, \
     PopulationView, Assembly
 from pynn_brainscales.brainscales2.projections import Projection
 from pynn_brainscales.brainscales2 import helper
-from dlens_vx_v2 import hal, halco, sta
+from dlens_vx_v2 import lola, hal, halco, sta
 import pygrenade_vx as grenade
 import pylogging as logger
 
@@ -96,6 +96,9 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
         enable_neuron_bypass: Enable neuron bypass mode: neurons forward spikes
                               arriving at the synaptic input (i.e. no leaky
                               integration is happening); defaults to False.
+        initial_config: Initial configuration of the entire chip. Can for
+                        example be used to manually apply a calibration
+                        result.
         injected_config: Optional user defined injected configuration.
         injected_readout: Optional user defined injected readout.
     """
@@ -131,6 +134,7 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
     simulator.state.conn = extra_params.pop('connection', None)
     simulator.state.conn_comes_from_outside = \
         (simulator.state.conn is not None)
+    simulator.state.initial_config = extra_params.pop('initial_config', None)
 
     if extra_params:
         raise KeyError("unhandled extra_params in call to pynn.setup(...):"

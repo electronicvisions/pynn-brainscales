@@ -1,54 +1,29 @@
 import urllib
-from typing import Dict
 from pathlib import Path
-from dlens_vx_v2 import sta, halco, lola, hxcomm
+from dlens_vx_v2 import sta, hxcomm
 
 
-def coco_from_portable_binary(data: bytes) -> dict:
+def chip_from_portable_binary(data: bytes) -> dict:
     """
-    Convert portable binary data to coco.
+    Convert portable binary data to chip object.
 
     :param data: Coco list in portable binary format.
-    :return: Dictionary of coco list.
+    :return: lola chip configuration.
     """
     dumper = sta.DumperDone()
     sta.from_portablebinary(dumper, data)
-    return dict(dumper.tolist())
+    return sta.convert_to_chip(dumper)
 
 
-def coco_from_file(path: str) -> dict:
+def chip_from_file(path: str) -> dict:
     """
-    Extract coco dict from file dump
+    Extract chip config from coco file dump
 
     :param path: path to file containing coco dump.
     """
     with open(path, 'rb') as fd:
         data = fd.read()
-    return coco_from_portable_binary(data)
-
-
-def filter_atomic_neuron(coco: dict) -> Dict[halco.AtomicNeuronOnDLS,
-                                             lola.AtomicNeuron]:
-    """
-    Filter AtomicNeuron entries from coco dict.
-
-    :param coco: coco list, e.g. returned from coco_from_file.
-    """
-    atomic_neuron_cocos = {coord: container for (coord, container) in
-                           coco.items() if isinstance(
-                               coord, halco.AtomicNeuronOnDLS)}
-    return atomic_neuron_cocos
-
-
-def filter_non_atomic_neuron(coco: dict) -> dict:
-    """
-    Filter all non AtomicNeuron entries from coco dict.
-
-    :param coco: coco list, e.g. returned from coco_from_file.
-    """
-    other_cocos = {coord: container for (coord, container) in coco.items()
-                   if not isinstance(coord, halco.AtomicNeuronOnDLS)}
-    return other_cocos
+    return chip_from_portable_binary(data)
 
 
 def get_unique_identifier() -> str:
@@ -83,32 +58,22 @@ def nightly_calib_url() -> str:
            "spiking_cocolist.pbin"
 
 
-def filtered_cocos_from_nightly() -> (dict, dict):
+def chip_from_nightly() -> (dict):
     """
-    Extract atomic and non-atomic coco lists from nightly calibration.
+    Extract chip config from nightly calibration.
     """
 
     # First check local filesystem if calibration does not exist try to
     # download it
     if nightly_calib_path().exists():
-        coco = coco_from_file(nightly_calib_path())
+        chip = chip_from_file(nightly_calib_path())
     else:
         try:
             data = urllib.request.urlopen(nightly_calib_url()).read()
-            coco = coco_from_portable_binary(data)
+            chip = chip_from_portable_binary(data)
 
         except urllib.error.URLError:
             raise RuntimeError('Could not find a nightly calibration for '
                                f'setup "{get_unique_identifier()}".')
 
-    atomic_coco = filter_atomic_neuron(coco)
-    inject_coco = filter_non_atomic_neuron(coco)
-    return atomic_coco, inject_coco
-
-
-def filtered_cocos_from_file(calib: Path) -> (dict, dict):
-    """
-    Extract atomic and non-atomic coco lists from calibration file.
-    """
-    coco = coco_from_file(calib)
-    return filter_atomic_neuron(coco), filter_non_atomic_neuron(coco)
+    return chip
