@@ -6,7 +6,7 @@ from pyNN.common import IDMixin, Population, Projection
 from pyNN.common.control import BaseState
 from pynn_brainscales.brainscales2.standardmodels.cells import HXNeuron, \
     SpikeSourceArray, SpikeSourcePoisson, SpikeSourcePoissonOnChip
-from dlens_vx_v2 import hal, halco, sta, hxcomm, lola, logger
+from dlens_vx_v2 import hal, halco, sta, lola, logger
 import pygrenade_vx as grenade
 import pylogging as logger
 
@@ -765,7 +765,7 @@ class State(BaseState):
 
         if not self.conn_comes_from_outside and \
            self.conn_manager is None:
-            self.conn_manager = hxcomm.ManagedConnection()
+            self.conn_manager = grenade.ManagedConnection()
             assert self.conn is None
             self.conn = self.conn_manager.__enter__()
 
