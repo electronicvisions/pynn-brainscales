@@ -308,48 +308,35 @@ class State(BaseState):
         return samples[0]
 
     @staticmethod
-    def _configure_common(builder: sta.PlaybackProgramBuilder,
-                          config: grenade.ChipConfig) \
-            -> (sta.PlaybackProgramBuilder, grenade.ChipConfig):
+    def _configure_common(config: lola.Chip) -> lola.Chip:
 
         # set global cells
-        neuron_params = {
-            halco.CapMemCellOnCapMemBlock.neuron_v_bias_casc_n: 340,
-            halco.CapMemCellOnCapMemBlock.neuron_i_bias_readout_amp: 110,
-            halco.CapMemCellOnCapMemBlock.neuron_i_bias_leak_source_follower:
-            100,
-            halco.CapMemCellOnCapMemBlock.neuron_i_bias_spike_comparator:
-            500}
-
-        for block in halco.iter_all(halco.CapMemBlockOnDLS):
-            for key, value in neuron_params.items():
-                builder.write(halco.CapMemCellOnDLS(key, block),
-                              hal.CapMemCell(value))
+        config.neuron_block.v_bias_casc_n.fill(340)
+        config.neuron_block.i_bias_readout_amp.fill(110)
+        config.neuron_block.i_bias_leak_source_follower.fill(100)
+        config.neuron_block.i_bias_threshold_comparator.fill(500)
 
         # set all neurons on chip to default values
         default_neuron = HXNeuron.create_hw_entity({})
         for coord in halco.iter_all(halco.AtomicNeuronOnDLS):
-            config.hemispheres[coord.toNeuronRowOnDLS().toHemisphereOnDLS()]\
-                .neuron_block[coord.toNeuronColumnOnDLS()] = default_neuron
+            config.neuron_block.atomic_neurons[coord] = default_neuron
 
-        neuron_config = hal.CommonNeuronBackendConfig()
-        neuron_config.clock_scale_fast = 3
-        neuron_config.clock_scale_slow = 3
-        neuron_config.enable_clocks = True
         for coord in halco.iter_all(halco.CommonNeuronBackendConfigOnDLS):
-            config.neuron_backend[coord] = neuron_config
+            config.neuron_block.backends[coord].clock_scale_fast = 3
+            config.neuron_block.backends[coord].clock_scale_slow = 3
+            config.neuron_block.backends[coord].enable_clocks = True
 
-        return builder, config
+        return config
 
     # pylint: disable=too-many-arguments
     def _configure_hxneuron(self,
-                            config: grenade.ChipConfig,
+                            config: lola.Chip,
                             neuron_id: ID,
                             parameters: dict,
                             readout_source:
                             Optional[hal.NeuronConfig.ReadoutSource],
                             enable_spike_output: bool) \
-            -> grenade.ChipConfig:
+            -> lola.Chip:
         """
         Places Neuron in Population "pop" on chip and configures spike and
         v recording.
@@ -375,8 +362,7 @@ class State(BaseState):
             atomic_neuron.readout.enable_buffered_access = True
             atomic_neuron.readout.source = readout_source
 
-        config.hemispheres[coord.toNeuronRowOnDLS().toHemisphereOnDLS()]\
-            .neuron_block[coord.toNeuronColumnOnDLS()] = atomic_neuron
+        config.neuron_block.atomic_neurons[coord] = atomic_neuron
 
         return config
 
@@ -428,8 +414,8 @@ class State(BaseState):
         return spike_source_indices
 
     def _configure_recorders_populations(self,
-                                         config: grenade.ChipConfig) \
-            -> grenade.ChipConfig:
+                                         config: lola.Chip) \
+            -> lola.Chip:
 
         changed = self._recorders_populations_changed()
         if not changed:
@@ -479,58 +465,48 @@ class State(BaseState):
         return config
 
     @staticmethod
-    def _configure_routing(builder: sta.PlaybackProgramBuilder,
-                           config: grenade.ChipConfig) \
-            -> (sta.PlaybackProgramBuilder, grenade.ChipConfig):
+    def _configure_routing(config: lola.Chip) -> lola.Chip:
         """
         Configure global routing-related but static parameters.
-        :param builder: Playback program builder to add configuration to
-        :config: Chip configuration to add configuration to
-        :return: Altered playback program builder and chip configuration
+        :param config: Chip configuration to add configuration to
+        :return: Altered hip configuration
         """
 
         # configure PADI bus
-        padi_config = hal.CommonPADIBusConfig()
-        for block in halco.iter_all(halco.PADIBusOnPADIBusBlock):
-            if state.enable_neuron_bypass:
-                # extend pulse length such that pre-synaptic signals have
-                # a stronger effect on the synaptic input voltage and spikes
-                # are more easily detected by the bypass circuit.
-                # pylint: disable=unsupported-assignment-operation
-                padi_config.dacen_pulse_extension[block] = \
-                    hal.CommonPADIBusConfig.DacenPulseExtension.max
         for padibus in halco.iter_all(halco.CommonPADIBusConfigOnDLS):
-            config.hemispheres[padibus.toHemisphereOnDLS()]\
-                .common_padi_bus_config = padi_config
+            for block in halco.iter_all(halco.PADIBusOnPADIBusBlock):
+                if state.enable_neuron_bypass:
+                    # extend pulse length such that pre-synaptic signals have
+                    # a stronger effect on the synaptic input voltage and
+                    # spikes are more easily detected by the bypass circuit.
+                    # pylint: disable=unsupported-assignment-operation
+                    config.synapse_driver_blocks[
+                        padibus.toSynapseDriverBlockOnDLS()]\
+                        .padi_bus.dacen_pulse_extension[block] = \
+                        hal.CommonPADIBusConfig.DacenPulseExtension.max
 
         # configure switches
         # TODO (Issue #3745, #3746): move to AtomicNeuron and set in `grenade`
-        current_switch_quad = hal.ColumnCurrentQuad()
-        switch = current_switch_quad.ColumnCurrentSwitch()
-        switch.enable_synaptic_current_excitatory = True
-        switch.enable_synaptic_current_inhibitory = True
-
-        for s in halco.iter_all(halco.EntryOnQuad):
-            current_switch_quad.set_switch(s, switch)
-
-        for sq in halco.iter_all(halco.ColumnCurrentQuadOnDLS):
-            builder.write(sq, current_switch_quad)
+        for row in halco.iter_all(halco.ColumnCurrentRowOnDLS):
+            for column in halco.iter_all(halco.SynapseOnSynapseRow):
+                config.neuron_block.current_rows[row].values[column]\
+                    .enable_synaptic_current_excitatory = True
+                config.neuron_block.current_rows[row].values[column]\
+                    .enable_synaptic_current_inhibitory = True
 
         # set synapse capmem cells
-        synapse_params = {
-            halco.CapMemCellOnCapMemBlock.syn_i_bias_dac: 1022,
-            halco.CapMemCellOnCapMemBlock.syn_i_bias_ramp: 1010,
-            halco.CapMemCellOnCapMemBlock.syn_i_bias_store: 1010,
-            halco.CapMemCellOnCapMemBlock.syn_i_bias_corout: 1010}
-        if state.enable_neuron_bypass:
-            synapse_params[halco.CapMemCellOnCapMemBlock.syn_i_bias_dac] = 1022
+        for block in halco.iter_all(halco.SynapseBlockOnDLS):
+            config.synapse_blocks[block].i_bias_dac.fill(1022)
 
-        for block in halco.iter_all(halco.CapMemBlockOnDLS):
-            for k, v in synapse_params.items():
-                builder.write(halco.CapMemCellOnDLS(k, block),
-                              hal.CapMemCell(v))
+        for coord in halco.iter_all(halco.CADCOnDLS):
+            config.cadc_readout_chains[coord]\
+                .correlation.i_bias_ramp.fill(1010)
+            config.cadc_readout_chains[coord]\
+                .correlation.i_bias_store.fill(1010)
+            config.cadc_readout_chains[coord]\
+                .correlation.i_bias_corout.fill(1010)
 
-        return builder, config
+        return config
 
     def _generate_network_graph(self) -> grenade.NetworkGraph:
         """
@@ -677,12 +653,12 @@ class State(BaseState):
         return cocos
 
     def prepare_static_config(self):
-        config = grenade.ChipConfig()
+        config = lola.Chip()
         builder1 = sta.PlaybackProgramBuilder()
 
         # generate common static configuration
-        builder1, config = self._configure_common(builder1, config)
-        builder1, config = self._configure_routing(builder1, config)
+        config = self._configure_common(config)
+        config = self._configure_routing(config)
 
         # injected configuration pre non realtime
         if not isinstance(self.injected_config.pre_non_realtime,
@@ -690,7 +666,7 @@ class State(BaseState):
             tmpdumper = sta.DumperDone()
             tmpdumper.values = list(
                 self.injected_config.pre_non_realtime.items())
-            config = grenade.convert_to_chip(tmpdumper, config)
+            config = sta.convert_to_chip(tmpdumper, config)
             builder1.merge_back(sta.convert_to_builder(tmpdumper))
         else:
             builder1.merge_back(self.injected_config.pre_non_realtime)
