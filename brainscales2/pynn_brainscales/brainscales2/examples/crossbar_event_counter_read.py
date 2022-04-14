@@ -31,7 +31,7 @@ def main(num_spikes: int = 200, runtime: float = 20.) \
     for coord in halco.iter_all(halco.CrossbarOutputOnDLS):
         # pylint: disable=unsupported-assignment-operation
         crossbar_output_config.enable_event_counter[coord] = True
-    injected_config.pre_non_realtime = \
+    injected_config.pre_realtime = \
         {halco.CrossbarOutputConfigOnDLS(): crossbar_output_config}
 
     # Injections are specified upon setup of PyNN.
