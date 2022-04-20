@@ -6,7 +6,7 @@ from pyNN.common import IDMixin, Population, Projection
 from pyNN.common.control import BaseState
 from pynn_brainscales.brainscales2.standardmodels.cells import HXNeuron, \
     SpikeSourceArray, SpikeSourcePoisson, SpikeSourcePoissonOnChip
-from dlens_vx_v2 import hal, halco, sta, lola, logger
+from dlens_vx_v3 import hal, halco, sta, lola, logger
 import pygrenade_vx as grenade
 import pylogging as logger
 

@@ -6,7 +6,7 @@ import unittest
 from unittest import mock
 import numpy
 import pynn_brainscales.brainscales2 as pynn
-from dlens_vx_v2 import halco, hal, lola, sta
+from dlens_vx_v3 import halco, hal, lola, sta
 
 
 class TestHelper(unittest.TestCase):

@@ -3,7 +3,7 @@
 import unittest
 import numpy as np
 import pynn_brainscales.brainscales2 as pynn
-from dlens_vx_v2 import halco, lola
+from dlens_vx_v3 import halco, lola
 
 
 class TestCoCoInject(unittest.TestCase):

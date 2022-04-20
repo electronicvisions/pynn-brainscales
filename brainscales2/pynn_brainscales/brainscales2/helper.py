@@ -1,7 +1,7 @@
 import urllib
 from typing import Dict
 from pathlib import Path
-from dlens_vx_v2 import sta, halco, lola, hxcomm
+from dlens_vx_v3 import sta, halco, lola, hxcomm
 
 
 def coco_from_portable_binary(data: bytes) -> dict:

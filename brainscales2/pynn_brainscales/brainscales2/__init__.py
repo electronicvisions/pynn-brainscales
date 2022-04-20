@@ -16,7 +16,7 @@ from pynn_brainscales.brainscales2.populations import Population, \
     PopulationView, Assembly
 from pynn_brainscales.brainscales2.projections import Projection
 from pynn_brainscales.brainscales2 import helper
-from dlens_vx_v2 import hal, halco, sta
+from dlens_vx_v3 import hal, halco, sta
 import pygrenade_vx as grenade
 import pylogging as logger
 

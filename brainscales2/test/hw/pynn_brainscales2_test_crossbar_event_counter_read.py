@@ -3,7 +3,7 @@
 import unittest
 from pynn_brainscales.brainscales2.examples.crossbar_event_counter_read \
     import main
-from dlens_vx_v2 import halco
+from dlens_vx_v3 import halco
 
 
 class TestCrossbarEventCounterRead(unittest.TestCase):

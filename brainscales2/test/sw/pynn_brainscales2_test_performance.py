@@ -4,7 +4,7 @@ import time
 import unittest
 import numpy as np
 import pynn_brainscales.brainscales2 as pynn
-from dlens_vx_v2 import logger
+from dlens_vx_v3 import logger
 
 
 logger.set_loglevel(logger.get('TestPerformance'), logger.LogLevel.INFO)
