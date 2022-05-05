@@ -8,7 +8,6 @@ from pynn_brainscales.brainscales2.standardmodels.cells import HXNeuron, \
     SpikeSourceArray, SpikeSourcePoisson, SpikeSourcePoissonOnChip
 from dlens_vx_v2 import hal, halco, sta, lola, logger
 import pygrenade_vx as grenade
-import pylogging as logger
 
 
 name = "HX"  # for use in annotating output data
@@ -471,7 +470,7 @@ class State(BaseState):
         """
         Configure global routing-related but static parameters.
         :param config: Chip configuration to add configuration to
-        :return: Altered hip configuration
+        :return: Altered chip configuration
         """
 
         # configure PADI bus
