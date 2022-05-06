@@ -130,11 +130,11 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
         extra_params.pop('injected_config', InjectedConfiguration())
     simulator.state.injected_readout = \
         extra_params.pop('injected_readout', InjectedReadout())
-    simulator.state.prepare_static_config()
     simulator.state.conn = extra_params.pop('connection', None)
     simulator.state.conn_comes_from_outside = \
         (simulator.state.conn is not None)
     simulator.state.initial_config = extra_params.pop('initial_config', None)
+    simulator.state.prepare_static_config()
 
     if extra_params:
         raise KeyError("unhandled extra_params in call to pynn.setup(...):"

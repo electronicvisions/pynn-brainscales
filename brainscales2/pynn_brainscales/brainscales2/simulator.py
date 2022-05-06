@@ -1,5 +1,6 @@
 import time
 import itertools
+from copy import copy
 from typing import Optional, Final, List, Dict, Union, Set
 import numpy as np
 from pyNN.common import IDMixin, Population, Projection
@@ -322,11 +323,6 @@ class State(BaseState):
         for coord in halco.iter_all(halco.AtomicNeuronOnDLS):
             config.neuron_block.atomic_neurons[coord] = default_neuron
 
-        for coord in halco.iter_all(halco.CommonNeuronBackendConfigOnDLS):
-            config.neuron_block.backends[coord].clock_scale_fast = 3
-            config.neuron_block.backends[coord].clock_scale_slow = 3
-            config.neuron_block.backends[coord].enable_clocks = True
-
         return config
 
     # pylint: disable=too-many-arguments
@@ -624,7 +620,7 @@ class State(BaseState):
         if self.initial_config is None:
             config = lola.Chip()
         else:
-            config = self.initial_config
+            config = copy(self.initial_config)
         builder1 = sta.PlaybackProgramBuilder()
 
         # generate common static configuration

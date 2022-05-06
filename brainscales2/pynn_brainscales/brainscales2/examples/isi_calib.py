@@ -3,6 +3,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pynn_brainscales.brainscales2 as pynn
+from dlens_vx_v2 import lola, halco
 
 cell_params = {"threshold_v_threshold": 400,
                "leak_v_leak": 1022,
@@ -14,7 +15,14 @@ cell_params = {"threshold_v_threshold": 400,
 
 
 def get_isi(tau_ref: int):
-    pynn.setup()
+    initial_config = lola.Chip()
+    for coord in halco.iter_all(halco.CommonNeuronBackendConfigOnDLS):
+        # pylint: disable=no-member
+        initial_config.neuron_block.backends[coord].enable_clocks = True
+        initial_config.neuron_block.backends[coord].clock_scale_slow = 3
+        initial_config.neuron_block.backends[coord].clock_scale_fast = 3
+
+    pynn.setup(initial_config=initial_config)
     cell_params.update({"refractory_period_refractory_time": tau_ref})
     pop = pynn.Population(1, pynn.cells.HXNeuron(**cell_params))
     pop.record("spikes")

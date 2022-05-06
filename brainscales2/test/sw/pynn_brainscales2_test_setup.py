@@ -98,11 +98,13 @@ class TestpyNNSetup(unittest.TestCase):
         backend_c = halco.CommonNeuronBackendConfigOnDLS(halco.common.Enum(0))
         config.neuron_block.atomic_neurons[an_coord0].leak.i_bias = 666
         config.neuron_block.atomic_neurons[an_coord1].leak.i_bias = 420
-        config.neuron_block.backends[backend_c].clock_scale_fast = 3
+        config.neuron_block.backends[backend_c].clock_scale_fast = 2
         pynn.setup(initial_config=config)
         pop = pynn.Population(2, pynn.cells.HXNeuron())
         self.assertTrue(
             numpy.array_equal(pop.get("leak_i_bias"), [666, 420]))
+        self.assertEqual(pynn.simulator.state.grenade_chip_config.neuron_block
+                         .backends[backend_c].clock_scale_fast, 2)
         pynn.run(None)
         pynn.end()
 
