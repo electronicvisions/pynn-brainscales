@@ -108,7 +108,6 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
     simulator.state = simulator.State()
 
     max_delay = extra_params.pop('max_delay', DEFAULT_MAX_DELAY)
-    enable_neuron_bypass = extra_params.pop('enable_neuron_bypass', False)
     common.setup(timestep, min_delay, **extra_params)
     simulator.state.clear()
     if min_delay == "auto":
@@ -117,7 +116,6 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
         max_delay = 0
     simulator.state.min_delay = min_delay
     simulator.state.max_delay = max_delay
-    simulator.state.enable_neuron_bypass = enable_neuron_bypass
     simulator.state.neuron_placement = simulator.NeuronPlacement(
         extra_params.pop("neuronPermutation",
                          simulator.NeuronPlacement.default_permutation))
@@ -133,7 +131,15 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
     simulator.state.conn = extra_params.pop('connection', None)
     simulator.state.conn_comes_from_outside = \
         (simulator.state.conn is not None)
-    simulator.state.initial_config = extra_params.pop('initial_config', None)
+    initial_config = extra_params.pop('initial_config', None)
+    enable_neuron_bypass = extra_params.pop('enable_neuron_bypass', False)
+    if enable_neuron_bypass:
+        if initial_config is not None:
+            simulator.state.log.INFO(
+                "setup(): Supplied initial_config "
+                "overwritten by enable_neuron_bypass")
+        initial_config = lola.Chip.default_neuron_bypass
+    simulator.state.initial_config = initial_config
     simulator.state.prepare_static_config()
 
     if extra_params:

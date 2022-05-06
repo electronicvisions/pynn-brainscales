@@ -216,7 +216,6 @@ class State(BaseState):
         self.id_counter = 0
         self.current_sources = []
         self.segment_counter = -1
-        self.enable_neuron_bypass = False
         self.log = logger.get("pyNN.brainscales2")
         self.injected_config = None
         self.injected_readout = None
@@ -246,7 +245,6 @@ class State(BaseState):
         self.id_counter = 0
         self.current_sources = []
         self.segment_counter = -1
-        self.enable_neuron_bypass = False
         self.neuron_placement = None
         self.background_spike_source_placement = None
         self.injected_readout = None
@@ -345,11 +343,6 @@ class State(BaseState):
         atomic_neuron.event_routing.analog_output = \
             atomic_neuron.EventRouting.AnalogOutputMode.normal
         atomic_neuron.event_routing.enable_digital = enable_spike_output
-        if self.enable_neuron_bypass:
-            # disable threshold comparator
-            atomic_neuron.threshold.enable = False
-            atomic_neuron.event_routing.enable_bypass_excitatory = True
-            atomic_neuron.event_routing.enable_bypass_inhibitory = True
 
         config.neuron_block.atomic_neurons[coord] = atomic_neuron
 
@@ -452,19 +445,6 @@ class State(BaseState):
         :param config: Chip configuration to add configuration to
         :return: Altered chip configuration
         """
-
-        # configure PADI bus
-        for padibus in halco.iter_all(halco.CommonPADIBusConfigOnDLS):
-            for block in halco.iter_all(halco.PADIBusOnPADIBusBlock):
-                if state.enable_neuron_bypass:
-                    # extend pulse length such that pre-synaptic signals have
-                    # a stronger effect on the synaptic input voltage and
-                    # spikes are more easily detected by the bypass circuit.
-                    # pylint: disable=unsupported-assignment-operation
-                    config.synapse_driver_blocks[
-                        padibus.toSynapseDriverBlockOnDLS()]\
-                        .padi_bus.dacen_pulse_extension[block] = \
-                        hal.CommonPADIBusConfig.DacenPulseExtension.max
 
         # set synapse capmem cells
         for block in halco.iter_all(halco.SynapseBlockOnDLS):
