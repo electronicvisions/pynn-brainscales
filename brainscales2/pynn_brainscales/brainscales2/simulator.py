@@ -486,15 +486,6 @@ class State(BaseState):
                         .padi_bus.dacen_pulse_extension[block] = \
                         hal.CommonPADIBusConfig.DacenPulseExtension.max
 
-        # configure switches
-        # TODO (Issue #3745, #3746): move to AtomicNeuron and set in `grenade`
-        for row in halco.iter_all(halco.ColumnCurrentRowOnDLS):
-            for column in halco.iter_all(halco.SynapseOnSynapseRow):
-                config.neuron_block.current_rows[row].values[column]\
-                    .enable_synaptic_current_excitatory = True
-                config.neuron_block.current_rows[row].values[column]\
-                    .enable_synaptic_current_inhibitory = True
-
         # set synapse capmem cells
         for block in halco.iter_all(halco.SynapseBlockOnDLS):
             config.synapse_blocks[block].i_bias_dac.fill(1022)
