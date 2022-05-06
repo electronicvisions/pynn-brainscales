@@ -310,12 +310,6 @@ class State(BaseState):
     @staticmethod
     def _configure_common(config: lola.Chip) -> lola.Chip:
 
-        # set global cells
-        config.neuron_block.v_bias_casc_n.fill(340)
-        config.neuron_block.i_bias_readout_amp.fill(110)
-        config.neuron_block.i_bias_leak_source_follower.fill(100)
-        config.neuron_block.i_bias_threshold_comparator.fill(500)
-
         # set all neurons on chip to default values
         default_neuron = HXNeuron.create_hw_entity({})
         for coord in halco.iter_all(halco.AtomicNeuronOnDLS):
