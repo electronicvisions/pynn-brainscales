@@ -490,14 +490,6 @@ class State(BaseState):
         for block in halco.iter_all(halco.SynapseBlockOnDLS):
             config.synapse_blocks[block].i_bias_dac.fill(1022)
 
-        for coord in halco.iter_all(halco.CADCOnDLS):
-            config.cadc_readout_chains[coord]\
-                .correlation.i_bias_ramp.fill(1010)
-            config.cadc_readout_chains[coord]\
-                .correlation.i_bias_store.fill(1010)
-            config.cadc_readout_chains[coord]\
-                .correlation.i_bias_corout.fill(1010)
-
         return config
 
     def _generate_network_graph(self) -> grenade.NetworkGraph:
