@@ -334,8 +334,6 @@ class State(BaseState):
                             config: lola.Chip,
                             neuron_id: ID,
                             parameters: dict,
-                            readout_source:
-                            Optional[hal.NeuronConfig.ReadoutSource],
                             enable_spike_output: bool) \
             -> lola.Chip:
         """
@@ -356,12 +354,6 @@ class State(BaseState):
             atomic_neuron.threshold.enable = False
             atomic_neuron.event_routing.enable_bypass_excitatory = True
             atomic_neuron.event_routing.enable_bypass_inhibitory = True
-
-        # configure v recording
-        if readout_source is not None:
-            atomic_neuron.readout.enable_amplifier = True
-            atomic_neuron.readout.enable_buffered_access = True
-            atomic_neuron.readout.source = readout_source
 
         config.neuron_block.atomic_neurons[coord] = atomic_neuron
 
@@ -434,8 +426,6 @@ class State(BaseState):
 
                 # retrieve for which neurons what kind of recording is active
                 spike_rec_indexes = set()
-                madc_recording_id = None
-                readout_source = Optional[hal.NeuronConfig.ReadoutSource]
                 for parameter, cell_ids in recorder.recorded.items():
                     for cell_id in cell_ids:
                         if parameter == "spikes":
@@ -443,8 +433,6 @@ class State(BaseState):
                         elif parameter in recorder.madc_variables:
                             assert self.madc_recorder is not None and \
                                 cell_id == self.madc_recorder.cell_id
-                            madc_recording_id = cell_id
-                            readout_source = self.madc_recorder.readout_source
                         else:
                             raise NotImplementedError
                 if population in spike_source_indices:
@@ -454,14 +442,10 @@ class State(BaseState):
                         population.all_cells,
                         population.celltype.parameter_space):
 
-                    this_source = None
-                    if cell_id == madc_recording_id:
-                        this_source = readout_source
                     config = self._configure_hxneuron(
                         config,
                         cell_id,
                         parameters,
-                        readout_source=this_source,
                         enable_spike_output=cell_id in spike_rec_indexes)
         return config
 
