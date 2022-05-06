@@ -307,16 +307,6 @@ class State(BaseState):
         assert len(samples) == 1  # only one batch
         return samples[0]
 
-    @staticmethod
-    def _configure_common(config: lola.Chip) -> lola.Chip:
-
-        # set all neurons on chip to default values
-        default_neuron = HXNeuron.create_hw_entity({})
-        for coord in halco.iter_all(halco.AtomicNeuronOnDLS):
-            config.neuron_block.atomic_neurons[coord] = default_neuron
-
-        return config
-
     # pylint: disable=too-many-arguments
     def _configure_hxneuron(self,
                             config: lola.Chip,
@@ -598,7 +588,6 @@ class State(BaseState):
         builder1 = sta.PlaybackProgramBuilder()
 
         # generate common static configuration
-        config = self._configure_common(config)
         config = self._configure_routing(config)
 
         def add_configuration(
