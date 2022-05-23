@@ -64,6 +64,14 @@ class Projection(pyNN.common.Projection):
                                          space, label)
         self.connections = []
         connector.connect(self)
+
+        def key(connection):
+            return (connection.presynaptic_index,
+                    connection.postsynaptic_index)
+        # PyNN creates connections in column-major order, we require
+        # row-major order.
+        self.connections = sorted(self.connections, key=key)
+
         self._simulator.state.projections.append(self)
         self.changed_since_last_run = True
 

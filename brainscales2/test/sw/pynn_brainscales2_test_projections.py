@@ -53,15 +53,15 @@ class TestProjection(unittest.TestCase):
 
         proj = pynn.Projection(self.pop3, self.pop4, pynn.AllToAllConnector(),
                                synapse_type=synapse)
-        connection_list = [(0, 0, 32), (1, 0, 32),
-                           (0, 1, 32), (1, 1, 32),
-                           (0, 2, 32), (1, 2, 32)]
+        connection_list = [(0, 0, 32), (0, 1, 32),
+                           (0, 2, 32), (1, 0, 32),
+                           (1, 1, 32), (1, 2, 32)]
         self.assertEqual(proj.get("weight", format="list"), connection_list)
 
         proj = pynn.Projection(self.pop4, self.pop3, pynn.AllToAllConnector(),
                                synapse_type=synapse)
-        connection_list = [(0, 0, 32), (1, 0, 32), (2, 0, 32),
-                           (0, 1, 32), (1, 1, 32), (2, 1, 32)]
+        connection_list = [(0, 0, 32), (0, 1, 32), (1, 0, 32),
+                           (1, 1, 32), (2, 0, 32), (2, 1, 32)]
         self.assertEqual(proj.get("weight", format="list"), connection_list)
         pynn.run(None)
 
