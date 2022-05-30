@@ -1,5 +1,9 @@
 from typing import NamedTuple
+from datetime import datetime
+from warnings import warn
 import numpy as np
+import neo
+import quantities as pq
 import pyNN.recording
 import pyNN.errors
 from pynn_brainscales.brainscales2 import simulator
@@ -100,17 +104,70 @@ class Recorder(pyNN.recording.Recorder):
                 all_spiketimes[cell_id] = simulator.state.spikes[neuron_idx]
         return all_spiketimes
 
-    # pylint: disable=unused-argument
-    @staticmethod
-    def _get_all_signals(variable, ids, clear=False):
-        if variable in Recorder.madc_variables:
-            signals = np.stack(
-                (simulator.state.times, simulator.state.madc_samples)).T
-        else:
-            raise ValueError("Only implemented for membrane potential 'v' and"
-                             + "technical parameters: '{exc,inh}_synin', "
-                             + "'adaptation'.")
-        return signals
+    # TODO: Patch to utilize IrregularlySampledSignal as return value.
+    #       Remove when upstream pyNN support is merged and reimplement
+    #       _get_all_signals()
+    #       https://github.com/NeuralEnsemble/PyNN/pull/754
+    # pylint: disable=too-many-locals
+    def _get_current_segment(
+            self,
+            filter_ids=None,
+            variables='all',
+            clear=False):
+        segment = neo.Segment(
+            name="segment%03d" % self._simulator.state.segment_counter,
+            description=self.population.describe(),
+            rec_datetime=datetime.now())
+        variables_to_include = set(self.recorded.keys())
+        if variables != 'all':
+            variables_to_include = variables_to_include.\
+                intersection(set(variables))
+        for variable in variables_to_include:
+            if variable == 'spikes':
+                t_stop = self._simulator.state.t * pq.ms
+                sids = sorted(self.filter_recorded('spikes', filter_ids))
+                data = self._get_spiketimes(sids)
+
+                segment.spiketrains = []
+                for identifier in sids:
+                    times = pq.Quantity(data.get(int(identifier), []), pq.ms)
+                    if times.size > 0 and times.max() > t_stop:
+                        warn("Recorded at least one spike after t_stop")
+                        times = times[times <= t_stop]
+                    segment.spiketrains.append(
+                        neo.SpikeTrain(
+                            times,
+                            t_start=self._recording_start_time,
+                            t_stop=t_stop,
+                            units='ms',
+                            source_population=self.population.label,
+                            source_id=int(identifier),
+                            source_index=self.population.id_to_index(
+                                int(identifier)))
+                    )
+            else:
+                if variable not in Recorder.madc_variables:
+                    raise ValueError(
+                        "Only implemented for membrane potential 'v' and "
+                        + "technical parameters: '{exc,inh}_synin', "
+                        + "'adaptation'.")
+                ids = sorted(self.filter_recorded(variable, filter_ids))
+                if simulator.state.times.size > 0:
+                    units = self.population.find_units(variable)
+                    source_ids = np.fromiter(ids, dtype=int)
+                    id_array = np.array(
+                        [self.population.id_to_index(myid) for myid in ids])
+                    signal = neo.IrregularlySampledSignal(
+                        times=simulator.state.times,
+                        signal=simulator.state.madc_samples,
+                        units=units,
+                        time_units='ms',
+                        name=variable,
+                        source_population=self.population.label,
+                        source_ids=source_ids,
+                        array_annotations={"channel_index": id_array})
+                    segment.analogsignals.append(signal)
+        return segment
 
     def _local_count(self, variable, filter_ids):
         counts = {}

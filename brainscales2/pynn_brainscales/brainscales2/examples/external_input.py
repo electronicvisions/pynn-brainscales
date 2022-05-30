@@ -39,8 +39,9 @@ def main(params: dict):
     pynn.run(0.2)
 
     spiketrain = nrn.get_data("spikes").segments[0].spiketrains[0]
-    mem_v = nrn.get_data("v").segments[0]
-    membrane_times, membrane_voltage = zip(*mem_v.filter(name="v")[0])
+    mem_v = nrn.get_data("v").segments[0].analogsignals[0]
+    membrane_times = mem_v.times
+    membrane_voltage = mem_v.magnitude
 
     pynn.end()
 
