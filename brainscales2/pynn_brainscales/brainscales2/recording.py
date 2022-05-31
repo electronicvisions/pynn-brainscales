@@ -93,8 +93,9 @@ class Recorder(pyNN.recording.Recorder):
     def _clear_simulator(self):
         raise NotImplementedError
 
+    # pylint: disable=unused-argument
     @staticmethod
-    def _get_spiketimes(ids):
+    def _get_spiketimes(ids, clear=None):
         """Returns a dict containing the neuron_id and its spiketimes."""
         all_spiketimes = {}
         for cell_id in ids:
@@ -126,7 +127,7 @@ class Recorder(pyNN.recording.Recorder):
             if variable == 'spikes':
                 t_stop = self._simulator.state.t * pq.ms
                 sids = sorted(self.filter_recorded('spikes', filter_ids))
-                data = self._get_spiketimes(sids)
+                data = self._get_spiketimes(sids, clear=clear)
 
                 segment.spiketrains = []
                 for identifier in sids:
