@@ -78,7 +78,8 @@ def plot_membrane_dynamics(population: Population, segment_id=-1):
     # Experimental results are given in the 'neo' data format, the following
     # lines extract membrane traces as well as spikes and construct a simple
     # figure.
-    mem_v = population.get_data("v").segments[segment_id].analogsignals[0]
+    mem_v = population.get_data("v").segments[segment_id]\
+        .irregularlysampledsignals[0]
     times = mem_v.times
     membrane = mem_v.magnitude
     try:

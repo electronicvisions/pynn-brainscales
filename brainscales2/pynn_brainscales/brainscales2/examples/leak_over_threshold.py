@@ -39,7 +39,7 @@ def main(params: dict):
     log.INFO("Number of spikes of single recorded neuron: ", len(spiketimes))
     log.INFO("Spiketimes of recorded neuron: ", spiketimes)
 
-    v_mem = pop1.get_data("v").segments[0].analogsignals[0]
+    v_mem = pop1.get_data("v").segments[0].irregularlysampledsignals[0]
     membrane = v_mem.magnitude
     times = v_mem.times
     log.INFO("Number of MADC Samples: ", len(times))

@@ -58,7 +58,7 @@ def main():
         spikenumber2 += spikes
     main_log.INFO("Number of spikes from pop2: ", spikenumber2)
 
-    mem_v = pop1.get_data("v").segments[0].analogsignals[0]
+    mem_v = pop1.get_data("v").segments[0].irregularlysampledsignals[0]
     membrane_times = mem_v.times
     membrane_voltage = mem_v.magnitude
 

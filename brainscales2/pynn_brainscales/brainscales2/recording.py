@@ -167,7 +167,7 @@ class Recorder(pyNN.recording.Recorder):
                         source_population=self.population.label,
                         source_ids=source_ids,
                         array_annotations={"channel_index": id_array})
-                    segment.analogsignals.append(signal)
+                    segment.irregularlysampledsignals.append(signal)
         return segment
 
     def _local_count(self, variable, filter_ids):
