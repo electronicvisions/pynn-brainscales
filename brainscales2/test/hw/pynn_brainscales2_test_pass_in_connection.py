@@ -3,7 +3,7 @@
 import unittest
 import pynn_brainscales.brainscales2 as pynn
 
-from dlens_vx_v2 import hxcomm
+from dlens_vx_v3 import hxcomm
 
 
 class TestPassInConnection(unittest.TestCase):

@@ -240,8 +240,6 @@ stimulated_p = pynn.Population(1, pynn.cells.HXNeuron(
     excitatory_input_i_bias_tau=200,
     inhibitory_input_i_bias_tau=200,
     # Technical parameters
-    excitatory_input_i_drop_input=300,
-    inhibitory_input_i_drop_input=300,
     excitatory_input_i_shift_reference=300,
     inhibitory_input_i_shift_reference=300))
 

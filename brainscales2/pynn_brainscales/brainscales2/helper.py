@@ -1,6 +1,6 @@
 import urllib
 from pathlib import Path
-from dlens_vx_v2 import sta, hxcomm
+from dlens_vx_v3 import sta, hxcomm
 
 
 def chip_from_portable_binary(data: bytes) -> dict:

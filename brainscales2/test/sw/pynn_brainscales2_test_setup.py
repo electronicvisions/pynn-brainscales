@@ -2,7 +2,7 @@
 
 import unittest
 import numpy
-from dlens_vx_v2 import halco, lola, sta
+from dlens_vx_v3 import halco, lola, sta
 import pynn_brainscales.brainscales2 as pynn
 
 

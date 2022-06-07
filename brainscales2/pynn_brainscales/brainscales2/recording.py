@@ -7,7 +7,7 @@ import quantities as pq
 import pyNN.recording
 import pyNN.errors
 from pynn_brainscales.brainscales2 import simulator
-from dlens_vx_v2 import hal
+from dlens_vx_v3 import hal
 
 
 class MADCRecorderSetting(NamedTuple):

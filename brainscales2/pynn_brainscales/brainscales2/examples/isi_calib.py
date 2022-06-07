@@ -3,7 +3,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pynn_brainscales.brainscales2 as pynn
-from dlens_vx_v2 import lola, halco
+from dlens_vx_v3 import lola, halco
 
 cell_params = {"threshold_v_threshold": 400,
                "leak_v_leak": 1022,

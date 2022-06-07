@@ -9,7 +9,7 @@ from pyNN.standardmodels import cells, build_translations, StandardCellType
 from pyNN.common import Population
 from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.recording import Recorder
-from dlens_vx_v2 import lola, hal, halco, sta
+from dlens_vx_v3 import lola, hal, halco, sta
 import pygrenade_vx as grenade
 
 

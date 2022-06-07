@@ -3,7 +3,7 @@
 from typing import Dict
 import numpy as np
 import pynn_brainscales.brainscales2 as pynn
-from dlens_vx_v2 import halco, hal
+from dlens_vx_v3 import halco, hal
 
 
 def main(num_spikes: int = 200, runtime: float = 20.) \
