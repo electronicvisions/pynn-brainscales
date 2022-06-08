@@ -666,7 +666,7 @@ class State(BaseState):
             raise ValueError(f"Runtime of {runtime} to long. "
                              f"Maximum supported runtime {max_runtime}")
 
-        inputs.runtime = [runtime_in_clocks]
+        inputs.runtime = {grenade.ExecutionInstance(): [runtime_in_clocks]}
 
         if not self.conn_comes_from_outside and \
            self.conn_manager is None:
