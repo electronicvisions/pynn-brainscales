@@ -48,9 +48,7 @@ def build(bld):
         source = bld.path.ant_glob('pynn_brainscales/brainscales2/examples/*.py'),
         relative_trick = True,
         use = ['pynn_brainscales2'],
-        install_from = 'pynn_brainscales/brainscales2/examples',
-        install_path = '${PREFIX}/bin',
-        chmod=Utils.O755,
+        install_path = '${PREFIX}/lib',
         pylint_config = join(get_toplevel_path(), "code-format", "pylintrc"),
         pycodestyle_config = join(get_toplevel_path(), "code-format", "pycodestyle"),
     )
