@@ -670,7 +670,7 @@ class State(BaseState):
 
         if not self.conn_comes_from_outside and \
            self.conn_manager is None:
-            self.conn_manager = grenade.ManagedConnection()
+            self.conn_manager = grenade.ManagedJITGraphExecutor()
             assert self.conn is None
             self.conn = self.conn_manager.__enter__()
 
