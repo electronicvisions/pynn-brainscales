@@ -211,6 +211,7 @@ class State(BaseState):
         self.madc_recorder = None
         self.projections: List[Projection] = []
         self.plasticity_rules: List["PlasticityRule"] = []
+        self.synaptic_observables: List[Dict[str, object]] = []
         self.id_counter = 0
         self.current_sources = []
         self.segment_counter = -1
@@ -249,6 +250,7 @@ class State(BaseState):
         self.madc_recorder = None
         self.projections = []
         self.plasticity_rules = []
+        self.synaptic_observables = []
         self.id_counter = 0
         self.current_sources = []
         self.segment_counter = -1
@@ -321,6 +323,31 @@ class State(BaseState):
             return np.array([], dtype=np.float32), np.array([], dtype=np.int32)
         assert len(samples) == 1  # only one batch
         return samples[0]
+
+    def _get_synaptic_observables(
+            self,
+            logical_network_graph: grenade.logical_network.NetworkGraph,
+            hardware_network_graph: grenade.NetworkGraph,
+            outputs: grenade.IODataMap) -> Dict[str, np.ndarray]:
+        """
+        Get synaptic observables.
+        :param network_graph: Network graph to use for lookup of
+                              plasticity rule descriptor
+        :param outputs: All outputs of a single execution to extract
+                        samples from
+        :return: Dict over projections and recorded data
+        """
+
+        observables = [dict() for projection in self.projections]
+        for plasticity_rule in self.plasticity_rules:
+            if not plasticity_rule.observables:
+                continue
+            data = plasticity_rule.get_data(
+                logical_network_graph, hardware_network_graph, outputs)
+            for obsv_name, data in data.data_per_synapse.items():
+                for descriptor, value in data.items():
+                    observables[descriptor].update({obsv_name: value[0]})
+        return observables
 
     # pylint: disable=too-many-arguments
     def _configure_hxneuron(self,
@@ -757,6 +784,9 @@ class State(BaseState):
         # make two list for madc samples: times, madc_samples
         self.times, self.madc_samples = self._get_v(
             hardware_network, outputs)
+
+        self.synaptic_observables = self._get_synaptic_observables(
+            logical_network, hardware_network, outputs)
 
         self.pre_realtime_read = self._get_pre_realtime_read()
         self.post_realtime_read = self._get_post_realtime_read()

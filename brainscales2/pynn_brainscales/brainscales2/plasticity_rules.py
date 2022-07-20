@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Dict, Optional
 import textwrap
 from pyNN.common import Projection
 from pynn_brainscales.brainscales2 import simulator
@@ -66,13 +67,40 @@ class PlasticityRule:
     """
     _simulator = simulator
 
-    def __init__(self, timer: Timer):
+    class Observable:
+        pass
+
+    class ObservablePerSynapse(Observable):
+        ElementType = grenade.PlasticityRule.TimedRecording \
+            .ObservablePerSynapse.Type
+        LayoutPerRow = grenade.PlasticityRule.TimedRecording \
+            .ObservablePerSynapse.LayoutPerRow
+
+        def __init__(self, element_type: ElementType,
+                     layout_per_row: LayoutPerRow):
+            self.element_type = element_type
+            self.layout_per_row = layout_per_row
+
+    class ObservableArray(Observable):
+        ElementType = grenade.PlasticityRule.TimedRecording \
+            .ObservableArray.Type
+
+        def __init__(self, element_type: ElementType, size: int):
+            self.element_type = element_type
+            self.size = size
+
+    def __init__(self, timer: Timer,
+                 observables: Optional[Dict[str, Observable]] = None):
         """
         Create a new plasticity rule with timing information.
 
         :param timer: Timer object.
         """
         self._timer = timer
+        if observables is None:
+            self._observables = dict()
+        else:
+            self._observables = observables
         self._projections = list()
         self._simulator.state.plasticity_rules.append(self)
         self.changed_since_last_run = True
@@ -86,6 +114,16 @@ class PlasticityRule:
         return self._timer
 
     timer = property(_get_timer, _set_timer)
+
+    def _set_observables(self, new_observables):
+        self._observables = new_observables
+        self.changed_since_last_run = True
+
+    def _get_observables(self):
+        self.changed_since_last_run = True
+        return self._observables
+
+    observables = property(_get_observables, _set_observables)
 
     def _add_projection(self, new_projection: Projection):
         self._projections.append(new_projection)
@@ -126,6 +164,24 @@ class PlasticityRule:
             -> grenade.logical_network.PlasticityRuleDescriptor:
         plasticity_rule = grenade.logical_network.PlasticityRule()
         plasticity_rule.timer = self.timer.to_grenade()
+        if self.observables:
+            plasticity_rule.recording = grenade.PlasticityRule.TimedRecording()
+            observables = dict()
+            for name, observable in self.observables.items():
+                if isinstance(observable, self.ObservablePerSynapse):
+                    grenade_observable = grenade.PlasticityRule \
+                        .TimedRecording.ObservablePerSynapse()
+                    grenade_observable.layout_per_row = observable \
+                        .layout_per_row
+                elif isinstance(observable, self.ObservableArray):
+                    grenade_observable = grenade.PlasticityRule \
+                        .TimedRecording.ObservableArray()
+                    grenade_observable.size = observable.size
+                else:
+                    raise RuntimeError("Observable type not implemented.")
+                grenade_observable.type = observable.element_type
+                observables.update({name: grenade_observable})
+            plasticity_rule.recording.observables = observables
         plasticity_rule.kernel = self.generate_kernel()
         plasticity_rule.projections = [
             grenade.logical_network.ProjectionDescriptor(
@@ -133,3 +189,26 @@ class PlasticityRule:
             for proj in self._projections
         ]
         return builder.add(plasticity_rule)
+
+    def get_data(
+            self,
+            logical_network_graph: grenade.logical_network.NetworkGraph,
+            hardware_network_graph: grenade.NetworkGraph,
+            outputs: grenade.IODataMap) -> grenade.logical_network \
+            .PlasticityRule.RecordingData:
+        """
+        Get synaptic observables of plasticity rule.
+        :param network_graph: Network graph to use for lookup of
+                              MADC output vertex descriptor
+        :param outputs: All outputs of a single execution to extract
+                        samples from
+        :return: Recording data
+        """
+
+        recording_data = grenade.logical_network\
+            .extract_plasticity_rule_recording_data(
+                outputs,
+                logical_network_graph, hardware_network_graph,
+                grenade.logical_network.PlasticityRuleDescriptor(
+                    self._simulator.state.plasticity_rules.index(self)))
+        return recording_data

@@ -28,7 +28,7 @@ class PlasticSynapse(
         pynn.PlasticityRule,
         pynn.standardmodels.synapses.StaticSynapse):
     def __init__(self, timer: pynn.Timer, weight: float):
-        pynn.PlasticityRule.__init__(self, timer)
+        pynn.PlasticityRule.__init__(self, timer, observables={})
         pynn.standardmodels.synapses.StaticSynapse.__init__(
             self, weight=weight)
 

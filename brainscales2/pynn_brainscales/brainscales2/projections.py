@@ -201,6 +201,16 @@ class Projection(pyNN.common.Projection):
             .get_placed_connections(grenade.ProjectionDescriptor(
                 self._simulator.state.projections.index(self)))
 
+    def get_data(self, observable: str):
+        if not isinstance(self.synapse_type, PlasticityRule):
+            raise RuntimeError("Synapse type can't have observables, since it"
+                               + " is not derived from PlasticityRule.")
+        if observable not in self.synapse_type.observables:
+            raise RuntimeError(
+                "Synapse type doesn't have requested observable.")
+        return self._simulator.state.synaptic_observables[
+            self._simulator.state.projections.index(self)][observable]
+
 
 class Connection(pyNN.common.Connection):
     """
