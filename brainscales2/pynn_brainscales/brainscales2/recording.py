@@ -100,7 +100,7 @@ class Recorder(pyNN.recording.Recorder):
         """Returns a dict containing the neuron_id and its spiketimes."""
         all_spiketimes = {}
         for cell_id in ids:
-            neuron_idx = simulator.state.neuron_placement.id2hwenum(
+            neuron_idx = simulator.state.neuron_placement.id2first_circuit(
                 cell_id)
             if neuron_idx in simulator.state.spikes:
                 all_spiketimes[cell_id] = simulator.state.spikes[neuron_idx]

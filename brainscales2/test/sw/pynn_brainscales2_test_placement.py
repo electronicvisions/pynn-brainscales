@@ -18,13 +18,13 @@ class TestPlacement(unittest.TestCase):
         pynn.Population(1, pynn.cells.HXNeuron())
 
         self.assertEqual(
-            pynn.simulator.state.neuron_placement.id2hwenum(1),
+            pynn.simulator.state.neuron_placement.id2first_circuit(1),
             self.permutation[0])
         self.assertEqual(
-            pynn.simulator.state.neuron_placement.id2hwenum(2),
+            pynn.simulator.state.neuron_placement.id2first_circuit(2),
             self.permutation[1])
         self.assertEqual(
-            pynn.simulator.state.neuron_placement.id2hwenum(4),
+            pynn.simulator.state.neuron_placement.id2first_circuit(4),
             self.permutation[2])
 
         pynn.end()
@@ -41,11 +41,11 @@ class TestPlacement(unittest.TestCase):
         pynn.setup(neuronPermutation=self.permutation)
         pynn.Population(1, pynn.cells.HXNeuron())
         self.assertEqual(
-            pynn.simulator.state.neuron_placement.id2hwenum(0),
+            pynn.simulator.state.neuron_placement.id2first_circuit(0),
             self.permutation[0])
         pynn.reset()
         self.assertEqual(
-            pynn.simulator.state.neuron_placement.id2hwenum(0),
+            pynn.simulator.state.neuron_placement.id2first_circuit(0),
             self.permutation[0])
         pynn.end()
 
@@ -53,13 +53,13 @@ class TestPlacement(unittest.TestCase):
         pynn.setup(neuronPermutation=self.permutation)
         pynn.Population(1, pynn.cells.HXNeuron())
         self.assertEqual(
-            pynn.simulator.state.neuron_placement.id2hwenum(0),
+            pynn.simulator.state.neuron_placement.id2first_circuit(0),
             self.permutation[0])
         pynn.end()
         pynn.setup()
         pynn.Population(1, pynn.cells.HXNeuron())
         self.assertEqual(
-            pynn.simulator.state.neuron_placement.id2hwenum(0), 0)
+            pynn.simulator.state.neuron_placement.id2first_circuit(0), 0)
         pynn.end()
 
 

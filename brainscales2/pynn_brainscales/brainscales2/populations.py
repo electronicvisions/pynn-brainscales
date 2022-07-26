@@ -30,9 +30,11 @@ class Population(pyNN.common.Population):
             cell_id.parent = self
 
         if hasattr(self.celltype, "create_hw_entity"):
-            simulator.state.neuron_placement.register_id(self.all_cells)
-            coords = simulator.state. \
-                neuron_placement.id2atomicneuron(self.all_cells)
+            simulator.state.neuron_placement.register_neuron(
+                self.all_cells, self.celltype.logical_compartments)
+            coords = simulator.state.neuron_placement.\
+                id2logicalneuron(self.all_cells)
+
             self.celltype.apply_config(coords)
 
         parameter_space = self.celltype.parameter_space

@@ -35,56 +35,89 @@ class NeuronPlacement:
                     population neuron enumeration. Value: HW neuron
                     enumeration.
     """
-    _id_2_an: Dict[ID, halco.AtomicNeuronOnDLS]
-    _permutation: List[halco.AtomicNeuronOnDLS]
+    _id_2_coord: Dict[ID, halco.LogicalNeuronOnDLS]
+    _available_coords: np.ndarray
     _MAX_NUM_ENTRIES: Final[int] = halco.AtomicNeuronOnDLS.size
     DEFAULT_PERMUTATION: Final[List[int]] = range(halco.AtomicNeuronOnDLS.size)
 
     def __init__(self, permutation: List[int] = None):
         if permutation is None:
             permutation = range(self._MAX_NUM_ENTRIES)
-        self._id_2_an = {}
-        self._permutation = self._check_and_transform(permutation)
+        self._id_2_coord = {}
+        self._available_coords = self._check_and_transform(permutation)
 
-    def register_id(self, neuron_id: Union[List[ID], ID]):
+    def register_neuron(self, neuron_id: Union[List[ID], ID],
+                        logical_compartments: halco.LogicalNeuronCompartments):
         """
-        Register a new ID to placement
+        Register new IDs to placement.
 
-        :param neuron_id: pyNN neuron ID to be registered
+        :param neuron_id: pyNN neuron IDs to be registered.
+        :param logical_compartments: LogicalNeuronCompartments which belong
+            to the neurons which should be registered. All neurons which should
+            be registered have to share the same morphology, i.e. have the same
+            LogicalNeuronCompartments coordinate.
         """
         if not (hasattr(neuron_id, "__iter__")
                 and hasattr(neuron_id, "__len__")):
             neuron_id = [neuron_id]
-        if len(self._id_2_an) + len(neuron_id) > len(self._permutation):
-            raise ValueError(
-                f"Cannot register more than {len(self._permutation)} IDs")
-        for idx in neuron_id:
-            self._id_2_an[idx] = self._permutation[len(self._id_2_an)]
 
-    def id2atomicneuron(self, neuron_id: Union[List[ID], ID]) \
-            -> Union[List[halco.AtomicNeuronOnDLS], halco.AtomicNeuronOnDLS]:
+        compartments = logical_compartments.get_compartments().values()
+        circuits_per_neuron = np.sum([len(comp) for comp in compartments])
+        if len(neuron_id) * circuits_per_neuron > len(self._available_coords):
+            raise ValueError(
+                f"Cannot register more than {len(self._available_coords)} "
+                "neuron circuits.")
+        for idx in neuron_id:
+            placed = False
+            # try one available coordinate after another as an anchor
+            for anchor in self._available_coords:
+                try:
+                    logical_neuron = halco.LogicalNeuronOnDLS(
+                        logical_compartments, anchor)
+                except RuntimeError:
+                    # logical neuron extends over edge of neuron array
+                    continue
+
+                atomic_neurons = logical_neuron.get_atomic_neurons()
+                if not np.isin(atomic_neurons, self._available_coords).all():
+                    continue
+
+                self._available_coords = self._available_coords[
+                    ~np.isin(self._available_coords, atomic_neurons)]
+                self._id_2_coord[idx] = logical_neuron
+                placed = True
+                break
+
+            if not placed:
+                raise ValueError("LogicalNeuron cannot be placed.")
+
+    def id2logicalneuron(self, neuron_id: Union[List[ID], ID]) \
+            -> Union[List[halco.LogicalNeuronOnDLS], halco.LogicalNeuronOnDLS]:
         """
         Get hardware coordinate from pyNN ID
-
         :param neuron_id: pyNN neuron ID
         """
         try:
-            return [self._id_2_an[idx] for idx in neuron_id]
+            return [self._id_2_coord[idx] for idx in
+                    neuron_id]
         except TypeError:
-            return self._id_2_an[neuron_id]
+            return self._id_2_coord[neuron_id]
 
-    def id2hwenum(self, neuron_id: Union[List[ID], ID]) \
+    def id2first_circuit(self, neuron_id: Union[List[ID], ID]) \
             -> Union[List[int], int]:
         """
-        Get hardware coordinate as plain int from pyNN ID
+        Get hardware coordinate of first circuit in first compartment as plain
+        int from pyNN ID.
 
         :param neuron_id: pyNN neuron ID
+        :return: Enums of first circuits in first compartments.
         """
-        atomic_neuron = self.id2atomicneuron(neuron_id)
+        logical_neurons = self.id2logicalneuron(neuron_id)
         try:
-            return [int(idx.toEnum()) for idx in atomic_neuron]
+            return [int(idx.get_atomic_neurons()[0].toEnum()) for
+                    idx in logical_neurons]
         except TypeError:
-            return int(atomic_neuron.toEnum())
+            return int(logical_neurons.get_atomic_neurons()[0].toEnum())
 
     @staticmethod
     def _check_and_transform(lut: list) -> list:
@@ -103,7 +136,7 @@ class NeuronPlacement:
                 )
             coord = halco.AtomicNeuronOnDLS(halco.common.Enum(neuron_idx))
             permutation.append(coord)
-        return permutation
+        return np.array(permutation)
 
 
 class BackgroundSpikeSourcePlacement:
@@ -363,7 +396,11 @@ class State(BaseState):
 
         # places the neurons from pop on chip
         atomic_neuron = HXNeuron.create_hw_entity(parameters)
-        coord = self.neuron_placement.id2atomicneuron(neuron_id)
+        logical_coord = self.neuron_placement.id2logicalneuron(neuron_id)
+
+        # HXNeurons consist of single compartments with single circuits
+        assert len(logical_coord.get_atomic_neurons()) == 1
+        coord = logical_coord.get_atomic_neurons()[0]
 
         # configure spike recording
         atomic_neuron.event_routing.analog_output = \

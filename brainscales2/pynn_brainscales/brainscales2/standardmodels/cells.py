@@ -83,6 +83,12 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
     # needed to restore after chip config was applied
     _user_provided_parameters: Optional[Dict[str, Union[int, bool]]]
 
+    # HXNeuron consits of a single compartment with a single circuit
+    logical_compartments: Final[halco.LogicalNeuronCompartments] = \
+        halco.LogicalNeuronCompartments(
+            {halco.CompartmentOnLogicalNeuron():
+             [halco.AtomicNeuronOnLogicalNeuron()]})
+
     def __init__(self, **parameters):
         """
         `parameters` should be a mapping object, e.g. a dict
@@ -164,7 +170,7 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
 
         return neuron
 
-    def apply_config(self, coords: List[halco.AtomicNeuronOnDLS]):
+    def apply_config(self, logical_coords: List[halco.LogicalNeuronOnDLS]):
         """
         Extract and apply config according to provided chip object
 
@@ -174,6 +180,11 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
         if simulator.state.initial_config is None:
             # no coco provided -> skip
             return
+
+        # HXneurons consist of single compartments with single circuits
+        assert np.all([len(coord.get_atomic_neurons()) == 1 for coord
+                       in logical_coords])
+        coords = [coord.get_atomic_neurons()[0] for coord in logical_coords]
 
         param_per_neuron: List[Dict[str, Union[int, bool]]]
         param_per_neuron = []
@@ -205,10 +216,9 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
         pop_cells_int = np.asarray(population.all_cells, dtype=int)
 
         # get neuron coordinates
-        coords: List[halco.AtomicNeuronOnDLS] = [
-            simulator.state.neuron_placement.id2atomicneuron(coord) for coord
-            in population.all_cells  # pop_cells_int is slower here
-        ]
+        coords: List[halco.LogicalNeuronOnDLS] = \
+            simulator.state.neuron_placement.id2logicalneuron(
+                population.all_cells)  # pop_cells_int is slower here
         # create receptors
         receptors = set([
             grenade.logical_network.Receptor(
@@ -227,15 +237,13 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
         # create neurons
         neurons: List[grenade.logical_network.Population.Neuron] = [
             grenade.logical_network.Population.Neuron(
-                halco.LogicalNeuronOnDLS(halco.LogicalNeuronCompartments(
-                    {halco.CompartmentOnLogicalNeuron():
-                     [halco.AtomicNeuronOnLogicalNeuron()]}), atomic_neuron),
+                coord,
                 {halco.CompartmentOnLogicalNeuron():
                  grenade.logical_network.Population.Neuron.Compartment(
                      grenade.logical_network.Population
                      .Neuron.Compartment.SpikeMaster(
                          0, enable_record_spikes[i]), [receptors])})
-            for i, atomic_neuron in enumerate(coords)
+            for i, coord in enumerate(coords)
         ]
         # create grenade population
         gpopulation = grenade.logical_network.Population(neurons)
