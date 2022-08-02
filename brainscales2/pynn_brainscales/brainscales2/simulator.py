@@ -424,20 +424,6 @@ class State(BaseState):
                         enable_spike_output=cell_id in spike_rec_indexes)
         return config
 
-    @staticmethod
-    def _configure_routing(config: lola.Chip) -> lola.Chip:
-        """
-        Configure global routing-related but static parameters.
-        :param config: Chip configuration to add configuration to
-        :return: Altered chip configuration
-        """
-
-        # set synapse capmem cells
-        for block in halco.iter_all(halco.SynapseBlockOnDLS):
-            config.synapse_blocks[block].i_bias_dac.fill(1022)
-
-        return config
-
     def _generate_network_graph(self) -> grenade.NetworkGraph:
         """
         Generate placed and routed executable network graph representation.
@@ -593,9 +579,6 @@ class State(BaseState):
         else:
             config = copy(self.initial_config)
         builder1 = sta.PlaybackProgramBuilder()
-
-        # generate common static configuration
-        config = self._configure_routing(config)
 
         def add_configuration(
                 builder: sta.PlaybackProgramBuilder,
