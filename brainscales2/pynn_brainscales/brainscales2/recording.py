@@ -89,9 +89,10 @@ class Recorder(pyNN.recording.Recorder):
             if variable in Recorder.madc_variables:
                 self._simulator.state.madc_recorder = None
 
-    # TODO: cf. feature #3598
     def _clear_simulator(self):
-        raise NotImplementedError
+        self._simulator.state.spikes = []
+        self._simulator.state.times = []
+        self._simulator.state.madc_samples = []
 
     # pylint: disable=unused-argument
     @staticmethod
