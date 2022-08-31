@@ -177,8 +177,6 @@ class Projection(pyNN.common.Projection):
         gprojection = grenade.Projection()
         gprojection.from_numpy(
             receptor_type, connections, population_pre, population_post)
-        gprojection.enable_is_required_dense_in_order = \
-            isinstance(projection.synapse_type, PlasticityRule)
 
         return builder.add(gprojection)
 
