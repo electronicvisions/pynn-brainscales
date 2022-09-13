@@ -58,7 +58,6 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
     receptor_types: Final[List[str]] = ["excitatory", "inhibitory"]
     conductance_based: Final[bool] = False
     injectable: Final[bool] = True
-    default_initial_values: ClassVar[dict]
 
     # the actual unit of `v` is `haldls::vx::CapMemCell::Value`
     # [0–1022]; 1023 means off,
@@ -321,8 +320,7 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
         pass
 
 
-HXNeuron.default_initial_values = HXNeuron.get_default_values()
-HXNeuron.default_parameters = HXNeuron.default_initial_values
+HXNeuron.default_parameters = HXNeuron.get_default_values()
 HXNeuron.translations = HXNeuron._create_translation()  # pylint: disable=protected-access
 HXNeuron._generate_hw_entity_setters()  # pylint: disable=protected-access
 
