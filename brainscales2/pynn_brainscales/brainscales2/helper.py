@@ -1,6 +1,8 @@
+from typing import List, Optional
+import inspect
 import urllib
 from pathlib import Path
-from dlens_vx_v3 import sta, hxcomm
+from dlens_vx_v3 import sta, hxcomm, lola
 
 
 def chip_from_portable_binary(data: bytes) -> dict:
@@ -79,3 +81,55 @@ def chip_from_nightly() -> (dict):
                                f'setup "{get_unique_identifier()}".') from ex
 
     return chip
+
+
+# TODO: add more precise return type (cf. feature #3599)
+def get_values_of_atomic_neuron(atomic_neuron: lola.AtomicNeuron(),
+                                exclude: Optional[List[str]] = None) -> dict:
+    """
+    Get values of a LoLa Neuron instance as a dict.
+
+    Parse the atomic neuron and save the values of all members and their
+    attributes in a dictionary. The keys of the dictionary are the member's
+    name and it's attributes name combined by an underscore.
+
+    :param atomic_neuron: Atomic neuron from which to get the values.
+    :param exclude: Members to exclude from parsing.
+    :return: Dictionary with the values saved in the atomic neuron.
+    """
+
+    if exclude is None:
+        exclude = []
+
+    # TODO: types again like above (cf. feature #3599)
+    values = {}
+
+    for member, value in inspect.getmembers(atomic_neuron):
+        # skip for non container members
+        if member.startswith("_") or not member.islower() \
+                or inspect.ismethod(value) or inspect.isbuiltin(value):
+            continue
+
+        for name, inner_value in inspect.getmembers(value):
+
+            # get members
+            # exclude lola.AtomicNeuron.EventRouting, since they
+            # only have the signature of members, but actually are
+            # none
+            if name.startswith("_") or not name.islower() \
+                or isinstance(inner_value,
+                              lola.AtomicNeuron.EventRouting):
+                continue
+            # asserts just a subset of possible unwanted types
+            assert not inspect.ismethod(inner_value)
+            assert not inspect.isbuiltin(inner_value)
+
+            key = member + "_" + name
+            if key in exclude:
+                continue
+            if isinstance(inner_value, bool):
+                values[key] = inner_value
+            else:
+                values[key] = float(inner_value)
+
+    return values

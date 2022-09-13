@@ -9,6 +9,7 @@ from pyNN.standardmodels import cells, build_translations, StandardCellType
 from pyNN.common import Population
 from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.recording import Recorder
+from pynn_brainscales.brainscales2.helper import get_values_of_atomic_neuron
 from dlens_vx_v3 import lola, hal, halco, sta
 import pygrenade_vx as grenade
 
@@ -93,48 +94,11 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
         super().__init__(**parameters)
 
     @classmethod
-    # TODO: add more precise return type (cf. feature #3599)
-    def get_values(cls, atomic_neuron: lola.AtomicNeuron()) -> dict:
-        """Get values of a LoLa Neuron instance as a dict."""
-
-        # TODO: types again like above (cf. feature #3599)
-        values = {}
-
-        for member, value in inspect.getmembers(atomic_neuron):
-            # skip for non container members
-            if member.startswith("_") or not member.islower() \
-                    or inspect.ismethod(value) or inspect.isbuiltin(value):
-                continue
-
-            for name, inner_value in inspect.getmembers(value):
-
-                # get members
-                # exclude lola.AtomicNeuron.EventRouting, since they
-                # only have the signature of members, but actually are
-                # none
-                if name.startswith("_") or not name.islower() \
-                    or isinstance(inner_value,
-                                  lola.AtomicNeuron.EventRouting):
-                    continue
-                # asserts just a subset of possible unwanted types
-                assert not inspect.ismethod(inner_value)
-                assert not inspect.isbuiltin(inner_value)
-
-                key = member + "_" + name
-                if key in cls._not_configurable:
-                    continue
-                if isinstance(inner_value, bool):
-                    values[key] = inner_value
-                else:
-                    values[key] = float(inner_value)
-
-        return values
-
-    @classmethod
     def get_default_values(cls) -> dict:
         """Get the default values of a LoLa Neuron."""
 
-        return cls.get_values(lola.AtomicNeuron())
+        return get_values_of_atomic_neuron(lola.AtomicNeuron(),
+                                           cls._not_configurable)
 
     @classmethod
     def _create_translation(cls) -> dict:
@@ -227,11 +191,13 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
         param_dict = {}
         for coord in coords:
             try:
-                param_per_neuron.append(self.get_values(
-                    simulator.state.initial_config.
-                    neuron_block.atomic_neurons[coord]))
+                atomic_neuron = simulator.state.initial_config.neuron_block.\
+                    atomic_neurons[coord]
             except KeyError:
                 raise KeyError(f"No coco entry for {coord}")
+            param_per_neuron.append(get_values_of_atomic_neuron(
+                atomic_neuron, self._not_configurable))
+
         # "fuse" entries of individual parameters to one large dict of arrays
         for k in param_per_neuron[0].keys():
             param_dict[k] = \
