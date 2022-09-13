@@ -93,9 +93,9 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
         self._user_provided_parameters = parameters
         super().__init__(**parameters)
 
-    @staticmethod
+    @classmethod
     # TODO: add more precise return type (cf. feature #3599)
-    def get_values(atomic_neuron: lola.AtomicNeuron()) -> dict:
+    def get_values(cls, atomic_neuron: lola.AtomicNeuron()) -> dict:
         """Get values of a LoLa Neuron instance as a dict."""
 
         # TODO: types again like above (cf. feature #3599)
@@ -122,7 +122,7 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
                 assert not inspect.isbuiltin(inner_value)
 
                 key = member + "_" + name
-                if key in HXNeuron._not_configurable:
+                if key in cls._not_configurable:
                     continue
                 if isinstance(inner_value, bool):
                     values[key] = inner_value
@@ -131,15 +131,15 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
 
         return values
 
-    @staticmethod
-    def get_default_values() -> dict:
+    @classmethod
+    def get_default_values(cls) -> dict:
         """Get the default values of a LoLa Neuron."""
 
-        return HXNeuron.get_values(lola.AtomicNeuron())
+        return cls.get_values(lola.AtomicNeuron())
 
-    @staticmethod
-    def _create_translation() -> dict:
-        default_values = HXNeuron.get_default_values()
+    @classmethod
+    def _create_translation(cls) -> dict:
+        default_values = cls.get_default_values()
         translation = []
         for key in default_values:
             translation.append((key, key))
