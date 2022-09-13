@@ -9,7 +9,8 @@ from pyNN.standardmodels import cells, build_translations, StandardCellType
 from pyNN.common import Population
 from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.recording import Recorder
-from pynn_brainscales.brainscales2.helper import get_values_of_atomic_neuron
+from pynn_brainscales.brainscales2.helper import get_values_of_atomic_neuron, \
+    decompose_in_member_names
 from dlens_vx_v3 import lola, hal, halco, sta
 import pygrenade_vx as grenade
 
@@ -77,10 +78,6 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
         "readout_enable_buffered_access",
         "readout_i_bias"]
 
-    ATOMIC_NEURON_MEMBERS: Final[List[str]] = \
-        [name for name, _ in inspect.getmembers(lola.AtomicNeuron())
-         if(not(name.startswith("_")) and name.islower())]
-
     _hw_entity_setters: ClassVar[Dict[str, Callable]]
 
     # needed to restore after chip config was applied
@@ -121,14 +118,7 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
         cls._hw_entity_setters = dict()
 
         for param in cls.get_default_values():
-            member = ""
-            cut = 0
-            for mem in cls.ATOMIC_NEURON_MEMBERS:  # slice
-                start_index = param.find(mem)
-                if start_index == 0:
-                    cut = start_index + len(mem) + 1
-                    member = mem
-            attr = param[cut:]
+            member, attr = decompose_in_member_names(param)
 
             def generate_setter(member, attr, param):
                 if param == "readout_source":

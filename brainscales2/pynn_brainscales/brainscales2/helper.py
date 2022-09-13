@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple
 import inspect
 import urllib
 from pathlib import Path
@@ -133,3 +133,36 @@ def get_values_of_atomic_neuron(atomic_neuron: lola.AtomicNeuron(),
                 values[key] = float(inner_value)
 
     return values
+
+
+def decompose_in_member_names(composed_name: str) -> Tuple[str, str]:
+    '''
+    Extract member and attribute of a lola.AtomicNeuron from composed name.
+
+    This function can be used to retrieve the original name of the member and
+    the attributes of the `lola.AtomicNeuron` for the keys in the dictionary
+    returned by `get_values_of_atomic_neuron`.
+    For example 'multicompartment_i_bias_nmda' is decomposed in the member
+    'multicompartment' and  the attribute 'i_bias_nmda'.
+
+    :param composed_name: String which is a combination of a member of the
+        lola.AtomicNeuron and an attribute of it. The two are combined by
+        an underscore.
+    :return: Tuple of the name of the member and the attribute.
+    '''
+    member = ""
+    cut = 0
+    for mem in ATOMIC_NEURON_MEMBERS:  # slice
+        start_index = composed_name.find(mem)
+        if start_index == 0:
+            cut = start_index + len(mem) + 1
+            member = mem
+    attr = composed_name[cut:]
+
+    return member, attr
+
+
+# all members of the lola.AtomicNeuron
+ATOMIC_NEURON_MEMBERS = \
+    [name for name, _ in inspect.getmembers(lola.AtomicNeuron())
+     if(not(name.startswith("_")) and name.islower())]
