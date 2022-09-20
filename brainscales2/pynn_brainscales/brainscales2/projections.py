@@ -167,10 +167,14 @@ class Projection(pyNN.common.Projection):
 
         if projection.receptor_type == "excitatory":
             receptor_type = \
-                grenade.logical_network.Projection.ReceptorType.excitatory
+                grenade.logical_network.Receptor(
+                    grenade.logical_network.Receptor.ID(),
+                    grenade.logical_network.Receptor.Type.excitatory)
         elif projection.receptor_type == "inhibitory":
             receptor_type = \
-                grenade.logical_network.Projection.ReceptorType.inhibitory
+                grenade.logical_network.Receptor(
+                    grenade.logical_network.Receptor.ID(),
+                    grenade.logical_network.Receptor.Type.inhibitory)
         else:
             raise NotImplementedError(
                 "grenade.Projection.RecetorType does "
