@@ -254,6 +254,15 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
             simulator.state.neuron_placement.id2atomicneuron(coord) for coord
             in population.all_cells  # pop_cells_int is slower here
         ]
+        # create receptors
+        receptors = set([
+            grenade.logical_network.Receptor(
+                grenade.logical_network.Receptor.ID(),
+                grenade.logical_network.Receptor.Type.excitatory),
+            grenade.logical_network.Receptor(
+                grenade.logical_network.Receptor.ID(),
+                grenade.logical_network.Receptor.Type.inhibitory),
+        ])
         # get recorder configuration
         enable_record_spikes = np.zeros((len(coords)), dtype=bool)
         if "spikes" in population.recorder.recorded:
@@ -262,7 +271,7 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
                 list(population.recorder.recorded["spikes"]))
         # create grenade population
         gpopulation = grenade.logical_network.Population(
-            coords, enable_record_spikes)
+            coords, [receptors] * len(coords), enable_record_spikes)
         # add to builder
         descriptor = builder.add(gpopulation)
 
