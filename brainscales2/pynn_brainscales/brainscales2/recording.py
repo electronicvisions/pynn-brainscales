@@ -154,6 +154,10 @@ class Recorder(pyNN.recording.Recorder):
                         + "technical parameters: '{exc,inh}_synin', "
                         + "'adaptation'.")
                 ids = sorted(self.filter_recorded(variable, filter_ids))
+                if not ids:
+                    # don't add a signal when no ids of the requested selection
+                    # were recorded
+                    continue
                 if simulator.state.times.size > 0:
                     units = self.population.find_units(variable)
                     source_ids = np.fromiter(ids, dtype=int)

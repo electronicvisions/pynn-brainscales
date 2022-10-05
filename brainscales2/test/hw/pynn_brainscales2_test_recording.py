@@ -102,5 +102,40 @@ class TestSpikeRecording(unittest.TestCase):
                         0.02)
 
 
+class TestMembraneRecording(unittest.TestCase):
+    """
+    Tests to ensure the correct recording of analog traces.
+    """
+
+    def setUp(self):
+        pynn.setup()
+
+    def tearDown(self):
+        pynn.end()
+
+    def test_analog_recording(self):
+        """
+        Here we test that an analog trace is recorded for (and only for) the
+        indicated neuron.
+        NOTE: We do not test the correctness of the hardware configuration.
+        """
+
+        pop = pynn.Population(2, pynn.cells.HXNeuron())
+        pop[0:1].record(["v"])  # slicing to PopulationView sad but necessary
+
+        pynn.run(0.42)
+
+        # check that analog samples were recorded for the target neuron
+        samples = pop[0:1].get_data("v").segments[-1]\
+            .irregularlysampledsignals[0]
+        self.assertTrue(samples.size > 0)
+
+        # check that the recorded samples are assigned only to the selected
+        # neuron (and not the other one)
+        with self.assertRaises(IndexError):
+            samples = pop[1:2].get_data("v").segments[-1]\
+                .irregularlysampledsignals[0]
+
+
 if __name__ == "__main__":
     unittest.main()
