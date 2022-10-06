@@ -238,6 +238,7 @@ class State(BaseState):
         self.injection_inside_realtime_end = None
         self.injection_post_realtime = None
         self.initial_config = None
+        self.execution_time_info = None
 
     def run_until(self, tstop):
         self.run(tstop - self.t)
@@ -273,6 +274,7 @@ class State(BaseState):
         self.injection_inside_realtime_end = None
         self.injection_post_realtime = None
         self.initial_config = None
+        self.execution_time_info = None
 
         self.reset()
 
@@ -758,6 +760,9 @@ class State(BaseState):
 
         self.pre_realtime_read = self._get_pre_realtime_read()
         self.post_realtime_read = self._get_post_realtime_read()
+
+        self.execution_time_info = outputs.execution_time_info
+        assert self.execution_time_info is not None
 
         self.log.DEBUG("run(): Postprocessing finished in {:.3f}s".format(
             time.time() - time_after_hw_run))

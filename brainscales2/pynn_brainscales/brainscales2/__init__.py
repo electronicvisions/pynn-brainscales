@@ -262,3 +262,23 @@ def get_backend_statistics() -> grenade.NetworkGraphStatistics:
             "Backend statistics are only available after first mapping and"
             " routing execution, which happens in pynn.run().")
     return grenade.extract_statistics(simulator.state.grenade_network_graph)
+
+
+def get_execution_time_info() -> grenade.ExecutionTimeInfo:
+    """
+    Get time information of last execution.
+    :raises RuntimeError: If the simulator is not active, i.e. pynn.setup()
+                          was not called.
+    :raises RuntimeError: If no info is available, i.e. pynn.run() was not
+                          called.
+    :return: Time info object.
+    """
+    if not simulator.state:
+        raise RuntimeError(
+            "Execution time information is only available for active "
+            "simulator."
+        )
+    if not simulator.state.running:
+        raise RuntimeError(
+            "Execution time information is only available after pynn.run().")
+    return simulator.state.execution_time_info
