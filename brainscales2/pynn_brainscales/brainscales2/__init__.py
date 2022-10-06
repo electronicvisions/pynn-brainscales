@@ -44,6 +44,10 @@ class InjectedConfiguration():
                               the non realtime configuration.
     :param pre_realtime: Injection written prior to
                           the realtime configuration.
+    :param inside_realtime_begin: Injection written prior to
+                          the realtime events.
+    :param inside_realtime_end: Injection written after
+                          the realtime events and runtime.
     :param post_realtime: Injection written after the
                            the realtime configuration.
     """
@@ -54,6 +58,14 @@ class InjectedConfiguration():
     pre_realtime: Union[Dict[halco.Coordinate,
                              hal.Container],
                         sta.PlaybackProgramBuilder] = \
+        field(default_factory=dict)
+    inside_realtime_begin: Union[Dict[halco.Coordinate,
+                                      hal.Container],
+                                 sta.PlaybackProgramBuilder] = \
+        field(default_factory=dict)
+    inside_realtime_end: Union[Dict[halco.Coordinate,
+                                    hal.Container],
+                               sta.PlaybackProgramBuilder] = \
         field(default_factory=dict)
     post_realtime: Union[Dict[halco.Coordinate,
                               hal.Container], sta.PlaybackProgramBuilder] = \
@@ -66,10 +78,16 @@ class InjectedReadout():
 
     :param pre_realtime: Injection of reads after the
                            the pre_realtime configuration.
+    :param inside_realtime_begin: Injection of reads after the
+                           the inside_realtime_begin configuration.
+    :param inside_realtime_end: Injection of reads after the
+                           the inside_realtime_end configuration.
     :param post_realtime: Injection of reads after the
                            the post_realtime configuration.
     """
     pre_realtime: Set[halco.Coordinate] = field(default_factory=set)
+    inside_realtime_begin: Set[halco.Coordinate] = field(default_factory=set)
+    inside_realtime_end: Set[halco.Coordinate] = field(default_factory=set)
     post_realtime: Set[halco.Coordinate] = field(default_factory=set)
 
 

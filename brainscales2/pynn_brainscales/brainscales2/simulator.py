@@ -221,8 +221,12 @@ class State(BaseState):
         self.injected_config = None
         self.injected_readout = None
         self.pre_realtime_tickets = None
+        self.inside_realtime_begin_tickets = None
+        self.inside_realtime_end_tickets = None
         self.post_realtime_tickets = None
         self.pre_realtime_read = dict()
+        self.inside_realtime_begin_read = dict()
+        self.inside_realtime_end_read = dict()
         self.post_realtime_read = dict()
         self.conn_manager = None
         self.conn = None
@@ -232,6 +236,8 @@ class State(BaseState):
         self.grenade_chip_config = None
         self.injection_pre_static_config = None
         self.injection_pre_realtime = None
+        self.injection_inside_realtime_begin = None
+        self.injection_inside_realtime_end = None
         self.injection_post_realtime = None
         self.initial_config = None
 
@@ -252,14 +258,20 @@ class State(BaseState):
         self.injected_readout = None
         self.injected_config = None
         self.pre_realtime_tickets = None
+        self.inside_realtime_begin_tickets = None
+        self.inside_realtime_end_tickets = None
         self.post_realtime_tickets = None
         self.pre_realtime_read = dict()
+        self.inside_realtime_begin_read = dict()
+        self.inside_realtime_end_read = dict()
         self.post_realtime_read = dict()
         self.grenade_network = None
         self.grenade_network_graph = None
         self.grenade_chip_config = None
         self.injection_pre_static_config = None
         self.injection_pre_realtime = None
+        self.injection_inside_realtime_begin = None
+        self.injection_inside_realtime_end = None
         self.injection_post_realtime = None
         self.initial_config = None
 
@@ -500,20 +512,31 @@ class State(BaseState):
     def _generate_playback_hooks(self):
         assert self.injection_pre_static_config is not None
         assert self.injection_pre_realtime is not None
+        assert self.injection_inside_realtime_begin is not None
+        assert self.injection_inside_realtime_end is not None
         assert self.injection_post_realtime is not None
         pre_static_config = sta.PlaybackProgramBuilder()
         pre_realtime = sta.PlaybackProgramBuilder()
+        inside_realtime_begin = sta.PlaybackProgramBuilder()
+        inside_realtime_end = sta.PlaybackProgramBuilder()
         post_realtime = sta.PlaybackProgramBuilder()
         pre_static_config.copy_back(
             self.injection_pre_static_config)
         pre_realtime.copy_back(
             self.injection_pre_realtime)
         self._prepare_pre_realtime_read(pre_realtime)
+        inside_realtime_begin.copy_back(
+            self.injection_inside_realtime_begin)
+        self._prepare_inside_realtime_begin_read(inside_realtime_begin)
+        inside_realtime_end.copy_back(
+            self.injection_inside_realtime_end)
+        self._prepare_inside_realtime_end_read(inside_realtime_end)
         post_realtime.copy_back(
             self.injection_post_realtime)
         self._prepare_post_realtime_read(post_realtime)
         return grenade.ExecutionInstancePlaybackHooks(
-            pre_static_config, pre_realtime, post_realtime)
+            pre_static_config, pre_realtime, inside_realtime_begin,
+            inside_realtime_end, post_realtime)
 
     def _prepare_pre_realtime_read(self, builder: sta.PlaybackProgramBuilder):
         """
@@ -526,6 +549,42 @@ class State(BaseState):
             return
         self.pre_realtime_tickets = {coord: builder.read(coord) for coord in
                                      self.injected_readout.pre_realtime}
+        barrier = hal.Barrier()
+        barrier.enable_omnibus = True
+        barrier.enable_jtag = True
+        builder.block_until(halco.BarrierOnFPGA(), barrier)
+
+    def _prepare_inside_realtime_begin_read(
+            self, builder: sta.PlaybackProgramBuilder):
+        """
+        Prepare injected readout after inside_realtime_begin configuration and
+        before event insertion. This generates tickets to access the read
+        information and ensures completion via a barrier.
+        :param builder: Builder to append instructions to.
+        """
+        if not self.injected_readout.inside_realtime_begin:
+            return
+        self.inside_realtime_begin_tickets = {
+            coord: builder.read(coord) for
+            coord in self.injected_readout.inside_realtime_begin}
+        barrier = hal.Barrier()
+        barrier.enable_omnibus = True
+        barrier.enable_jtag = True
+        builder.block_until(halco.BarrierOnFPGA(), barrier)
+
+    def _prepare_inside_realtime_end_read(
+            self, builder: sta.PlaybackProgramBuilder):
+        """
+        Prepare injected readout after inside_realtime_end configuration and
+        after realtime_end experiment section. This generates tickets to access
+        the read information and ensures completion via a barrier.
+        :param builder: Builder to append instructions to.
+        """
+        if not self.injected_readout.inside_realtime_end:
+            return
+        self.inside_realtime_end_tickets = {
+            coord: builder.read(coord) for coord in
+            self.injected_readout.inside_realtime_end}
         barrier = hal.Barrier()
         barrier.enable_omnibus = True
         barrier.enable_jtag = True
@@ -604,12 +663,24 @@ class State(BaseState):
         pre_realtime = sta.PlaybackProgramBuilder()
         add_configuration(pre_realtime, self.injected_config.pre_realtime)
 
+        # injected configuration inside realtime begin
+        inside_realtime_begin = sta.PlaybackProgramBuilder()
+        add_configuration(inside_realtime_begin,
+                          self.injected_config.inside_realtime_begin)
+
+        # injected configuration inside realtime_end end
+        inside_realtime_end = sta.PlaybackProgramBuilder()
+        add_configuration(inside_realtime_end,
+                          self.injected_config.inside_realtime_end)
+
         # injected configuration post realtime
         post_realtime = sta.PlaybackProgramBuilder()
         add_configuration(post_realtime, self.injected_config.post_realtime)
 
         self.injection_pre_static_config = builder1
         self.injection_pre_realtime = pre_realtime
+        self.injection_inside_realtime_begin = inside_realtime_begin
+        self.injection_inside_realtime_end = inside_realtime_end
         self.injection_post_realtime = post_realtime
 
     def run(self, runtime: Optional[float]):
