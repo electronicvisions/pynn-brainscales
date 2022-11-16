@@ -37,13 +37,13 @@ class NeuronPlacement:
     """
     _id_2_an: Dict[ID, halco.AtomicNeuronOnDLS]
     _permutation: List[halco.AtomicNeuronOnDLS]
-    _max_num_entries: Final[int] = halco.AtomicNeuronOnDLS.size
-    default_permutation: Final[List[int]] = range(halco.AtomicNeuronOnDLS.size)
+    _MAX_NUM_ENTRIES: Final[int] = halco.AtomicNeuronOnDLS.size
+    DEFAULT_PERMUTATION: Final[List[int]] = range(halco.AtomicNeuronOnDLS.size)
 
     def __init__(self, permutation: List[int] = None):
         if permutation is None:
-            permutation = range(self._max_num_entries)
-        self._id_2_an = dict()
+            permutation = range(self._MAX_NUM_ENTRIES)
+        self._id_2_an = {}
         self._permutation = self._check_and_transform(permutation)
 
     def register_id(self, neuron_id: Union[List[ID], ID]):
@@ -89,7 +89,7 @@ class NeuronPlacement:
     @staticmethod
     def _check_and_transform(lut: list) -> list:
 
-        cell_id_size = NeuronPlacement._max_num_entries
+        cell_id_size = NeuronPlacement._MAX_NUM_ENTRIES
         if len(lut) > cell_id_size:
             raise ValueError("Too many elements in HW LUT.")
         if len(lut) > len(set(lut)):
@@ -114,14 +114,14 @@ class BackgroundSpikeSourcePlacement:
     Default constructed with reversed 1 to 1 permutation to yield better
     distribution for small networks.
 
-    :cvar default_permutation: Default permutation, where allocation is ordered
+    :cvar DEFAULT_PERMUTATION: Default permutation, where allocation is ordered
                                to start at the highest-enum PADI-bus to reduce
                                overlap with allocated neurons.
     """
     _pb_2_id: Dict[halco.PADIBusOnPADIBusBlock, List[ID]]
     _permutation: List[halco.PADIBusOnPADIBusBlock]
-    _max_num_entries: Final[int] = halco.PADIBusOnPADIBusBlock.size
-    default_permutation: Final[List[int]] = list(reversed(range(
+    _MAX_NUM_ENTRIES: Final[int] = halco.PADIBusOnPADIBusBlock.size
+    DEFAULT_PERMUTATION: Final[List[int]] = list(reversed(range(
         halco.PADIBusOnPADIBusBlock.size)))
 
     def __init__(self, permutation: List[int] = None):
@@ -132,8 +132,8 @@ class BackgroundSpikeSourcePlacement:
         """
 
         if permutation is None:
-            permutation = self.default_permutation
-        self._pb_2_id = dict()
+            permutation = self.DEFAULT_PERMUTATION
+        self._pb_2_id = {}
         self._permutation = self._check_and_transform(permutation)
 
     def register_id(self, neuron_id: Union[List[ID], ID]):
@@ -157,15 +157,15 @@ class BackgroundSpikeSourcePlacement:
 
         :param neuron_id: pyNN neuron ID
         """
-        for padi_bus in self._pb_2_id:
-            if all(i in self._pb_2_id[padi_bus] for i in neuron_id):
+        for padi_bus, ids in self._pb_2_id.items():
+            if all(i in ids for i in neuron_id):
                 return padi_bus
         raise RuntimeError("No ID found.")
 
     @staticmethod
     def _check_and_transform(lut: list) -> list:
 
-        cell_id_size = BackgroundSpikeSourcePlacement._max_num_entries
+        cell_id_size = BackgroundSpikeSourcePlacement._MAX_NUM_ENTRIES
         if len(lut) > cell_id_size:
             raise ValueError("Too many elements in HW LUT.")
         if len(lut) > len(set(lut)):
@@ -191,7 +191,7 @@ class State(BaseState):
 
     # pylint: disable=invalid-name
     def __init__(self):
-        super(State, self).__init__()
+        super().__init__()
 
         self.spikes = []
         self.times = []
@@ -222,10 +222,10 @@ class State(BaseState):
         self.inside_realtime_begin_tickets = None
         self.inside_realtime_end_tickets = None
         self.post_realtime_tickets = None
-        self.pre_realtime_read = dict()
-        self.inside_realtime_begin_read = dict()
-        self.inside_realtime_end_read = dict()
-        self.post_realtime_read = dict()
+        self.pre_realtime_read = {}
+        self.inside_realtime_begin_read = {}
+        self.inside_realtime_end_read = {}
+        self.post_realtime_read = {}
         self.conn_manager = None
         self.conn = None
         self.conn_comes_from_outside = False
@@ -262,10 +262,10 @@ class State(BaseState):
         self.inside_realtime_begin_tickets = None
         self.inside_realtime_end_tickets = None
         self.post_realtime_tickets = None
-        self.pre_realtime_read = dict()
-        self.inside_realtime_begin_read = dict()
-        self.inside_realtime_end_read = dict()
-        self.post_realtime_read = dict()
+        self.pre_realtime_read = {}
+        self.inside_realtime_begin_read = {}
+        self.inside_realtime_end_read = {}
+        self.post_realtime_read = {}
         self.grenade_network = None
         self.grenade_logical_network_graph = None
         self.grenade_network_graph = None
@@ -302,7 +302,7 @@ class State(BaseState):
         spikes = grenade.extract_neuron_spikes(
             outputs, network_graph)
         if not spikes:
-            return dict()
+            return {}
         assert len(spikes) == 1  # only one batch
         return spikes[0]
 
@@ -338,7 +338,7 @@ class State(BaseState):
         :return: Dict over projections and recorded data
         """
 
-        observables = [dict() for projection in self.projections]
+        observables = [{} for projection in self.projections]
         for plasticity_rule in self.plasticity_rules:
             if not plasticity_rule.observables:
                 continue
@@ -409,7 +409,7 @@ class State(BaseState):
         :return: Sets cell ids of neurons which serve as spike sources.
                  These sets are organized in populations which they belong to.
         """
-        spike_source_indices = dict()
+        spike_source_indices = {}
         for projection in self.projections:
             pre_has_grandparent = hasattr(projection.pre, "grandparent")
             pre = projection.pre.grandparent if \
@@ -652,7 +652,7 @@ class State(BaseState):
                  values.
         """
         if not self.pre_realtime_tickets:
-            return dict()
+            return {}
         cocos = {coord: ticket.get() for coord, ticket in
                  self.pre_realtime_tickets.items()}
         return cocos
@@ -665,7 +665,7 @@ class State(BaseState):
                  values.
         """
         if not self.post_realtime_tickets:
-            return dict()
+            return {}
         cocos = {coord: ticket.get() for coord, ticket in
                  self.post_realtime_tickets.items()}
         return cocos
@@ -744,8 +744,8 @@ class State(BaseState):
         self._reset_changed_since_last_run()
 
         if runtime is None:
-            self.log.DEBUG("run(): Completed in {:.3f}s".format(
-                time.time() - time_begin))
+            self.log.DEBUG(
+                f"run(): Completed in {(time.time() - time_begin):.3f}s")
             return
 
         # generate external spike trains
@@ -767,15 +767,15 @@ class State(BaseState):
             self.conn = self.conn_manager.__enter__()
 
         time_after_preparations = time.time()
-        self.log.DEBUG("run(): Preparations finished in {:.3f}s".format(
-            time_after_preparations - time_begin))
+        self.log.DEBUG("run(): Preparations finished in "
+                       f"{(time_after_preparations - time_begin):.3f}s")
 
         outputs = grenade.run(
             self.conn, self.grenade_chip_config, hardware_network,
             inputs, self._generate_playback_hooks())
 
-        self.log.DEBUG("run(): Execution finished in {:.3f}s".format(
-            time.time() - time_after_preparations))
+        self.log.DEBUG("run(): Execution finished in "
+                       f"{(time.time() - time_after_preparations):.3f}s")
         time_after_hw_run = time.time()
 
         # make list 'spikes' of tupel (neuron id, spike time)
@@ -794,10 +794,10 @@ class State(BaseState):
         self.execution_time_info = outputs.execution_time_info
         assert self.execution_time_info is not None
 
-        self.log.DEBUG("run(): Postprocessing finished in {:.3f}s".format(
-            time.time() - time_after_hw_run))
-        self.log.DEBUG("run(): Completed in {:.3f}s".format(
-            time.time() - time_begin))
+        self.log.DEBUG("run(): Postprocessing finished in "
+                       f"{(time.time() - time_after_hw_run):.3f}s")
+        self.log.DEBUG("run(): Completed in "
+                       f"{(time.time() - time_begin):.3f}s")
 
 
 # state is instantiated in setup()

@@ -138,12 +138,12 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
     simulator.state.max_delay = max_delay
     simulator.state.neuron_placement = simulator.NeuronPlacement(
         extra_params.pop("neuronPermutation",
-                         simulator.NeuronPlacement.default_permutation))
+                         simulator.NeuronPlacement.DEFAULT_PERMUTATION))
     simulator.state.background_spike_source_placement = \
         simulator.BackgroundSpikeSourcePlacement(
             extra_params.pop("backgroundPermutation",
                              simulator.BackgroundSpikeSourcePlacement
-                             .default_permutation))
+                             .DEFAULT_PERMUTATION))
     simulator.state.injected_config = \
         extra_params.pop('injected_config', InjectedConfiguration())
     simulator.state.injected_readout = \
@@ -166,8 +166,8 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
         raise KeyError("unhandled extra_params in call to pynn.setup(...):"
                        f"{extra_params}")
 
-    simulator.state.log.DEBUG("setup(): Completed in {:.3f}s".format(
-        time.time() - time_begin))
+    simulator.state.log.DEBUG(
+        f"setup(): Completed in {(time.time() - time_begin):.3f}s")
 
 
 def end():
@@ -184,8 +184,8 @@ def end():
         simulator.state.conn_manager = None
         assert simulator.state.conn is not None
         simulator.state.conn = None
-    simulator.state.log.DEBUG("end(): Completed in {:.3f}s".format(
-        time.time() - time_begin))
+    simulator.state.log.DEBUG(
+        f"end(): Completed in {(time.time() - time_begin):.3f}s")
     # remove instance singleton
     simulator.state = None
 

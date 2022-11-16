@@ -59,10 +59,8 @@ class Projection(pyNN.common.Projection):
                       if this is not supplied),
                       defaults to None
         """
-        super(Projection, self).__init__(presynaptic_neurons,
-                                         postsynaptic_neurons, connector,
-                                         synapse_type, source, receptor_type,
-                                         space, label)
+        super().__init__(presynaptic_neurons, postsynaptic_neurons, connector,
+                         synapse_type, source, receptor_type, space, label)
         self.connections = []
         connector.connect(self)
 
@@ -248,7 +246,7 @@ class Connection(pyNN.common.Connection):
         if parameters["delay"] != 0:
             raise ValueError("Setting the delay unequal 0 is not supported.")
         self._delay = parameters["delay"]
-        self.parameters = {x: parameters[x] for x in parameters
+        self.parameters = {x: param for x, param in parameters.items()
                            if x not in ["delay", "weight"]}
 
     def _set_weight(self, new_weight):

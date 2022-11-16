@@ -21,7 +21,7 @@ class Recorder(pyNN.recording.Recorder):
     madc_variables = ["v", "exc_synin", "inh_synin", "adaptation"]
 
     def __init__(self, population, file=None):
-        super(Recorder, self).__init__(population, file=file)
+        super().__init__(population, file=file)
         self.changed_since_last_run = True
 
     def record(self, variables, ids, sampling_interval=None):
@@ -73,7 +73,7 @@ class Recorder(pyNN.recording.Recorder):
                     cell_id=n_id, readout_source=readout_source)
                 self._simulator.state.madc_recorder = madc_recorder
 
-        super(Recorder, self).record(
+        super().record(
             variables=variables,
             ids=ids,
             sampling_interval=sampling_interval)
@@ -110,7 +110,7 @@ class Recorder(pyNN.recording.Recorder):
     #       Remove when upstream pyNN support is merged and reimplement
     #       _get_all_signals()
     #       https://github.com/NeuralEnsemble/PyNN/pull/754
-    # pylint: disable=too-many-locals
+    # pylint: disable=too-many-locals,consider-using-f-string
     def _get_current_segment(
             self,
             filter_ids=None,

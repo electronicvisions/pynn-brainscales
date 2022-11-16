@@ -69,11 +69,13 @@ def chip_from_nightly() -> (dict):
         chip = chip_from_file(nightly_calib_path())
     else:
         try:
+            # urllib handles closing on destruction of data
+            # pylint: disable=consider-using-with
             data = urllib.request.urlopen(nightly_calib_url()).read()
             chip = chip_from_portable_binary(data)
 
-        except urllib.error.URLError:
+        except urllib.error.URLError as ex:
             raise RuntimeError('Could not find a nightly calibration for '
-                               f'setup "{get_unique_identifier()}".')
+                               f'setup "{get_unique_identifier()}".') from ex
 
     return chip

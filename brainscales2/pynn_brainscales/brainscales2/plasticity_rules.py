@@ -16,7 +16,7 @@ class Timer:
         self._start = parameters["start"]
         self._period = parameters["period"]
         self._num_periods = parameters["num_periods"]
-        self.parameters = {x: parameters[x] for x in parameters
+        self.parameters = {x: param for x, param in parameters.items()
                            if x not in ["start", "period", "num_periods"]}
 
     def _set_start(self, new_start):
@@ -98,10 +98,10 @@ class PlasticityRule:
         """
         self._timer = timer
         if observables is None:
-            self._observables = dict()
+            self._observables = {}
         else:
             self._observables = observables
-        self._projections = list()
+        self._projections = []
         self._simulator.state.plasticity_rules.append(self)
         self.changed_since_last_run = True
 
@@ -166,7 +166,7 @@ class PlasticityRule:
         plasticity_rule.timer = self.timer.to_grenade()
         if self.observables:
             plasticity_rule.recording = grenade.PlasticityRule.TimedRecording()
-            observables = dict()
+            observables = {}
             for name, observable in self.observables.items():
                 if isinstance(observable, self.ObservablePerSynapse):
                     grenade_observable = grenade.PlasticityRule \

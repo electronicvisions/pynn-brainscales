@@ -31,12 +31,11 @@ def main(params: dict):
 
     # TODO: Find out how to extract neuron ids.
     for i, spiketrain in enumerate(spikes2.spiketrains):
-        log.INFO("Number of Spikes of Neuron {}: ".format(i + 1),
-                 len(spiketrain))
-        log.INFO("Spiketimes of Neuron {}: ".format(i + 1), spiketrain)
+        log.INFO(f"Number of Spikes of Neuron {i + 1}: ", len(spiketrain))
+        log.INFO(f"Spiketimes of Neuron {i + 1}: ", spiketrain)
 
     spiketimes = spikes1.spiketrains[0]
-    log.INFO("Number of spikes of single recorded neuron: ", len(spiketimes))
+    log.INFO("Number of spikes of single recorded neuron: {}", len(spiketimes))
     log.INFO("Spiketimes of recorded neuron: ", spiketimes)
 
     v_mem = pop1.get_data("v").segments[0].irregularlysampledsignals[0]

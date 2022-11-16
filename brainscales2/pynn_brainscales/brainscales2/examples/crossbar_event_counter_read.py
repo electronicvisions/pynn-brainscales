@@ -61,7 +61,7 @@ def main(num_spikes: int = 200, runtime: float = 20.) \
 
     # We calculate the difference in event counter values and return
     # the result.
-    diffs = dict()
+    diffs = {}
     for coord in halco.iter_all(halco.CrossbarOutputOnDLS):
         c_before = event_counter_reads_before[coord]
         c_after = event_counter_reads_after[coord]
@@ -78,4 +78,4 @@ if __name__ == "__main__":
     ds = main()
 
     for c, diff in ds.items():
-        log.INFO("Event counter diff {}: {}".format(c, diff))
+        log.INFO(f"Event counter diff {c}: {diff}")

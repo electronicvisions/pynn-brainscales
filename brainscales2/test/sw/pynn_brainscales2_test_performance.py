@@ -33,22 +33,20 @@ class TestPerformance(unittest.TestCase):
             for j in range(256):
                 projs.append(pynn.Projection(pops[i], pops[j],
                                              pynn.AllToAllConnector()))
-        log.INFO("network construction {}s".format(time.time() - begin))
+        log.INFO(f"network construction {time.time() - begin}s")
 
         begin = time.time()
         pynn.run(None)
-        log.INFO("first run {}s".format(time.time() - begin))
+        log.INFO(f"first run {time.time() - begin}s")
 
         begin = time.time()
         projs[-1].set(weight=10)
-        log.INFO("network modification (weights) {}s".format(
-            time.time() - begin))
+        log.INFO(f"network modification (weights) {time.time() - begin}s")
 
         for i in range(10):
             begin = time.time()
             pynn.run(None)
-            log.INFO("run {} after modification {}s".format(
-                i, time.time() - begin))
+            log.INFO(f"run {i} after modification {time.time() - begin}s")
 
     @classmethod
     def test_few_large_projections(cls):
@@ -62,22 +60,20 @@ class TestPerformance(unittest.TestCase):
         projs = []
         projs.append(pynn.Projection(pops[0], pops[0],
                                      pynn.AllToAllConnector()))
-        log.INFO("network construction {}s".format(time.time() - begin))
+        log.INFO(f"network construction {time.time() - begin}s")
 
         begin = time.time()
         pynn.run(None)
-        log.INFO("first run {}s".format(time.time() - begin))
+        log.INFO(f"first run {time.time() - begin}s")
 
         begin = time.time()
         projs[-1].set(weight=10)
-        log.INFO("network modification (weights) {}s".format(
-            time.time() - begin))
+        log.INFO(f"network modification (weights) {time.time() - begin}s")
 
         for i in range(10):
             begin = time.time()
             pynn.run(None)
-            log.INFO(
-                "run {} after modification {}s".format(i, time.time() - begin))
+            log.INFO(f"run {i} after modification {time.time() - begin}s")
 
 
 if __name__ == '__main__':

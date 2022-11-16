@@ -11,7 +11,7 @@ class TestSpikeSources(unittest.TestCase):
     def setUp(self):
         pynn.setup()
 
-        self.pops_in = dict()
+        self.pops_in = {}
 
         # SpikeSourceArray
         self.spike_times = [0.01, 0.03, 0.05, 0.07, 0.09]
