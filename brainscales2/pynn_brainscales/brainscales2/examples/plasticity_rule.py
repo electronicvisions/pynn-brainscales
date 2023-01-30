@@ -24,13 +24,9 @@ cell_params = {"threshold_v_threshold": 300,
                }
 
 
-class PlasticSynapse(
-        pynn.PlasticityRule,
-        pynn.standardmodels.synapses.StaticSynapse):
-    def __init__(self, timer: pynn.Timer, weight: float):
+class PlasticityRule(pynn.PlasticityRule):
+    def __init__(self, timer: pynn.Timer):
         pynn.PlasticityRule.__init__(self, timer, observables={})
-        pynn.standardmodels.synapses.StaticSynapse.__init__(
-            self, weight=weight)
 
     def generate_kernel(self) -> str:
         """
@@ -39,12 +35,14 @@ class PlasticSynapse(
         :return: PPU-code of plasticity-rule kernel as string.
         """
         return textwrap.dedent("""
+        #include "grenade/vx/ppu/neuron_view_handle.h"
         #include "grenade/vx/ppu/synapse_array_view_handle.h"
         #include "libnux/vx/location.h"
         using namespace grenade::vx::ppu;
         using namespace libnux::vx;
         void PLASTICITY_RULE_KERNEL(
-            std::array<SynapseArrayViewHandle, 1>& synapses)
+            std::array<SynapseArrayViewHandle, 1>& synapses,
+            std::array<NeuronViewHandle, 0>& /* neurons */)
         {
             PPUOnDLS location;
             get_location(location);
@@ -75,7 +73,8 @@ def main(params: dict):
                                 cellparams={"spike_times": spike_times})
 
     timer = pynn.Timer(start=5, period=10, num_periods=1)
-    synapse = PlasticSynapse(timer=timer, weight=63)
+    synapse = pynn.standardmodels.synapses.PlasticSynapse(
+        weight=63, plasticity_rule=PlasticityRule(timer=timer))
 
     pynn.Projection(
         pop_input, nrn, pynn.AllToAllConnector(),

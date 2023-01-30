@@ -1,10 +1,10 @@
 from __future__ import annotations
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 import textwrap
-from pyNN.common import Projection
+from pyNN.common import Projection, Population
 from pynn_brainscales.brainscales2 import simulator
 import pygrenade_vx as grenade
-from dlens_vx_v3 import hal
+from dlens_vx_v3 import hal, halco
 
 
 class Timer:
@@ -67,30 +67,17 @@ class PlasticityRule:
     """
     _simulator = simulator
 
-    class Observable:
-        pass
-
-    class ObservablePerSynapse(Observable):
-        ElementType = grenade.PlasticityRule.TimedRecording \
-            .ObservablePerSynapse.Type
-        LayoutPerRow = grenade.PlasticityRule.TimedRecording \
-            .ObservablePerSynapse.LayoutPerRow
-
-        def __init__(self, element_type: ElementType,
-                     layout_per_row: LayoutPerRow):
-            self.element_type = element_type
-            self.layout_per_row = layout_per_row
-
-    class ObservableArray(Observable):
-        ElementType = grenade.PlasticityRule.TimedRecording \
-            .ObservableArray.Type
-
-        def __init__(self, element_type: ElementType, size: int):
-            self.element_type = element_type
-            self.size = size
+    ObservablePerSynapse = grenade.logical_network.PlasticityRule\
+        .TimedRecording.ObservablePerSynapse
+    ObservablePerNeuron = grenade.logical_network.PlasticityRule\
+        .TimedRecording.ObservablePerNeuron
+    ObservableArray = grenade.logical_network.PlasticityRule\
+        .TimedRecording.ObservableArray
 
     def __init__(self, timer: Timer,
-                 observables: Optional[Dict[str, Observable]] = None):
+                 observables: Optional[Dict[str, Union[
+                     ObservablePerSynapse, ObservablePerNeuron,
+                     ObservableArray]]] = None):
         """
         Create a new plasticity rule with timing information.
 
@@ -102,6 +89,7 @@ class PlasticityRule:
         else:
             self._observables = observables
         self._projections = []
+        self._populations = []
         self._simulator.state.plasticity_rules.append(self)
         self.changed_since_last_run = True
 
@@ -133,6 +121,14 @@ class PlasticityRule:
         self._projections.remove(old_projection)
         self.changed_since_last_run = True
 
+    def _add_population(self, new_population: Population):
+        self._populations.append(new_population)
+        self.changed_since_last_run = True
+
+    def _remove_population(self, old_population: Population):
+        self._populations.remove(old_population)
+        self.changed_since_last_run = True
+
     # pylint: disable=no-self-use
     def generate_kernel(self) -> str:
         """
@@ -162,31 +158,21 @@ class PlasticityRule:
     def add_to_network_graph(self, builder: grenade.logical_network
                              .NetworkBuilder) \
             -> grenade.logical_network.PlasticityRuleDescriptor:
+        print(self._projections, self._populations)
         plasticity_rule = grenade.logical_network.PlasticityRule()
         plasticity_rule.timer = self.timer.to_grenade()
         if self.observables:
-            plasticity_rule.recording = grenade.PlasticityRule.TimedRecording()
-            observables = {}
-            for name, observable in self.observables.items():
-                if isinstance(observable, self.ObservablePerSynapse):
-                    grenade_observable = grenade.PlasticityRule \
-                        .TimedRecording.ObservablePerSynapse()
-                    grenade_observable.layout_per_row = observable \
-                        .layout_per_row
-                elif isinstance(observable, self.ObservableArray):
-                    grenade_observable = grenade.PlasticityRule \
-                        .TimedRecording.ObservableArray()
-                    grenade_observable.size = observable.size
-                else:
-                    raise RuntimeError("Observable type not implemented.")
-                grenade_observable.type = observable.element_type
-                observables.update({name: grenade_observable})
-            plasticity_rule.recording.observables = observables
+            plasticity_rule.recording = grenade.logical_network.PlasticityRule\
+                .TimedRecording()
+            plasticity_rule.recording.observables = self.observables
         plasticity_rule.kernel = self.generate_kernel()
         plasticity_rule.projections = [
-            grenade.logical_network.ProjectionDescriptor(
-                self._simulator.state.projections.index(proj))
+            proj.synapse_type.to_plasticity_rule_projection_handle(proj)
             for proj in self._projections
+        ]
+        plasticity_rule.populations = [
+            pop.celltype.to_plasticity_rule_population_handle(pop)
+            for pop in self._populations
         ]
         return builder.add(plasticity_rule)
 
@@ -212,3 +198,71 @@ class PlasticityRule:
                 grenade.logical_network.PlasticityRuleDescriptor(
                     self._simulator.state.plasticity_rules.index(self)))
         return recording_data
+
+
+class PlasticityRuleHandle:
+    """
+    Handle to (shared) plasticity rule.
+    Inheritance is to be used for actual implementations of cell types.
+    """
+
+    _simulator = simulator
+
+    def __init__(self, plasticity_rule: PlasticityRule = None):
+        """
+        Create a new handle to a plasticity rule.
+
+        :param plasticity_rule: PlasticityRule instance.
+        :param observable_options: Observable options to use in this cell type
+                                   instance.
+        """
+        self._plasticity_rule = plasticity_rule
+        self.changed_since_last_run = True
+
+    def _set_plasticity_rule(self, new_plasticity_rule):
+        self._plasticity_rule = new_plasticity_rule
+        self.changed_since_last_run = True
+
+    def _get_plasticity_rule(self):
+        self.changed_since_last_run = True
+        return self._plasticity_rule
+
+    plasticity_rule = property(_get_plasticity_rule, _set_plasticity_rule)
+
+    # pylint: disable=invalid-name
+    @classmethod
+    def to_plasticity_rule_population_handle(cls, population: Population) \
+            -> grenade.logical_network.PlasticityRule.PopulationHandle:
+        """
+        Convert observable options to population handle of plasticity rule
+        to backend representation, when plasticity rule handle is assoiated
+        to neuron cell type and used in a population.
+
+        :param population: Population for which to convert
+        :return: Representation in grenade
+        """
+        handle = grenade.logical_network.PlasticityRule.PopulationHandle()
+        handle.descriptor = grenade.logical_network.PopulationDescriptor(
+            cls._simulator.state.populations.index(population))
+        handle.neuron_readout_sources = [
+            {halco.CompartmentOnLogicalNeuron(): [None]}
+            for i in range(len(population))
+        ]
+        return handle
+
+    # pylint: disable=invalid-name
+    @classmethod
+    def to_plasticity_rule_projection_handle(cls, projection: Projection) \
+            -> grenade.logical_network.ProjectionDescriptor:
+        """
+        Convert observable options to projection handle of plasticity rule
+        to backend representation, when plasticity rule handle is assoiated
+        to synapse type and used in a projection.
+
+        Currently no options are available.
+
+        :param projection: Projection for which to convert
+        :return: Representation in grenade
+        """
+        return grenade.logical_network.ProjectionDescriptor(
+            cls._simulator.state.projections.index(projection))

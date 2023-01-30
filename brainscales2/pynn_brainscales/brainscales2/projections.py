@@ -7,7 +7,7 @@ from pyNN.common import Population, PopulationView, Assembly
 from pyNN.space import Space
 from pynn_brainscales.brainscales2.standardmodels.synapses import StaticSynapse
 from pynn_brainscales.brainscales2 import simulator
-from pynn_brainscales.brainscales2.plasticity_rules import PlasticityRule
+from pynn_brainscales.brainscales2.plasticity_rules import PlasticityRuleHandle
 import pygrenade_vx as grenade
 
 
@@ -81,11 +81,13 @@ class Projection(pyNN.common.Projection):
         # registration here is required.
         if name == "synapse_type":
             if hasattr(self, name):
-                if isinstance(self.synapse_type, PlasticityRule):
-                    self.synapse_type._remove_projection(self)
+                if isinstance(self.synapse_type, PlasticityRuleHandle) \
+                        and self.synapse_type.plasticity_rule is not None:
+                    self.synapse_type.plasticity_rule._remove_projection(self)
             super().__setattr__(name, value)
-            if isinstance(self.synapse_type, PlasticityRule):
-                self.synapse_type._add_projection(self)
+            if isinstance(self.synapse_type, PlasticityRuleHandle) \
+                    and self.synapse_type.plasticity_rule is not None:
+                self.synapse_type.plasticity_rule._add_projection(self)
         else:
             super().__setattr__(name, value)
 
@@ -200,10 +202,13 @@ class Projection(pyNN.common.Projection):
                 self._simulator.state.projections.index(self)))
 
     def get_data(self, observable: str):
-        if not isinstance(self.synapse_type, PlasticityRule):
+        if not isinstance(self.synapse_type, PlasticityRuleHandle):
             raise RuntimeError("Synapse type can't have observables, since it"
-                               + " is not derived from PlasticityRule.")
-        if observable not in self.synapse_type.observables:
+                               + " is not derived from PlasticityRuleHandle.")
+        if self.synapse_type.plasticity_rule is None:
+            raise RuntimeError("Synapse type can't have observables, since it"
+                               + " does not hold a plasticity rule.")
+        if observable not in self.synapse_type.plasticity_rule.observables:
             raise RuntimeError(
                 "Synapse type doesn't have requested observable.")
         return self._simulator.state.synaptic_observables[

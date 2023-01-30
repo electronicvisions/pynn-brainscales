@@ -245,6 +245,7 @@ class State(BaseState):
         self.projections: List[Projection] = []
         self.plasticity_rules: List["PlasticityRule"] = []
         self.synaptic_observables: List[Dict[str, object]] = []
+        self.neuronal_observables: List[Dict[str, object]] = []
         self.id_counter = 0
         self.current_sources = []
         self.segment_counter = -1
@@ -284,6 +285,7 @@ class State(BaseState):
         self.projections = []
         self.plasticity_rules = []
         self.synaptic_observables = []
+        self.neuronal_observables = []
         self.id_counter = 0
         self.current_sources = []
         self.segment_counter = -1
@@ -378,6 +380,31 @@ class State(BaseState):
             data = plasticity_rule.get_data(
                 logical_network_graph, hardware_network_graph, outputs)
             for obsv_name, data in data.data_per_synapse.items():
+                for descriptor, value in data.items():
+                    observables[descriptor].update({obsv_name: value[0]})
+        return observables
+
+    def _get_neuronal_observables(
+            self,
+            logical_network_graph: grenade.logical_network.NetworkGraph,
+            hardware_network_graph: grenade.NetworkGraph,
+            outputs: grenade.IODataMap) -> Dict[str, np.ndarray]:
+        """
+        Get neuronal observables.
+        :param network_graph: Network graph to use for lookup of
+                              plasticity rule descriptor
+        :param outputs: All outputs of a single execution to extract
+                        samples from
+        :return: Dict over projections and recorded data
+        """
+
+        observables = [{} for population in self.populations]
+        for plasticity_rule in self.plasticity_rules:
+            if not plasticity_rule.observables:
+                continue
+            data = plasticity_rule.get_data(
+                logical_network_graph, hardware_network_graph, outputs)
+            for obsv_name, data in data.data_per_neuron.items():
                 for descriptor, value in data.items():
                     observables[descriptor].update({obsv_name: value[0]})
         return observables
@@ -748,6 +775,9 @@ class State(BaseState):
             hardware_network, outputs)
 
         self.synaptic_observables = self._get_synaptic_observables(
+            logical_network, hardware_network, outputs)
+
+        self.neuronal_observables = self._get_neuronal_observables(
             logical_network, hardware_network, outputs)
 
         self.pre_realtime_read = self._get_pre_realtime_read()

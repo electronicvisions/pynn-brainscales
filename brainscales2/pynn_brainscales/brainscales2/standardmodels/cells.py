@@ -7,7 +7,7 @@ from typing import List, Dict, ClassVar, Final, Optional, Union, Callable, Set
 from pyNN.parameters import ArrayParameter
 from pyNN.standardmodels import cells, build_translations, StandardCellType
 from pyNN.common import Population
-from pynn_brainscales.brainscales2 import simulator
+from pynn_brainscales.brainscales2 import simulator, plasticity_rules
 from pynn_brainscales.brainscales2.recording import Recorder
 from pynn_brainscales.brainscales2.helper import get_values_of_atomic_neuron, \
     decompose_in_member_names
@@ -165,8 +165,9 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
 
         neuron = lola.AtomicNeuron()
         for param in pynn_parameters:
-            cls._hw_entity_setters[param](
-                neuron, pynn_parameters[param])
+            if param in cls._hw_entity_setters:
+                cls._hw_entity_setters[param](
+                    neuron, pynn_parameters[param])
 
         return neuron
 
@@ -313,6 +314,70 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
 HXNeuron.default_parameters = HXNeuron.get_default_values()
 HXNeuron.translations = HXNeuron._create_translation()  # pylint: disable=protected-access
 HXNeuron._generate_hw_entity_setters()  # pylint: disable=protected-access
+
+
+class PlasticHXNeuron(HXNeuron, plasticity_rules.PlasticityRuleHandle):
+    """
+    HXNeuron with plasticity rule handle.
+
+    Currently this includes setting the readout source of each neuron
+    to be available to the plasticity rule.
+    """
+
+    ReadoutSource = lola.AtomicNeuron.Readout.Source
+
+    translations = {
+        **HXNeuron.translations, **build_translations(
+            ("plasticity_rule_readout_source",
+             "plasticity_rule_readout_source"),
+            ("plasticity_rule_enable_readout_source",
+             "plasticity_rule_enable_readout_source"),
+        )}
+
+    def __init__(
+            self,
+            plasticity_rule_enable_readout_source: bool = False,
+            plasticity_rule_readout_source: lola.AtomicNeuron.Readout.Source =
+            lola.AtomicNeuron.Readout.Source.membrane,
+            plasticity_rule: Optional[plasticity_rules.PlasticityRule] = None,
+            **parameters):
+        plasticity_rules.PlasticityRuleHandle.__init__(
+            self, plasticity_rule=plasticity_rule)
+        HXNeuron.__init__(self, **{
+            **parameters,
+            "plasticity_rule_readout_source": float(
+                plasticity_rule_readout_source),
+            "plasticity_rule_enable_readout_source":
+                plasticity_rule_enable_readout_source})
+
+    @classmethod
+    def to_plasticity_rule_population_handle(cls, population: Population) \
+            -> grenade.logical_network.PlasticityRule.PopulationHandle:
+        handle = plasticity_rules.PlasticityRuleHandle\
+            .to_plasticity_rule_population_handle(population)
+        readout_source = population.get(
+            "plasticity_rule_readout_source", simplify=False)
+        enable_readout_source = population.get(
+            "plasticity_rule_enable_readout_source", simplify=False)
+        handle.neuron_readout_sources = [
+            {halco.CompartmentOnLogicalNeuron(): [
+                cls.ReadoutSource(int(readout_source[i])) if
+                enable_readout_source[i] else None]}
+            for i in range(len(readout_source))
+        ]
+        return handle
+
+    @classmethod
+    def get_default_values(cls) -> dict:
+        """Get the default values of a LoLa Neuron."""
+
+        return {**HXNeuron.get_default_values(),
+                "plasticity_rule_readout_source": float(
+                    cls.ReadoutSource.membrane),
+                "plasticity_rule_enable_readout_source": False}
+
+
+PlasticHXNeuron.default_parameters = PlasticHXNeuron.get_default_values()
 
 
 class SpikeSourcePoissonOnChip(StandardCellType, NetworkAddableCell):

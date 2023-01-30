@@ -2,6 +2,7 @@ import numpy as np
 import pyNN.common
 from pyNN.parameters import ParameterSpace, simplify
 from pynn_brainscales.brainscales2 import simulator
+from pynn_brainscales.brainscales2.plasticity_rules import PlasticityRuleHandle
 from pynn_brainscales.brainscales2.recording import Recorder
 
 
@@ -65,12 +66,51 @@ class Population(pyNN.common.Population):
         for name, value in parameter_space.items():
             self.celltype.parameter_space[name] = value
 
+    def __setattr__(self, name, value):
+        # Handle (de-)registering of population in plasticity rule.
+        # A plasticity rule can be applied to multiple populations
+        # and then serve handles to all in the kernel code, for which
+        # registration here is required.
+        if name == "celltype":
+            if hasattr(self, name):
+                if isinstance(self.celltype, PlasticityRuleHandle) \
+                        and self.celltype.plasticity_rule is not None:
+                    self.celltype.plasticity_rule._remove_population(self)
+            super().__setattr__(name, value)
+            if isinstance(self.celltype, PlasticityRuleHandle) \
+                    and self.celltype.plasticity_rule is not None:
+                self.celltype.plasticity_rule._add_population(self)
+        else:
+            super().__setattr__(name, value)
+
     # pylint: disable=unused-argument, no-self-use
     def _set_initial_value_array(self, variable, value):
         return
 
     def _get_view(self, selector, label=None):
         return PopulationView(self, selector, label)
+
+    def get_plasticity_data(self, observable: str):
+        """
+        Get recorded observable data for this population from plasticity
+        rule.
+        :raises RuntimeError: On no plasticity rule or requested observable
+            name present
+        :param observable: Observable name to get data for
+        :returns: Observable data per plasticity rule execution period per
+            neuron
+        """
+        if not isinstance(self.celltype, PlasticityRuleHandle):
+            raise RuntimeError("Celltype can't have observables, since it"
+                               + " is not derived from PlasticityRuleHandle.")
+        if self.celltype.plasticity_rule is None:
+            raise RuntimeError("Celltype can't have observables, since it"
+                               + " does not hold a plasticity rule.")
+        if observable not in self.celltype.plasticity_rule.observables:
+            raise RuntimeError(
+                "Celltype doesn't have requested observable.")
+        return self._simulator.state.neuronal_observables[
+            self._simulator.state.populations.index(self)][observable]
 
 
 # pylint:disable=abstract-method
