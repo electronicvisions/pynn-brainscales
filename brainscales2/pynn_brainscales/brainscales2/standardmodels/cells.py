@@ -2,7 +2,7 @@ from abc import abstractmethod, ABC
 import inspect
 import numbers
 import numpy as np
-from typing import List, Dict, ClassVar, Final, Optional, Union, Callable
+from typing import List, Dict, ClassVar, Final, Optional, Union, Callable, Set
 
 from pyNN.parameters import ArrayParameter
 from pyNN.standardmodels import cells, build_translations, StandardCellType
@@ -282,6 +282,32 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
             population: Population,
             builder: grenade.logical_network.InputGenerator):
         pass
+
+    # TODO circular import -> can not import ID for type hint of conn_indices
+    def add_to_chip(self, cell_ids: List, config: lola.Chip):
+        """
+        Add configuration of each neuron in the parameter space to the give
+        chip object.
+
+
+        :param cell_ids: Cell IDs for each neuron in the parameter space of
+            this celltype object.
+        :param chip: Lola chip object which is altered.
+        """
+        for cell_id, parameters in zip(cell_ids, self.parameter_space):
+            atomic_neuron = self.create_hw_entity(parameters)
+
+            # anlog output is needed for spiking -> enable globally
+            atomic_neuron.event_routing.analog_output = \
+                atomic_neuron.EventRouting.AnalogOutputMode.normal
+
+            # HXNeurons consist of single compartments with single circuits
+            logical_coord = \
+                simulator.state.neuron_placement.id2logicalneuron(cell_id)
+            assert len(logical_coord.get_atomic_neurons()) == 1
+            coord = logical_coord.get_atomic_neurons()[0]
+
+            config.neuron_block.atomic_neurons[coord] = atomic_neuron
 
 
 HXNeuron.default_parameters = HXNeuron.get_default_values()

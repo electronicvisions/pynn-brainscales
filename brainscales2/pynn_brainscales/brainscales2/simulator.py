@@ -382,33 +382,6 @@ class State(BaseState):
                     observables[descriptor].update({obsv_name: value[0]})
         return observables
 
-    # pylint: disable=too-many-arguments
-    def _configure_hxneuron(self,
-                            config: lola.Chip,
-                            neuron_id: ID,
-                            parameters: dict) \
-            -> lola.Chip:
-        """
-        Places Neuron in Population "pop" on chip and configures spike and
-        v recording.
-        """
-
-        # places the neurons from pop on chip
-        atomic_neuron = HXNeuron.create_hw_entity(parameters)
-        logical_coord = self.neuron_placement.id2logicalneuron(neuron_id)
-
-        # HXNeurons consist of single compartments with single circuits
-        assert len(logical_coord.get_atomic_neurons()) == 1
-        coord = logical_coord.get_atomic_neurons()[0]
-
-        # configure spike recording
-        atomic_neuron.event_routing.analog_output = \
-            atomic_neuron.EventRouting.AnalogOutputMode.normal
-
-        config.neuron_block.atomic_neurons[coord] = atomic_neuron
-
-        return config
-
     def _recorders_populations_changed(self) -> Set[Population]:
         """
         Collect populations which configurations were changed.
@@ -449,15 +422,8 @@ class State(BaseState):
                                                     SpikeSourceArray,
                                                     SpikeSourcePoisson,
                                                     SpikeSourcePoissonOnChip))
-            if isinstance(population.celltype, HXNeuron):
-                for cell_id, parameters in zip(
-                        population.all_cells,
-                        population.celltype.parameter_space):
-
-                    config = self._configure_hxneuron(
-                        config,
-                        cell_id,
-                        parameters)
+            if hasattr(population.celltype, 'add_to_chip'):
+                population.celltype.add_to_chip(population.all_cells, config)
         return config
 
     def _generate_network_graphs(self) \
