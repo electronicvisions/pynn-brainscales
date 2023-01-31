@@ -386,8 +386,7 @@ class State(BaseState):
     def _configure_hxneuron(self,
                             config: lola.Chip,
                             neuron_id: ID,
-                            parameters: dict,
-                            enable_spike_output: bool) \
+                            parameters: dict) \
             -> lola.Chip:
         """
         Places Neuron in Population "pop" on chip and configures spike and
@@ -405,7 +404,6 @@ class State(BaseState):
         # configure spike recording
         atomic_neuron.event_routing.analog_output = \
             atomic_neuron.EventRouting.AnalogOutputMode.normal
-        atomic_neuron.event_routing.enable_digital = enable_spike_output
 
         config.neuron_block.atomic_neurons[coord] = atomic_neuron
 
@@ -436,28 +434,6 @@ class State(BaseState):
                 changed.add(pre)
         return changed
 
-    def _spike_source_indices(self) -> Dict[Population, Set[ID]]:
-        """
-        Collect all neurons which serve as a spike source.
-
-        Check each projection and collect populations and their neurons which
-        serve as spike sources.
-
-        :return: Sets cell ids of neurons which serve as spike sources.
-                 These sets are organized in populations which they belong to.
-        """
-        spike_source_indices = {}
-        for projection in self.projections:
-            pre_has_grandparent = hasattr(projection.pre, "grandparent")
-            pre = projection.pre.grandparent if \
-                pre_has_grandparent else projection.pre
-            for connection in projection.connections:
-                if pre not in spike_source_indices:
-                    spike_source_indices.update({pre: set()})
-                spike_source_indices[pre].add(
-                    pre.all_cells[connection.pop_pre_index])
-        return spike_source_indices
-
     def _configure_recorders_populations(self,
                                          config: lola.Chip) \
             -> lola.Chip:
@@ -465,7 +441,6 @@ class State(BaseState):
         changed = self._recorders_populations_changed()
         if not changed:
             return config
-        spike_source_indices = self._spike_source_indices()
         for recorder in self.recorders:
             if recorder.population not in changed:
                 continue
@@ -475,21 +450,6 @@ class State(BaseState):
                                                     SpikeSourcePoisson,
                                                     SpikeSourcePoissonOnChip))
             if isinstance(population.celltype, HXNeuron):
-
-                # retrieve for which neurons what kind of recording is active
-                spike_rec_indexes = set()
-                for parameter, cell_ids in recorder.recorded.items():
-                    for cell_id in cell_ids:
-                        if parameter == "spikes":
-                            spike_rec_indexes.add(cell_id)
-                        elif parameter in recorder.madc_variables:
-                            assert self.madc_recorder is not None and \
-                                cell_id == self.madc_recorder.cell_id
-                        else:
-                            raise NotImplementedError
-                if population in spike_source_indices:
-                    spike_rec_indexes = spike_rec_indexes.union(
-                        spike_source_indices[population])
                 for cell_id, parameters in zip(
                         population.all_cells,
                         population.celltype.parameter_space):
@@ -497,8 +457,7 @@ class State(BaseState):
                     config = self._configure_hxneuron(
                         config,
                         cell_id,
-                        parameters,
-                        enable_spike_output=cell_id in spike_rec_indexes)
+                        parameters)
         return config
 
     def _generate_network_graphs(self) \
