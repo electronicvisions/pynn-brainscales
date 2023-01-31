@@ -44,12 +44,11 @@ class PlasticSynapse(
         using namespace grenade::vx::ppu;
         using namespace libnux::vx;
         void PLASTICITY_RULE_KERNEL(
-            std::array<SynapseArrayViewHandle, 1>& synapses,
-            std::array<PPUOnDLS, 1> synrams)
+            std::array<SynapseArrayViewHandle, 1>& synapses)
         {
             PPUOnDLS location;
             get_location(location);
-            if (synrams[0] != location) {
+            if (synapses[0].hemisphere != location) {
                 return;
             }
             SynapseArrayViewHandle::Row zeros;
