@@ -202,6 +202,18 @@ class Projection(pyNN.common.Projection):
                 self._simulator.state.projections.index(self)))
 
     def get_data(self, observable: str):
+        """
+        Get data for an observable per synapse.
+
+        :param observable: Name of observable.
+        :return: Array with recorded data. The array's entries are values
+            for each timer entry. Each value has a `.data` attribute,
+            containing the recorded data.
+
+        :raises RuntimeError: If observable name is not known or
+            the projection does not implement a plasticity rule.
+        """
+
         if not isinstance(self.synapse_type, PlasticityRuleHandle):
             raise RuntimeError("Synapse type can't have observables, since it"
                                + " is not derived from PlasticityRuleHandle.")

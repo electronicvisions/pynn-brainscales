@@ -246,6 +246,7 @@ class State(BaseState):
         self.plasticity_rules: List["PlasticityRule"] = []
         self.synaptic_observables: List[Dict[str, object]] = []
         self.neuronal_observables: List[Dict[str, object]] = []
+        self.array_observables: List[Dict[str, object]] = []
         self.id_counter = 0
         self.current_sources = []
         self.segment_counter = -1
@@ -286,6 +287,7 @@ class State(BaseState):
         self.plasticity_rules = []
         self.synaptic_observables = []
         self.neuronal_observables = []
+        self.array_observables = []
         self.id_counter = 0
         self.current_sources = []
         self.segment_counter = -1
@@ -407,6 +409,32 @@ class State(BaseState):
             for obsv_name, data in data.data_per_neuron.items():
                 for descriptor, value in data.items():
                     observables[descriptor].update({obsv_name: value[0]})
+        return observables
+
+    def _get_array_observables(
+            self,
+            logical_network_graph: grenade.logical_network.NetworkGraph,
+            hardware_network_graph: grenade.NetworkGraph,
+            outputs: grenade.IODataMap) -> List[Dict[str, np.ndarray]]:
+        """
+        Get general array observables.
+
+        :param network_graph: Network graph to use for lookup of
+                              plasticity rule descriptor
+        :param outputs: All outputs of a single execution to extract
+                        samples from
+        :return: List of dicts over plasticity rules and recorded data,
+            one dict per plasticity rule
+        """
+
+        observables = []
+        for plasticity_rule in self.plasticity_rules:
+            if not plasticity_rule.observables:
+                observables.append({})
+            else:
+                data = plasticity_rule.get_data(
+                    logical_network_graph, hardware_network_graph, outputs)
+                observables.append(data.data_array)
         return observables
 
     def _recorders_populations_changed(self) -> Set[Population]:
@@ -775,6 +803,8 @@ class State(BaseState):
             hardware_network, outputs)
 
         self.synaptic_observables = self._get_synaptic_observables(
+            logical_network, hardware_network, outputs)
+        self.array_observables = self._get_array_observables(
             logical_network, hardware_network, outputs)
 
         self.neuronal_observables = self._get_neuronal_observables(

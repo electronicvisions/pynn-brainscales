@@ -198,6 +198,34 @@ class PlasticityRule:
                     self._simulator.state.plasticity_rules.index(self)))
         return recording_data
 
+    def get_observable_array(self, observable: str) -> object:
+        """
+        Get data for an array observable.
+
+        :param observable: Name of observable.
+        :return: Array with recorded data. The array's entries are values
+            for each timer entry. Each value has a `.data` attribute,
+            containing the recorded data. This data is twice the size
+            set when initializing the observable, since it is added
+            for both top and bottom PPUs.
+
+        :raises RuntimeError: If observable name is not known.
+        :raises TypeError: If observable is not an ObservableArray.
+        """
+
+        if observable not in self.observables:
+            raise RuntimeError(
+                "Plasticity rule doesn't have requested observable.")
+        if not isinstance(self.observables[observable],
+                          PlasticityRule.ObservableArray):
+            raise TypeError(
+                f"Observable {observable} is not an ObservableArray. "
+                "For observables per synapse, use the `get_data` function "
+                "of the respective projection.")
+
+        return self._simulator.state.array_observables[
+            self._simulator.state.plasticity_rules.index(self)][observable][0]
+
 
 class PlasticityRuleHandle:
     """
