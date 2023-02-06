@@ -33,10 +33,10 @@ class Population(pyNN.common.Population):
         if hasattr(self.celltype, "logical_compartments"):
             simulator.state.neuron_placement.register_neuron(
                 self.all_cells, self.celltype.logical_compartments)
-            coords = simulator.state.neuron_placement.\
-                id2logicalneuron(self.all_cells)
-
-            self.celltype.apply_config(coords)
+            if hasattr(self.celltype, "apply_config"):
+                coords = simulator.state.neuron_placement.\
+                    id2logicalneuron(self.all_cells)
+                self.celltype.apply_config(coords)
 
         parameter_space = self.celltype.parameter_space
         parameter_space.shape = (self.size,)
@@ -112,6 +112,34 @@ class Population(pyNN.common.Population):
         return self._simulator.state.neuronal_observables[
             self._simulator.state.populations.index(self)][observable]
 
+    # Accessors for automatic calibration neuron types
+    @property
+    def actual_hwparams(self):
+        try:
+            return self.celltype.actual_hwparams
+        except AttributeError:
+            # pylint:disable=raise-missing-from
+            raise AttributeError("actual_hwparams not available for celltype "
+                                 f"{type(self.celltype)}")
+
+    @property
+    def calib_hwparams(self):
+        try:
+            return self.celltype.calib_hwparams
+        except AttributeError:
+            # pylint:disable=raise-missing-from
+            raise AttributeError("calib_hwparams not available for celltype "
+                                 f"{type(self.celltype)}")
+
+    @property
+    def calib_target(self):
+        try:
+            return self.celltype.calib_target
+        except AttributeError:
+            # pylint:disable=raise-missing-from
+            raise AttributeError("calib_target not available for celltype "
+                                 f"{type(self.celltype)}")
+
 
 # pylint:disable=abstract-method
 class PopulationView(pyNN.common.PopulationView):
@@ -137,3 +165,31 @@ class PopulationView(pyNN.common.PopulationView):
 
     def _get_view(self, selector, label=None):
         return PopulationView(self, selector, label)
+
+    # Accessors for automatic calibration neuron types
+    @property
+    def actual_hwparams(self):
+        try:
+            return self.celltype.actual_hwparams[self.mask]
+        except AttributeError:
+            # pylint:disable=raise-missing-from
+            raise AttributeError("actual_hwparams not available for celltype "
+                                 f"{type(self.celltype)}")
+
+    @property
+    def calib_hwparams(self):
+        try:
+            return self.celltype.calib_hwparams[self.mask]
+        except AttributeError:
+            # pylint:disable=raise-missing-from
+            raise AttributeError("calib_hwparams not available for celltype "
+                                 f"{type(self.celltype)}")
+
+    @property
+    def calib_target(self):
+        try:
+            return self.celltype.calib_target[self.mask]
+        except AttributeError:
+            # pylint:disable=raise-missing-from
+            raise AttributeError("calib_target not available for celltype "
+                                 f"{type(self.celltype)}")

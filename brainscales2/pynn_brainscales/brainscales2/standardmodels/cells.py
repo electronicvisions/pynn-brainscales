@@ -1,9 +1,10 @@
 import inspect
 import numbers
+import copy
 import numpy as np
 from typing import List, Dict, ClassVar, Final, Optional, Union, Callable, Set
 
-from pyNN.parameters import ArrayParameter
+from pyNN.parameters import ArrayParameter, ParameterSpace
 from pyNN.standardmodels import cells, build_translations, StandardCellType
 from pyNN.common import Population
 from pynn_brainscales.brainscales2 import simulator, plasticity_rules
@@ -12,6 +13,7 @@ from pynn_brainscales.brainscales2.helper import get_values_of_atomic_neuron, \
     decompose_in_member_names
 from dlens_vx_v3 import lola, hal, halco, sta
 import pygrenade_vx.network.placed_logical as grenade
+from quantities.quantity import Quantity
 
 from pynn_brainscales.brainscales2.standardmodels.cells_base import \
     NetworkAddableCell
@@ -353,6 +355,247 @@ class PlasticHXNeuron(HXNeuron, plasticity_rules.PlasticityRuleHandle):
 
 
 PlasticHXNeuron.default_parameters = PlasticHXNeuron.get_default_values()
+
+
+class CalibHXNeuronCuba(StandardCellType, NetworkAddableCell):
+    """
+    HX Neuron with automated calibration. Cell parameters correspond to
+    parameters for Calix spiking calibration.
+
+    :param parameters: Mapping of parameters and corresponding values, i.e.
+                       dict. Either 1-dimensional or population size
+                       dimensions. Default values are overwritten for specified
+                       parameters.
+    Available parameters are:
+    v_rest: Resting potential. Value range [50, 160].
+    v_reset: Reset potential. Value range [50, 160].
+    v_thresh: Threshold potential. Value range [50, 220].
+    tau_m: Membrane time constant. Value range [0.5, 60]us.
+    tau_syn_E: Excitatory synaptic input time constant. Value range
+        [0.3, 30]us.
+    tau_syn_E: Inhibitory synaptic input time constant. Value range
+        [0.3, 30]us.
+    cm: Membrane capacitance. Value range [0, 63].
+    tau_refrac: Refractory time. Value range [.04, 32]us.
+    i_synin_gm_E: Excitatory synaptic input strength bias current. Scales the
+        strength of excitatory weights. Technical parameter which needs to be
+        same for all populations. Value range [30, 800].
+    i_synin_gm_I: Inhibitory synaptic input strength bias current. Scales the
+        strength of excitatory weights. Technical parameter which needs to be
+        same for all populations. Value range [30, 800].
+    synapse_dac_bias: Synapse DAC bias current. Technical parameter which needs
+        to be same for all populations Can be lowered in order to reduce the
+        amplitude of a spike at the input of the synaptic input OTA. This can
+        be useful to avoid saturation when using larger synaptic time
+        constants. Value range [30, 1022].
+
+    Attributes:
+        calib_target: Archive of cell parameters used for last calibration run.
+                      Only available after pynn.preprocess() or pynn.run()
+                      call.
+        calib_hwparams: Archive of resulting hardware parameters from last
+                        calibration run. Only available after pynn.preprocess()
+                        or pynn.run() call.
+        acutal_hwparams: Hardware parameters used for actual hardware
+                         execution, can be manually adjusted. Only available
+                         after pynn.preprocess() or pynn.run() call.
+    """
+
+    # exc_synin, inh_synin and adaptation are technical voltages
+    recordable: Final[List[str]] = ["spikes", "v", "exc_synin", "inh_synin",
+                                    "adaptation"]
+
+    receptor_types: Final[List[str]] = ["excitatory", "inhibitory"]
+    conductance_based: Final[bool] = False
+
+    default_parameters = {
+        'v_rest': 80,
+        'v_reset': 70,
+        'v_thresh': 125,
+        'tau_m': 10,
+        'tau_syn_E': 10,
+        'tau_syn_I': 10,
+        'cm': 63,
+        'tau_refrac': 2,
+        'i_synin_gm_E': 500,
+        'i_synin_gm_I': 500,
+        'synapse_dac_bias': 600
+    }
+
+    units = {
+        'v_rest': 'dimensionless',
+        'v_reset': 'dimensionless',
+        'v_thresh': 'dimensionless',
+        'tau_m': 'us',
+        'tau_syn_E': 'us',
+        'tau_syn_I': 'us',
+        'cm': 'dimensionless',
+        'refractory_time': 'us',
+        'i_synin_gm_E': 'dimensionless',
+        'i_synin_gm_I': 'dimensionless',
+        'synapse_dac_bias': 'dimensionless',
+        "v": "dimensionless",
+        "exc_synin": "dimensionless",
+        "inh_synin": "dimensionless",
+        "adaptation": "dimensionless"
+    }
+
+    translations = build_translations(
+        ('v_rest', 'v_rest'),
+        ('v_reset', 'v_reset'),
+        ('v_thresh', 'v_thresh'),
+        ('tau_m', 'tau_m'),
+        ('tau_syn_E', 'tau_syn_E'),
+        ('tau_syn_I', 'tau_syn_I'),
+        ('cm', 'cm'),
+        ('tau_refrac', 'tau_refrac'),
+        ('i_synin_gm_E', 'i_synin_gm_E'),
+        ('i_synin_gm_I', 'i_synin_gm_I'),
+        ('synapse_dac_bias', 'synapse_dac_bias'),
+        ('v', 'v'),
+        ('exc_synin', 'exc_synin'),
+        ('inh_synin', 'inh_synin'),
+        ('adaptation', 'adaptation')
+    )
+
+    calib_target: ParameterSpace
+    calib_hwparams: List[lola.AtomicNeuron]
+    actual_hwparams: List[lola.AtomicNeuron]
+
+    # HXNeuron consists of a single compartment with a single circuit
+    logical_compartments: Final[halco.LogicalNeuronCompartments] = \
+        halco.LogicalNeuronCompartments(
+            {halco.CompartmentOnLogicalNeuron():
+             [halco.AtomicNeuronOnLogicalNeuron()]})
+
+    @staticmethod
+    def add_to_network_graph(population: Population,
+                             builder: grenade.NetworkBuilder) \
+            -> grenade.PopulationDescriptor:
+        return HXNeuron.add_to_network_graph(population, builder)
+
+    @staticmethod
+    def add_to_input_generator(population: Population,
+                               builder: grenade.InputGenerator):
+        pass
+
+    def can_record(self, variable: str) -> bool:
+        return variable in self.recordable
+
+    # map between pynn and hardware parameter names. Cannot utilize pyNN
+    # translations as it need to be bijective
+    param_trans = {
+        'v_rest': 'leak',
+        'v_reset': 'reset',
+        'v_thresh': 'threshold',
+        'tau_m': 'tau_mem',
+        'tau_syn_E': 'tau_syn',
+        'tau_syn_I': 'tau_syn',
+        'cm': 'membrane_capacitance',
+        'tau_refrac': 'refractory_time',
+        'i_synin_gm_E': 'i_synin_gm',
+        'i_synin_gm_I': 'i_synin_gm',
+        'synapse_dac_bias': 'synapse_dac_bias',
+        'v': 'v',
+        'exc_synin': 'exc_synin',
+        'inh_synin': 'inh_synin',
+        'adaptation': 'adaptation'
+    }
+
+    def add_calib_params(self, calib_params: Dict, cell_ids: List) -> Dict:
+        self._calib_target = copy.deepcopy(self.parameter_space)
+        paradict = calib_params.__dict__
+        for parameters, cell_id in zip(self.parameter_space, cell_ids):
+            for param in parameters:
+                coord = simulator.state.neuron_placement.id2first_circuit(cell_id)
+                myparam = self.param_trans[param]
+                if param == "tau_syn_E":
+                    paradict[myparam][0][coord] = Quantity(
+                        parameters[param], "us")
+                elif param == "tau_syn_I":
+                    paradict[myparam][1][coord] = Quantity(
+                        parameters[param], "us")
+                elif param == "synapse_dac_bias":
+                    if paradict[param] is not None and\
+                            parameters[param] != paradict[param]:
+                        raise AttributeError(
+                            "synapse_dac_bias requires same value for all "
+                            "neurons")
+                    paradict[param] = parameters[param]
+                elif param == "i_synin_gm_E":
+                    if paradict[myparam][0] is not None and\
+                            parameters[param] !=\
+                            paradict[myparam][0]:
+                        raise AttributeError(
+                            "i_synin_gm_ex requires same value for all "
+                            "neurons")
+                    paradict["i_synin_gm"][0] = parameters[param]
+                elif param == "i_synin_gm_I":
+                    if paradict[myparam][1] is not None and\
+                            parameters[param] !=\
+                            paradict[myparam][1]:
+                        raise AttributeError(
+                            "i_synin_gm_in needs to have same value for all "
+                            "neurons")
+                    paradict[myparam][1] = parameters[param]
+                # FIXME handling of Quantity
+                elif isinstance(paradict[myparam][coord], Quantity):
+                    paradict[myparam][coord] = Quantity(
+                        parameters[param], "us")
+                else:
+                    paradict[myparam][coord] = parameters[param]
+        return calib_params
+
+    def add_to_chip(self, cell_ids: List, config: lola.Chip):
+        """
+        Add configuration of each neuron in the parameter space to the given
+        chip object.
+
+
+        :param cell_ids: Cell IDs for each neuron in the parameter space of
+            this celltype object.
+        :param chip: Lola chip object which is altered.
+        """
+
+        calib_result = []
+        for cell_id in cell_ids:
+
+            logical_coord = \
+                simulator.state.neuron_placement.id2logicalneuron(cell_id)
+            assert len(logical_coord.get_atomic_neurons()) == 1
+            coord = logical_coord.get_atomic_neurons()[0]
+            atomic_neuron = config.neuron_block.atomic_neurons[coord]
+
+            calib_result.append(
+                atomic_neuron)
+
+        self._calib_hwparams = copy.deepcopy(calib_result)
+        self._actual_hwparams = calib_result
+
+    @property
+    def actual_hwparams(self):
+        # cast to tuple prevents overwriting reference with new object
+        try:
+            return tuple(self._actual_hwparams)
+        except AttributeError:
+            raise AttributeError("actual_hwparams only available after "
+                                 "pynn.preprocess() or pynn.run() call.")
+
+    @property
+    def calib_hwparams(self):
+        try:
+            return self._calib_hwparams
+        except AttributeError:
+            raise AttributeError("calib_hwparams only available after "
+                                 "pynn.preprocess() or pynn.run() call.")
+
+    @property
+    def calib_target(self):
+        try:
+            return self._calib_target
+        except AttributeError:
+            raise AttributeError("calib_target only available after "
+                                 "pynn.preprocess() or pynn.run() call.")
 
 
 class SpikeSourcePoissonOnChip(StandardCellType, NetworkAddableCell):

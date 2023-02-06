@@ -25,7 +25,7 @@ import pylogging as logger
 
 __all__ = ["list_standard_models", "setup", "end", "run", "run_until",
            "run_for", "reset", "initialize", "get_current_time", "create",
-           "connect", "set", "record", "logger"]
+           "connect", "set", "record", "logger", "preprocess"]
 
 
 def list_standard_models():
@@ -33,7 +33,7 @@ def list_standard_models():
     Return a list of all the StandardCellType classes available for this
     simulator.
     """
-    return [cells.HXNeuron]
+    return [cells.HXNeuron, cells.CalibHXNeuronCuba]
 
 
 @dataclass
@@ -121,6 +121,8 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
                         result.
         injected_config: Optional user defined injected configuration.
         injected_readout: Optional user defined injected readout.
+        calibration_cache: Directory where automated calibration is cached.
+                           If none provided defaults to home cache.
     """
     time_begin = time.time()
 
@@ -161,6 +163,8 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
         initial_config = lola.Chip.default_neuron_bypass
     simulator.state.initial_config = initial_config
     simulator.state.prepare_static_config()
+    simulator.state.calib_cache_dir = extra_params.pop('calibration_cache',
+                                                       None)
 
     if extra_params:
         raise KeyError("unhandled extra_params in call to pynn.setup(...):"
@@ -201,6 +205,18 @@ def run(*args, **kwargs):
 
 
 run_for = run
+
+
+def preprocess():
+    """
+    Execute all steps needed for the hardware back-end.
+    Includes place&route of network graph or execution calibration.
+    Can be called manually to obtain calibration results for e.g.
+    CalibHXNeuron and make adjustments if needed.
+    If not called manually is automatically called on run().
+    """
+    simulator.state.preprocess()
+
 
 reset = common.build_reset(simulator)
 

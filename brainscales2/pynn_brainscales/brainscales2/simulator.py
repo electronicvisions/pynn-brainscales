@@ -9,6 +9,9 @@ from pynn_brainscales.brainscales2.standardmodels.cells_base import \
     NetworkAddableCell
 from dlens_vx_v3 import hal, halco, sta, lola, logger
 import pygrenade_vx as grenade
+from calix.spiking import SpikingCalibTarget, SpikingCalibOptions
+from calix.spiking.neuron import NeuronCalibTarget
+from calix import calibrate
 
 
 name = "HX"  # for use in annotating output data
@@ -223,7 +226,7 @@ class State(BaseState):
     # TODO: replace by calculation (cf. feature #3594)
     dt: Final[float] = 3.4e-05  # average time between two MADC samples
 
-    # pylint: disable=invalid-name
+    # pylint: disable=invalid-name,too-many-statements
     def __init__(self):
         super().__init__()
 
@@ -275,6 +278,7 @@ class State(BaseState):
         self.injection_post_realtime = None
         self.initial_config = None
         self.execution_time_info = None
+        self.calib_cache_dir = None
 
     def run_until(self, tstop):
         self.run(tstop - self.t)
@@ -313,6 +317,7 @@ class State(BaseState):
         self.injection_post_realtime = None
         self.initial_config = None
         self.execution_time_info = None
+        self.calib_cache_dir = None
 
         self.reset()
 
@@ -458,24 +463,53 @@ class State(BaseState):
                 changed.add(pre)
         return changed
 
-    def _configure_recorders_populations(self,
-                                         config: lola.Chip) \
-            -> lola.Chip:
-
+    def _configure_recorders_populations(self):
         changed = self._recorders_populations_changed()
         if not changed:
-            return config
+            return
+
+        neuron_target = NeuronCalibTarget().DenseDefault
+        # initialize shared parameters between neurons with None to allow check
+        # for different values in different populations
+        neuron_target.synapse_dac_bias = None
+        neuron_target.i_synin_gm = np.array([None, None])
+
+        # gather calibration information
+        execute_calib = False
         for recorder in self.recorders:
             if recorder.population not in changed:
                 continue
             population = recorder.population
             assert isinstance(population.celltype, NetworkAddableCell)
-            if hasattr(population.celltype, 'add_to_chip'):
-                population.celltype.add_to_chip(population.all_cells, config)
-        return config
+            if hasattr(population.celltype, 'add_calib_params'):
+                population.celltype.add_calib_params(
+                    neuron_target, population.all_cells)
+                execute_calib = True
 
-    def _generate_network_graph(self) \
-            -> grenade.network.placed_logical.NetworkGraph:
+        if execute_calib:
+            if self.initial_config is not None:
+                self.log.WARN("Using automatically calibrating neurons with "
+                              "initial_config. Initial configuration will be "
+                              "overwritten")
+            calib_target = SpikingCalibTarget(neuron_target=neuron_target)
+            result = calibrate(
+                calib_target,
+                SpikingCalibOptions(),
+                self.calib_cache_dir)
+            dumper = sta.PlaybackProgramBuilderDumper()
+            result.apply(dumper)
+            self.grenade_chip_config = sta.convert_to_chip(
+                dumper.done(), self.grenade_chip_config)
+
+        for recorder in self.recorders:
+            if recorder.population not in changed:
+                continue
+            population = recorder.population
+            if hasattr(population.celltype, 'add_to_chip'):
+                population.celltype.add_to_chip(
+                    population.all_cells, self.grenade_chip_config)
+
+    def _generate_network_graph(self):
         """
         Generate placed and routed executable network graph representation.
         """
@@ -488,7 +522,7 @@ class State(BaseState):
                 iter(self.plasticity_rules)))
         if not changed_since_last_run:
             if self.grenade_network_graph is not None:
-                return self.grenade_network_graph
+                return
 
         # generate network
         network_builder = grenade.network.placed_logical.NetworkBuilder()
@@ -520,8 +554,6 @@ class State(BaseState):
         else:
             grenade.network.placed_logical.update_network_graph(
                 self.grenade_network_graph, self.grenade_network)
-
-        return self.grenade_network_graph
 
     def _reset_changed_since_last_run(self):
         """
@@ -678,9 +710,9 @@ class State(BaseState):
 
     def prepare_static_config(self):
         if self.initial_config is None:
-            config = lola.Chip()
+            self.grenade_chip_config = lola.Chip()
         else:
-            config = copy(self.initial_config)
+            self.grenade_chip_config = copy(self.initial_config)
         builder1 = sta.PlaybackProgramBuilder()
 
         def add_configuration(
@@ -699,7 +731,6 @@ class State(BaseState):
         # injected configuration pre non realtime
         add_configuration(builder1, self.injected_config.pre_non_realtime)
 
-        self.grenade_chip_config = config
         # reset dirty-flags
         self._reset_changed_since_last_run()
 
@@ -727,6 +758,18 @@ class State(BaseState):
         self.injection_inside_realtime_end = inside_realtime_end
         self.injection_post_realtime = post_realtime
 
+    def preprocess(self):
+        """
+        Execute all steps needed for the hardware back-end.
+        Includes place&route of network graph or execution of calibration.
+        Can be called manually to obtain calibration results for e.g.
+        CalibHXNeuronCuba and make adjustments if needed.
+        If not called manually is automatically called on run().
+        """
+        self._generate_network_graph()
+        self._configure_recorders_populations()
+        self._reset_changed_since_last_run()
+
     def run(self, runtime: Optional[float]):
         """
         Performs a hardware run for `runtime` milliseconds.
@@ -740,14 +783,7 @@ class State(BaseState):
             self.t += runtime
         self.running = True
 
-        # generate network graph
-        self._generate_network_graph()
-
-        # configure populations and recorders
-        self.grenade_chip_config = self._configure_recorders_populations(
-            self.grenade_chip_config)
-
-        self._reset_changed_since_last_run()
+        self.preprocess()
 
         if runtime is None:
             self.log.DEBUG(
