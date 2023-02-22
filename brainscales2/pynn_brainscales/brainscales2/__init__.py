@@ -33,7 +33,7 @@ def list_standard_models():
     Return a list of all the StandardCellType classes available for this
     simulator.
     """
-    return [cells.HXNeuron, cells.CalibHXNeuronCuba]
+    return [cells.HXNeuron, cells.CalibHXNeuronCuba, cells.CalibHXNeuronCoba]
 
 
 @dataclass

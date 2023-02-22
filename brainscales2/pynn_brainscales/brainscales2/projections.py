@@ -251,14 +251,14 @@ class Connection(pyNN.common.Connection):
                 projection.post.index_in_grandparent([post_index])[0]
         else:
             self.pop_post_index = post_index
-        assert not self.projection.post.conductance_based
         if ((parameters["weight"] < 0)
-                and (self.projection.receptor_type != "inhibitory")) or \
+                and ((self.projection.post.conductance_based
+                      or self.projection.receptor_type != "inhibitory"))) or \
                 ((parameters["weight"] > 0)
-                 and (self.projection.receptor_type != "excitatory")):
+                    and (self.projection.receptor_type != "excitatory")):
             raise pyNN.errors.ConnectionError(
-                "Weights must be positive for "
-                "conductance-based and/or excitatory synapses")
+                "Weights must be positive for conductance-based and/or "
+                "excitatory synapses and negative for inhibitory synapses")
         self._set_weight(parameters["weight"])
         if parameters["delay"] != 0:
             raise ValueError("Setting the delay unequal 0 is not supported.")
@@ -268,14 +268,14 @@ class Connection(pyNN.common.Connection):
 
     def _set_weight(self, new_weight):
         new_weight = round(new_weight)
-        assert not self.projection.post.conductance_based
         if ((new_weight < 0)
-                and (self.projection.receptor_type != "inhibitory")) or \
+                and ((self.projection.post.conductance_based
+                      or self.projection.receptor_type != "inhibitory"))) or \
                 ((new_weight > 0)
-                 and (self.projection.receptor_type != "excitatory")):
+                    and (self.projection.receptor_type != "excitatory")):
             raise pyNN.errors.ConnectionError(
-                "Weights must be positive for "
-                "conductance-based and/or excitatory synapses")
+                "Weights must be positive for conductance-based and/or "
+                "excitatory synapses and negative for inhibitory synapses")
         self._weight = new_weight
         self.projection.changed_since_last_run = True
 

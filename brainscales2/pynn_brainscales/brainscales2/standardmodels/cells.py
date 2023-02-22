@@ -598,6 +598,190 @@ class CalibHXNeuronCuba(StandardCellType, NetworkAddableCell):
                                  "pynn.preprocess() or pynn.run() call.")
 
 
+class CalibHXNeuronCoba(CalibHXNeuronCuba):
+    """
+    HX Neuron with automated calibration. Cell parameters correspond to
+    parameters for Calix spiking calibration.
+
+    :param parameters: Mapping of parameters and corresponding values, e.g.
+                       dict. Either 1-dimensional or population size
+                       dimensions. Default values are overwritten for specified
+                       parameters.
+
+    Available parameters are:
+    v_rest: Resting potential. Value range [50, 160].
+    v_reset: Reset potential. Value range [50, 160].
+    v_thresh: Threshold potential. Value range [50, 220].
+    tau_m: Membrane time constant. Value range [0.5, 60]us.
+    tau_syn_E: Excitatory synaptic input time constant. Value range
+        [0.3, 30]us.
+    tau_syn_E: Inhibitory synaptic input time constant. Value range
+        [0.3, 30]us.
+    cm: Membrane capacitance. Value range [0, 63].
+    tau_refrac: Refractory time. Value range [.04, 32]us.
+    e_rev_E: Excitatory COBA synaptic input reversal potential. At this
+        potential, the synaptic input strength will be zero. Value range
+        [60, 160].
+    e_rev_I: Inhibitory COBA synaptic input reversal potential. At this
+        potential, the synaptic input strength will be zero. Value range
+        [60, 160].
+    i_synin_gm_E: Excitatory synaptic input strength bias current. Scales the
+        strength of excitatory weights. Technical parameter which needs to be
+        same for all populations. Value range [30, 800].
+    i_synin_gm_I: Inhibitory synaptic input strength bias current. Scales the
+        strength of excitatory weights. Technical parameter which needs to be
+        same for all populations. Value range [30, 800].
+    synapse_dac_bias: Synapse DAC bias current. Technical parameter which needs
+        to be same for all populations Can be lowered in order to reduce the
+        amplitude of a spike at the input of the synaptic input OTA. This can
+        be useful to avoid saturation when using larger synaptic time
+        constants. Value range [30, 1022].
+
+    Attributes:
+        calib_target: Archive of cell parameters used for last calibration run.
+                      Only available after pynn.preprocess() or pynn.run()
+                      call.
+        calib_hwparams: Archive of resulting hardware parameters from last
+                        calibration run. Only available after pynn.preprocess()
+                        or pynn.run() call.
+        acutal_hwparams: Hardware parameters used for actual hardware
+                         execution, can be manually adjusted. Only available
+                         after pynn.preprocess() or pynn.run() call.
+    """
+
+    # exc_synin, inh_synin and adaptation are technical voltages
+    recordable: Final[List[str]] = ["spikes", "v", "exc_synin", "inh_synin",
+                                    "adaptation"]
+    receptor_types: Final[List[str]] = ["excitatory", "inhibitory"]
+    conductance_based: Final[bool] = True
+
+    default_parameters = {
+        'v_rest': 110,
+        'v_reset': 100,
+        'v_thresh': 160,
+        'tau_m': 10,
+        'tau_syn_E': 10,
+        'tau_syn_I': 10,
+        'cm': 63,
+        'tau_refrac': 2,
+        'e_rev_E': 300,
+        'e_rev_I': 30,
+        'i_synin_gm_E': 180,
+        'i_synin_gm_I': 250,
+        'synapse_dac_bias': 400
+    }
+
+    units = {
+        'v_rest': 'dimensionless',
+        'v_reset': 'dimensionless',
+        'v_thresh': 'dimensionless',
+        'tau_m': 'us',
+        'tau_syn_E': 'us',
+        'tau_syn_I': 'us',
+        'cm': 'dimensionless',
+        'refractory_time': 'us',
+        'e_rev_E': 'dimensionless',
+        'e_rev_I': 'dimensionless',
+        'i_synin_gm_E': 'dimensionless',
+        'i_synin_gm_I': 'dimensionless',
+        'synapse_dac_bias': 'dimensionless',
+        "v": "dimensionless",
+        "exc_synin": "dimensionless",
+        "inh_synin": "dimensionless",
+        "adaptation": "dimensionless"
+    }
+
+    translations = build_translations(
+        ('v_rest', 'v_rest'),
+        ('v_reset', 'v_reset'),
+        ('v_thresh', 'v_thresh'),
+        ('tau_m', 'tau_m'),
+        ('tau_syn_E', 'tau_syn_E'),
+        ('tau_syn_I', 'tau_syn_I'),
+        ('cm', 'cm'),
+        ('tau_refrac', 'tau_refrac'),
+        ('e_rev_E', 'e_rev_E'),
+        ('e_rev_I', 'e_rev_I'),
+        ('i_synin_gm_E', 'i_synin_gm_E'),
+        ('i_synin_gm_I', 'i_synin_gm_I'),
+        ('synapse_dac_bias', 'synapse_dac_bias'),
+        ('v', 'v'),
+        ('exc_synin', 'exc_synin'),
+        ('inh_synin', 'inh_synin'),
+        ('adaptation', 'adaptation')
+    )
+
+    # map between pynn and hardware parameter names. Cannot utilize pyNN
+    # translations as it need to be bijective
+    param_trans = {
+        'v_rest': 'leak',
+        'v_reset': 'reset',
+        'v_thresh': 'threshold',
+        'tau_m': 'tau_mem',
+        'tau_syn_E': 'tau_syn',
+        'tau_syn_I': 'tau_syn',
+        'cm': 'membrane_capacitance',
+        'tau_refrac': 'refractory_time',
+        'e_rev_E': 'e_coba_reversal',
+        'e_rev_I': 'e_coba_reversal',
+        'i_synin_gm_E': 'i_synin_gm',
+        'i_synin_gm_I': 'i_synin_gm',
+        'synapse_dac_bias': 'synapse_dac_bias',
+        'v': 'v',
+        'exc_synin': 'exc_synin',
+        'inh_synin': 'inh_synin',
+        'adaptation': 'adaptation'
+    }
+
+    def add_calib_params(self, calib_params: Dict, cell_ids: List) -> Dict:
+        self._calib_target = copy.deepcopy(self.parameter_space)
+        paradict = calib_params.__dict__
+        for parameters, cell_id in zip(self.parameter_space, cell_ids):
+            for param in parameters:
+                coord = simulator.state.neuron_placement.id2first_circuit(cell_id)
+                myparam = self.param_trans[param]
+                if param == "tau_syn_E":
+                    paradict[myparam][0][coord] = Quantity(
+                        parameters[param], "us")
+                elif param == "tau_syn_I":
+                    paradict[myparam][1][coord] = Quantity(
+                        parameters[param], "us")
+                elif param == "e_rev_E":
+                    paradict[myparam][0][coord] = parameters[param]
+                elif param == "e_rev_I":
+                    paradict[myparam][1][coord] = parameters[param]
+                elif param == "synapse_dac_bias":
+                    if paradict[param] is not None and\
+                            parameters[param] != paradict[param]:
+                        raise AttributeError(
+                            "synapse_dac_bias requires same value for all "
+                            "neurons")
+                    paradict[param] = parameters[param]
+                elif param == "i_synin_gm_E":
+                    if paradict[myparam][0] is not None and\
+                            parameters[param] !=\
+                            paradict[myparam][0]:
+                        raise AttributeError(
+                            "i_synin_gm_ex requires same value for all "
+                            "neurons")
+                    paradict["i_synin_gm"][0] = parameters[param]
+                elif param == "i_synin_gm_I":
+                    if paradict[myparam][1] is not None and\
+                            parameters[param] !=\
+                            paradict[myparam][1]:
+                        raise AttributeError(
+                            "i_synin_gm_in needs to have same value for all "
+                            "neurons")
+                    paradict[myparam][1] = parameters[param]
+                # FIXME handling of Quantity
+                elif isinstance(paradict[myparam][coord], Quantity):
+                    paradict[myparam][coord] = Quantity(
+                        parameters[param], "us")
+                else:
+                    paradict[myparam][coord] = parameters[param]
+        return calib_params
+
+
 class SpikeSourcePoissonOnChip(StandardCellType, NetworkAddableCell):
     """
     Spike source, generating spikes according to a Poisson process.

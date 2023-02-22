@@ -68,7 +68,7 @@ def build(bld):
 
     bld(name = 'pynn_brainscales2_hwtest',
         tests = bld.path.ant_glob('test/hw/*.py'),
-        test_timeout = 600,
+        test_timeout = 800,
         features = 'use pytest',
         use = ['pynn_brainscales2'],
         install_path = '${PREFIX}/bin',

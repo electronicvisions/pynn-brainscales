@@ -763,7 +763,7 @@ class State(BaseState):
         Execute all steps needed for the hardware back-end.
         Includes place&route of network graph or execution of calibration.
         Can be called manually to obtain calibration results for e.g.
-        CalibHXNeuronCuba and make adjustments if needed.
+        CalibHXNeuronCuba/Coba and make adjustments if needed.
         If not called manually is automatically called on run().
         """
         self._generate_network_graph()
