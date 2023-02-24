@@ -158,7 +158,6 @@ class PlasticityRule:
     def add_to_network_graph(self, builder: grenade.logical_network
                              .NetworkBuilder) \
             -> grenade.logical_network.PlasticityRuleDescriptor:
-        print(self._projections, self._populations)
         plasticity_rule = grenade.logical_network.PlasticityRule()
         plasticity_rule.timer = self.timer.to_grenade()
         if self.observables:
