@@ -5,8 +5,8 @@ from typing import Optional, Final, List, Dict, Union, Set, Tuple
 import numpy as np
 from pyNN.common import IDMixin, Population, Projection
 from pyNN.common.control import BaseState
-from pynn_brainscales.brainscales2.standardmodels.cells import HXNeuron, \
-    SpikeSourceArray, SpikeSourcePoisson, SpikeSourcePoissonOnChip
+from pynn_brainscales.brainscales2.standardmodels.cells_base import \
+    NetworkAddableCell
 from dlens_vx_v3 import hal, halco, sta, lola, logger
 import pygrenade_vx as grenade
 
@@ -473,10 +473,7 @@ class State(BaseState):
             if recorder.population not in changed:
                 continue
             population = recorder.population
-            assert isinstance(population.celltype, (HXNeuron,
-                                                    SpikeSourceArray,
-                                                    SpikeSourcePoisson,
-                                                    SpikeSourcePoissonOnChip))
+            assert isinstance(population.celltype, NetworkAddableCell)
             if hasattr(population.celltype, 'add_to_chip'):
                 population.celltype.add_to_chip(population.all_cells, config)
         return config

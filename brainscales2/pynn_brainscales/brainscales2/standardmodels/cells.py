@@ -1,4 +1,3 @@
-from abc import abstractmethod, ABC
 import inspect
 import numbers
 import numpy as np
@@ -14,32 +13,8 @@ from pynn_brainscales.brainscales2.helper import get_values_of_atomic_neuron, \
 from dlens_vx_v3 import lola, hal, halco, sta
 import pygrenade_vx as grenade
 
-
-class NetworkAddableCell(ABC):
-    @staticmethod
-    @abstractmethod
-    def add_to_network_graph(population: Population,
-                             builder: grenade.NetworkBuilder) \
-            -> grenade.logical_network.PopulationDescriptor:
-        """
-        Add population to network builder.
-        :param population: Population to add featuring this cell's celltype.
-        :param builder: Network builder to add population to.
-        :return: Descriptor of added population
-        """
-        raise NotImplementedError
-
-    @staticmethod
-    @abstractmethod
-    def add_to_input_generator(
-            population: Population,
-            builder: grenade.logical_network.InputGenerator):
-        """
-        Add external events to input generator.
-        :param population: Population to add featuring this cell's celltype.
-        :param builder: Input builder to add external events to.
-        """
-        raise NotImplementedError
+from pynn_brainscales.brainscales2.standardmodels.cells_base import \
+    NetworkAddableCell
 
 
 class HXNeuron(StandardCellType, NetworkAddableCell):
