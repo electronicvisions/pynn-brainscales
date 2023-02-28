@@ -11,7 +11,7 @@ from pynn_brainscales.brainscales2.recording import Recorder
 from pynn_brainscales.brainscales2.helper import get_values_of_atomic_neuron, \
     decompose_in_member_names
 from dlens_vx_v3 import lola, hal, halco, sta
-import pygrenade_vx as grenade
+import pygrenade_vx.logical_network as grenade
 
 from pynn_brainscales.brainscales2.standardmodels.cells_base import \
     NetworkAddableCell
@@ -186,8 +186,8 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
 
     @staticmethod
     def add_to_network_graph(population: Population,
-                             builder: grenade.logical_network.NetworkBuilder) \
-            -> grenade.logical_network.PopulationDescriptor:
+                             builder: grenade.NetworkBuilder) \
+            -> grenade.PopulationDescriptor:
         # pyNN is more performant when operating on integer cell ids
         pop_cells_int = np.asarray(population.all_cells, dtype=int)
 
@@ -197,12 +197,12 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
                 population.all_cells)  # pop_cells_int is slower here
         # create receptors
         receptors = set([
-            grenade.logical_network.Receptor(
-                grenade.logical_network.Receptor.ID(),
-                grenade.logical_network.Receptor.Type.excitatory),
-            grenade.logical_network.Receptor(
-                grenade.logical_network.Receptor.ID(),
-                grenade.logical_network.Receptor.Type.inhibitory),
+            grenade.Receptor(
+                grenade.Receptor.ID(),
+                grenade.Receptor.Type.excitatory),
+            grenade.Receptor(
+                grenade.Receptor.ID(),
+                grenade.Receptor.Type.inhibitory),
         ])
         # get recorder configuration
         enable_record_spikes = np.zeros((len(coords)), dtype=bool)
@@ -211,18 +211,18 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
                 pop_cells_int,
                 list(population.recorder.recorded["spikes"]))
         # create neurons
-        neurons: List[grenade.logical_network.Population.Neuron] = [
-            grenade.logical_network.Population.Neuron(
+        neurons: List[grenade.Population.Neuron] = [
+            grenade.Population.Neuron(
                 coord,
                 {halco.CompartmentOnLogicalNeuron():
-                 grenade.logical_network.Population.Neuron.Compartment(
-                     grenade.logical_network.Population
+                 grenade.Population.Neuron.Compartment(
+                     grenade.Population
                      .Neuron.Compartment.SpikeMaster(
                          0, enable_record_spikes[i]), [receptors])})
             for i, coord in enumerate(coords)
         ]
         # create grenade population
-        gpopulation = grenade.logical_network.Population(neurons)
+        gpopulation = grenade.Population(neurons)
         # add to builder
         descriptor = builder.add(gpopulation)
 
@@ -242,7 +242,7 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
 
         # add MADC recording
         assert len(readout_cell_idxs) == 1, "Number of readout cells != 1."
-        madc_recording = grenade.logical_network.MADCRecording()
+        madc_recording = grenade.MADCRecording()
         madc_recording.population = descriptor
         madc_recording.source = simulator.state.madc_recorder.readout_source
         madc_recording.neuron_on_population = readout_cell_idxs[0]
@@ -256,7 +256,7 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
     @staticmethod
     def add_to_input_generator(
             population: Population,
-            builder: grenade.logical_network.InputGenerator):
+            builder: grenade.InputGenerator):
         pass
 
     # TODO circular import -> can not import ID for type hint of conn_indices
@@ -327,7 +327,7 @@ class PlasticHXNeuron(HXNeuron, plasticity_rules.PlasticityRuleHandle):
 
     @classmethod
     def to_plasticity_rule_population_handle(cls, population: Population) \
-            -> grenade.logical_network.PlasticityRule.PopulationHandle:
+            -> grenade.PlasticityRule.PopulationHandle:
         handle = plasticity_rules.PlasticityRuleHandle\
             .to_plasticity_rule_population_handle(population)
         readout_source = population.get(
@@ -382,9 +382,10 @@ class SpikeSourcePoissonOnChip(StandardCellType, NetworkAddableCell):
         return variable in self.recordable
 
     @staticmethod
-    def add_to_network_graph(population: Population,
-                             builder: grenade.logical_network.NetworkBuilder) \
-            -> grenade.logical_network.PopulationDescriptor:
+    def add_to_network_graph(
+            population: Population,
+            builder: grenade.NetworkBuilder) \
+            -> grenade.PopulationDescriptor:
         # register hardware utilisation
         if not population.celltype._padi_bus:
             simulator.state.background_spike_source_placement.register_id(
@@ -413,7 +414,7 @@ class SpikeSourcePoissonOnChip(StandardCellType, NetworkAddableCell):
                 .background_source_clock_frequency / hwrate * prob) - 1))
         # create grenade population
         config = \
-            grenade.logical_network.BackgroundSpikeSourcePopulation.Config()
+            grenade.BackgroundSpikeSourcePopulation.Config()
         config.period = period
         config.rate = rate
         config.seed = hal.BackgroundSpikeSource.Seed(
@@ -421,7 +422,7 @@ class SpikeSourcePoissonOnChip(StandardCellType, NetworkAddableCell):
         config.enable_random = True
         # we need both hemispheres because of possibly arbitrary connection
         # targets
-        gpopulation = grenade.logical_network.BackgroundSpikeSourcePopulation(
+        gpopulation = grenade.BackgroundSpikeSourcePopulation(
             population.size,
             {halco.HemisphereOnDLS(0): population.celltype._padi_bus,
              halco.HemisphereOnDLS(1): population.celltype._padi_bus},
@@ -432,7 +433,7 @@ class SpikeSourcePoissonOnChip(StandardCellType, NetworkAddableCell):
     @staticmethod
     def add_to_input_generator(
             population: Population,
-            builder: grenade.logical_network.InputGenerator):
+            builder: grenade.InputGenerator):
         pass
 
 
@@ -524,10 +525,10 @@ class SpikeSourcePoisson(cells.SpikeSourcePoisson, NetworkAddableCell):
 
     @staticmethod
     def add_to_network_graph(population: Population,
-                             builder: grenade.logical_network.NetworkBuilder) \
-            -> grenade.logical_network.PopulationDescriptor:
+                             builder: grenade.NetworkBuilder) \
+            -> grenade.PopulationDescriptor:
         # create grenade population
-        gpopulation = grenade.logical_network.ExternalPopulation(
+        gpopulation = grenade.ExternalPopulation(
             population.size)
         # add to builder
         return builder.add(gpopulation)
@@ -535,12 +536,12 @@ class SpikeSourcePoisson(cells.SpikeSourcePoisson, NetworkAddableCell):
     @staticmethod
     def add_to_input_generator(
             population: Population,
-            builder: grenade.logical_network.InputGenerator):
+            builder: grenade.InputGenerator):
 
         spiketimes = population.celltype.get_spike_times()
         spiketimes = [np.sort(spiketimes_neuron) for spiketimes_neuron
                       in spiketimes]
-        descriptor = grenade.logical_network.PopulationDescriptor(
+        descriptor = grenade.PopulationDescriptor(
             simulator.state.populations.index(population))
         builder.add(spiketimes, descriptor)
 
@@ -565,10 +566,10 @@ class SpikeSourceArray(cells.SpikeSourceArray, NetworkAddableCell):
 
     @staticmethod
     def add_to_network_graph(population: Population,
-                             builder: grenade.logical_network.NetworkBuilder) \
-            -> grenade.logical_network.PopulationDescriptor:
+                             builder: grenade.NetworkBuilder) \
+            -> grenade.PopulationDescriptor:
         # create grenade population
-        gpopulation = grenade.logical_network.ExternalPopulation(
+        gpopulation = grenade.ExternalPopulation(
             population.size)
         # add to builder
         return builder.add(gpopulation)
@@ -576,9 +577,9 @@ class SpikeSourceArray(cells.SpikeSourceArray, NetworkAddableCell):
     @staticmethod
     def add_to_input_generator(
             population: Population,
-            builder: grenade.logical_network.InputGenerator):
+            builder: grenade.InputGenerator):
         spiketimes = population.celltype.parameter_space["spike_times"]
         spiketimes = [s.value for s in spiketimes]
-        descriptor = grenade.logical_network.PopulationDescriptor(
+        descriptor = grenade.PopulationDescriptor(
             simulator.state.populations.index(population))
         builder.add(spiketimes, descriptor)

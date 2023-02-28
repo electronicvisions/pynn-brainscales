@@ -3,7 +3,8 @@ from typing import Dict, Optional, Union
 import textwrap
 from pyNN.common import Projection, Population
 from pynn_brainscales.brainscales2 import simulator
-import pygrenade_vx as grenade
+import pygrenade_vx.logical_network as grenade
+import pygrenade_vx.signal_flow as grenade_signal_flow
 from dlens_vx_v3 import hal, halco
 
 
@@ -41,7 +42,7 @@ class Timer:
     period = property(_get_period, _set_period)
     num_periods = property(_get_num_periods, _set_num_periods)
 
-    def to_grenade(self) -> grenade.logical_network.PlasticityRule.Timer:
+    def to_grenade(self) -> grenade.PlasticityRule.Timer:
         def to_ppu_cycles(value: float) -> int:
             # TODO (Issue #3993): calculate frequency from chip config
             result = float(value)
@@ -50,7 +51,7 @@ class Timer:
             result = result * 2  # 250MHz vs. 125MHz
             return grenade.PlasticityRule.Timer.Value(int(round(result)))
 
-        timer = grenade.logical_network.PlasticityRule.Timer()
+        timer = grenade.PlasticityRule.Timer()
         timer.start = to_ppu_cycles(self.start)
         timer.period = to_ppu_cycles(self.period)
         timer.num_periods = int(self.num_periods)
@@ -67,11 +68,11 @@ class PlasticityRule:
     """
     _simulator = simulator
 
-    ObservablePerSynapse = grenade.logical_network.PlasticityRule\
+    ObservablePerSynapse = grenade.PlasticityRule\
         .TimedRecording.ObservablePerSynapse
-    ObservablePerNeuron = grenade.logical_network.PlasticityRule\
+    ObservablePerNeuron = grenade.PlasticityRule\
         .TimedRecording.ObservablePerNeuron
-    ObservableArray = grenade.logical_network.PlasticityRule\
+    ObservableArray = grenade.PlasticityRule\
         .TimedRecording.ObservableArray
 
     def __init__(self, timer: Timer,
@@ -155,13 +156,13 @@ class PlasticityRule:
         {}
         """)
 
-    def add_to_network_graph(self, builder: grenade.logical_network
+    def add_to_network_graph(self, builder: grenade
                              .NetworkBuilder) \
-            -> grenade.logical_network.PlasticityRuleDescriptor:
-        plasticity_rule = grenade.logical_network.PlasticityRule()
+            -> grenade.PlasticityRuleDescriptor:
+        plasticity_rule = grenade.PlasticityRule()
         plasticity_rule.timer = self.timer.to_grenade()
         if self.observables:
-            plasticity_rule.recording = grenade.logical_network.PlasticityRule\
+            plasticity_rule.recording = grenade.PlasticityRule\
                 .TimedRecording()
             plasticity_rule.recording.observables = self.observables
         plasticity_rule.kernel = self.generate_kernel()
@@ -177,10 +178,10 @@ class PlasticityRule:
 
     def get_data(
             self,
-            logical_network_graph: grenade.logical_network.NetworkGraph,
+            logical_network_graph: grenade.NetworkGraph,
             hardware_network_graph: grenade.NetworkGraph,
-            outputs: grenade.IODataMap) -> grenade.logical_network \
-            .PlasticityRule.RecordingData:
+            outputs: grenade_signal_flow.IODataMap) \
+            -> grenade.PlasticityRule.RecordingData:
         """
         Get synaptic observables of plasticity rule.
         :param network_graph: Network graph to use for lookup of
@@ -190,11 +191,11 @@ class PlasticityRule:
         :return: Recording data
         """
 
-        recording_data = grenade.logical_network\
+        recording_data = grenade\
             .extract_plasticity_rule_recording_data(
                 outputs,
                 logical_network_graph, hardware_network_graph,
-                grenade.logical_network.PlasticityRuleDescriptor(
+                grenade.PlasticityRuleDescriptor(
                     self._simulator.state.plasticity_rules.index(self)))
         return recording_data
 
@@ -259,7 +260,7 @@ class PlasticityRuleHandle:
     # pylint: disable=invalid-name
     @classmethod
     def to_plasticity_rule_population_handle(cls, population: Population) \
-            -> grenade.logical_network.PlasticityRule.PopulationHandle:
+            -> grenade.PlasticityRule.PopulationHandle:
         """
         Convert observable options to population handle of plasticity rule
         to backend representation, when plasticity rule handle is assoiated
@@ -268,8 +269,8 @@ class PlasticityRuleHandle:
         :param population: Population for which to convert
         :return: Representation in grenade
         """
-        handle = grenade.logical_network.PlasticityRule.PopulationHandle()
-        handle.descriptor = grenade.logical_network.PopulationDescriptor(
+        handle = grenade.PlasticityRule.PopulationHandle()
+        handle.descriptor = grenade.PopulationDescriptor(
             cls._simulator.state.populations.index(population))
         handle.neuron_readout_sources = [
             {halco.CompartmentOnLogicalNeuron(): [None]}
@@ -280,7 +281,7 @@ class PlasticityRuleHandle:
     # pylint: disable=invalid-name
     @classmethod
     def to_plasticity_rule_projection_handle(cls, projection: Projection) \
-            -> grenade.logical_network.ProjectionDescriptor:
+            -> grenade.ProjectionDescriptor:
         """
         Convert observable options to projection handle of plasticity rule
         to backend representation, when plasticity rule handle is assoiated
@@ -291,5 +292,5 @@ class PlasticityRuleHandle:
         :param projection: Projection for which to convert
         :return: Representation in grenade
         """
-        return grenade.logical_network.ProjectionDescriptor(
+        return grenade.ProjectionDescriptor(
             cls._simulator.state.projections.index(projection))

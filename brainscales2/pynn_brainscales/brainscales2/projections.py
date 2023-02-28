@@ -8,7 +8,7 @@ from pyNN.space import Space
 from pynn_brainscales.brainscales2.standardmodels.synapses import StaticSynapse
 from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.plasticity_rules import PlasticityRuleHandle
-import pygrenade_vx as grenade
+import pygrenade_vx.logical_network as grenade
 
 
 class Projection(pyNN.common.Projection):
@@ -136,8 +136,8 @@ class Projection(pyNN.common.Projection):
     @staticmethod
     def add_to_network_graph(populations: List[Population],
                              projection: Projection,
-                             builder: grenade.logical_network.NetworkBuilder) \
-            -> grenade.logical_network.ProjectionDescriptor:
+                             builder: grenade.NetworkBuilder) \
+            -> grenade.ProjectionDescriptor:
 
         if isinstance(projection.pre, Assembly):
             raise NotImplementedError("Assemblies are not supported yet")
@@ -154,9 +154,9 @@ class Projection(pyNN.common.Projection):
         post = projection.post.grandparent if \
             post_has_grandparent else projection.post
 
-        population_pre = grenade.logical_network.PopulationDescriptor(
+        population_pre = grenade.PopulationDescriptor(
             populations.index(pre))
-        population_post = grenade.logical_network.PopulationDescriptor(
+        population_post = grenade.PopulationDescriptor(
             populations.index(post))
 
         connections = np.empty((len(projection.connections), 5), dtype=int)
@@ -169,20 +169,20 @@ class Projection(pyNN.common.Projection):
 
         if projection.receptor_type == "excitatory":
             receptor_type = \
-                grenade.logical_network.Receptor(
-                    grenade.logical_network.Receptor.ID(),
-                    grenade.logical_network.Receptor.Type.excitatory)
+                grenade.Receptor(
+                    grenade.Receptor.ID(),
+                    grenade.Receptor.Type.excitatory)
         elif projection.receptor_type == "inhibitory":
             receptor_type = \
-                grenade.logical_network.Receptor(
-                    grenade.logical_network.Receptor.ID(),
-                    grenade.logical_network.Receptor.Type.inhibitory)
+                grenade.Receptor(
+                    grenade.Receptor.ID(),
+                    grenade.Receptor.Type.inhibitory)
         else:
             raise NotImplementedError(
                 "grenade.Projection.RecetorType does "
                 + f"not support {projection.receptor_type}.")
 
-        gprojection = grenade.logical_network.Projection()
+        gprojection = grenade.Projection()
         gprojection.from_numpy(
             receptor_type, connections, population_pre, population_post)
 

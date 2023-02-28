@@ -62,10 +62,11 @@ class StaticRecordingSynapse(
         def _get_observables(self):
             observables = set(
                 getattr(
-                    grenade.OnlyRecordingPlasticityRuleGenerator.Observable,
+                    grenade.network
+                    .OnlyRecordingPlasticityRuleGenerator.Observable,
                     obs)
                 for obs in self._recording_observables)
-            grenade_generator = grenade\
+            grenade_generator = grenade.network\
                 .OnlyRecordingPlasticityRuleGenerator(observables)
             return grenade_generator.generate().recording.observables
 
@@ -81,13 +82,15 @@ class StaticRecordingSynapse(
                 -> grenade.logical_network.PlasticityRuleDescriptor:
             observables = set(
                 getattr(
-                    grenade.OnlyRecordingPlasticityRuleGenerator.Observable,
+                    grenade.network
+                    .OnlyRecordingPlasticityRuleGenerator.Observable,
                     obs)
                 for obs in self._recording_observables)
-            grenade_generator = grenade\
+            grenade_generator = grenade.network\
                 .OnlyRecordingPlasticityRuleGenerator(observables)
             plasticity_rule = grenade_generator.generate()
-            logical_plasticity_rule = grenade.logical_network.PlasticityRule()
+            logical_plasticity_rule = \
+                grenade.logical_network.PlasticityRule()
             logical_plasticity_rule.projections = [
                 grenade.logical_network.ProjectionDescriptor(
                     self._simulator.state.projections.index(proj))
