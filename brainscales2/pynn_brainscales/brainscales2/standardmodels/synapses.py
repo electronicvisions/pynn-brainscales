@@ -1,7 +1,7 @@
 from typing import Final, List, Set
 from pyNN.standardmodels import synapses, build_translations
 from pynn_brainscales.brainscales2 import simulator, plasticity_rules
-import pygrenade_vx as grenade
+import pygrenade_vx.network.placed_logical as grenade
 
 
 class StaticSynapse(synapses.StaticSynapse):
@@ -62,11 +62,10 @@ class StaticRecordingSynapse(
         def _get_observables(self):
             observables = set(
                 getattr(
-                    grenade.network.placed_atomic
-                    .OnlyRecordingPlasticityRuleGenerator.Observable,
+                    grenade.OnlyRecordingPlasticityRuleGenerator.Observable,
                     obs)
                 for obs in self._recording_observables)
-            grenade_generator = grenade.network.placed_atomic\
+            grenade_generator = grenade\
                 .OnlyRecordingPlasticityRuleGenerator(observables)
             return grenade_generator.generate().recording.observables
 
@@ -78,27 +77,23 @@ class StaticRecordingSynapse(
         observables = property(_get_observables, _set_observables)
 
         def add_to_network_graph(
-                self, builder: grenade.network.placed_logical.NetworkBuilder) \
-                -> grenade.network.placed_logical.PlasticityRuleDescriptor:
+                self, builder: grenade.NetworkBuilder) \
+                -> grenade.PlasticityRuleDescriptor:
             observables = set(
                 getattr(
-                    grenade.network.placed_atomic
+                    grenade
                     .OnlyRecordingPlasticityRuleGenerator.Observable,
                     obs)
                 for obs in self._recording_observables)
-            grenade_generator = grenade.network.placed_atomic\
+            grenade_generator = grenade\
                 .OnlyRecordingPlasticityRuleGenerator(observables)
             plasticity_rule = grenade_generator.generate()
-            logical_plasticity_rule = \
-                grenade.network.placed_logical.PlasticityRule()
-            logical_plasticity_rule.projections = [
-                grenade.network.placed_logical.ProjectionDescriptor(
+            plasticity_rule.projections = [
+                grenade.ProjectionDescriptor(
                     self._simulator.state.projections.index(proj))
                 for proj in self._projections]
-            logical_plasticity_rule.timer = self.timer.to_grenade()
-            logical_plasticity_rule.kernel = plasticity_rule.kernel
-            logical_plasticity_rule.recording = plasticity_rule.recording
-            return builder.add(logical_plasticity_rule)
+            plasticity_rule.timer = self.timer.to_grenade()
+            return builder.add(plasticity_rule)
 
     POSSIBLE_OBSERVABLES: Final[List[str]] = [
         "weights", "correlation_causal", "correlation_acausal"]
