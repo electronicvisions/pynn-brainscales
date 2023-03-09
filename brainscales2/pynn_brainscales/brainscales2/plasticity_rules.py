@@ -178,8 +178,7 @@ class PlasticityRule:
 
     def get_data(
             self,
-            logical_network_graph: grenade.NetworkGraph,
-            hardware_network_graph: grenade.NetworkGraph,
+            network_graph: grenade.NetworkGraph,
             outputs: grenade_signal_flow.IODataMap) \
             -> grenade.PlasticityRule.RecordingData:
         """
@@ -193,8 +192,7 @@ class PlasticityRule:
 
         recording_data = grenade\
             .extract_plasticity_rule_recording_data(
-                outputs,
-                logical_network_graph, hardware_network_graph,
+                outputs, network_graph,
                 grenade.PlasticityRuleDescriptor(
                     self._simulator.state.plasticity_rules.index(self)))
         return recording_data

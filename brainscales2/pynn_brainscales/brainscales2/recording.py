@@ -7,7 +7,7 @@ import quantities as pq
 import pyNN.recording
 import pyNN.errors
 from pynn_brainscales.brainscales2 import simulator
-from dlens_vx_v3 import hal
+from dlens_vx_v3 import hal, halco
 
 
 class MADCRecorderSetting(NamedTuple):
@@ -95,13 +95,15 @@ class Recorder(pyNN.recording.Recorder):
         self._simulator.state.madc_samples = []
 
     # pylint: disable=unused-argument
-    @staticmethod
-    def _get_spiketimes(ids, clear=None):
+    def _get_spiketimes(self, ids, clear=None):
         """Returns a dict containing the neuron_id and its spiketimes."""
         all_spiketimes = {}
         for cell_id in ids:
-            neuron_idx = simulator.state.neuron_placement.id2first_circuit(
-                cell_id)
+            index_on_pop = np.where(self.population.all_cells == cell_id)[0]
+            assert len(index_on_pop) == 1
+            neuron_idx = (simulator.state.populations.index(self.population),
+                          index_on_pop[0],
+                          halco.CompartmentOnLogicalNeuron().value())
             if neuron_idx in simulator.state.spikes:
                 all_spiketimes[cell_id] = simulator.state.spikes[neuron_idx]
         return all_spiketimes
