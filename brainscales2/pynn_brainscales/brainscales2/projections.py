@@ -8,7 +8,7 @@ from pyNN.space import Space
 from pynn_brainscales.brainscales2.standardmodels.synapses import StaticSynapse
 from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.plasticity_rules import PlasticityRuleHandle
-import pygrenade_vx.logical_network as grenade
+import pygrenade_vx.network.placed_logical as grenade
 
 
 class Projection(pyNN.common.Projection):

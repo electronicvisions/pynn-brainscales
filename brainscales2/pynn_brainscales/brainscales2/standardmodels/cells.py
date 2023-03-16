@@ -11,7 +11,7 @@ from pynn_brainscales.brainscales2.recording import Recorder
 from pynn_brainscales.brainscales2.helper import get_values_of_atomic_neuron, \
     decompose_in_member_names
 from dlens_vx_v3 import lola, hal, halco, sta
-import pygrenade_vx.logical_network as grenade
+import pygrenade_vx.network.placed_logical as grenade
 
 from pynn_brainscales.brainscales2.standardmodels.cells_base import \
     NetworkAddableCell

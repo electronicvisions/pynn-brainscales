@@ -10,7 +10,7 @@ from pyNN.common import Population
 from pyNN.standardmodels import build_translations, StandardCellType
 
 from dlens_vx_v3 import lola, halco, hal
-import pygrenade_vx as grenade
+import pygrenade_vx.network.placed_logical as grenade
 
 from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.standardmodels.cells_base import \
@@ -142,8 +142,8 @@ class McNeuronBase(StandardCellType, NetworkAddableCell, ABC):
 
     @staticmethod
     def add_to_network_graph(population: Population,
-                             builder: grenade.logical_network.NetworkBuilder) \
-            -> grenade.logical_network.PopulationDescriptor:
+                             builder: grenade.NetworkBuilder) \
+            -> grenade.PopulationDescriptor:
         # pyNN is more performant when operating on integer cell ids
         pop_cells_int = np.asarray(population.all_cells, dtype=int)
 
@@ -154,27 +154,26 @@ class McNeuronBase(StandardCellType, NetworkAddableCell, ABC):
 
         # create receptors
         receptors = set([
-            grenade.logical_network.Receptor(
-                grenade.logical_network.Receptor.ID(),
-                grenade.logical_network.Receptor.Type.excitatory),
-            grenade.logical_network.Receptor(
-                grenade.logical_network.Receptor.ID(),
-                grenade.logical_network.Receptor.Type.inhibitory),
+            grenade.Receptor(
+                grenade.Receptor.ID(),
+                grenade.Receptor.Type.excitatory),
+            grenade.Receptor(
+                grenade.Receptor.ID(),
+                grenade.Receptor.Type.inhibitory),
         ])
 
         neurons = []
         for coord in coords:
             comps = {}
             for comp_id, comp in population.celltype.compartments.items():
-                spike_master = grenade.logical_network.Population.Neuron\
+                spike_master = grenade.Population.Neuron\
                     .Compartment.SpikeMaster(0, True)
-                comps[comp_id] = grenade.logical_network.Population.Neuron\
+                comps[comp_id] = grenade.Population.Neuron\
                     .Compartment(spike_master, [receptors] * comp.size)
 
-            neurons.append(grenade.logical_network.Population.Neuron(coord,
-                                                                     comps))
+            neurons.append(grenade.Population.Neuron(coord, comps))
         # create grenade population
-        gpopulation = grenade.logical_network.Population(neurons)
+        gpopulation = grenade.Population(neurons)
         # add to builder
         descriptor = builder.add(gpopulation)
 
@@ -195,7 +194,7 @@ class McNeuronBase(StandardCellType, NetworkAddableCell, ABC):
         # TODO JJK: allow to record different compartments (and circuits)
         # add MADC recording
         assert len(readout_cell_idxs) == 1, "Number of readout cells != 1."
-        madc_recording = grenade.logical_network.MADCRecording()
+        madc_recording = grenade.MADCRecording()
         madc_recording.population = descriptor
         madc_recording.source = simulator.state.madc_recorder.readout_source
         madc_recording.neuron_on_population = readout_cell_idxs[0]
@@ -209,7 +208,7 @@ class McNeuronBase(StandardCellType, NetworkAddableCell, ABC):
     @staticmethod
     def add_to_input_generator(
             population: Population,
-            builder: grenade.logical_network.InputGenerator):
+            builder: grenade.InputGenerator):
         pass
 
     @classmethod

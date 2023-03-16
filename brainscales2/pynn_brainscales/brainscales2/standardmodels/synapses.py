@@ -62,11 +62,11 @@ class StaticRecordingSynapse(
         def _get_observables(self):
             observables = set(
                 getattr(
-                    grenade.network
+                    grenade.network.placed_atomic
                     .OnlyRecordingPlasticityRuleGenerator.Observable,
                     obs)
                 for obs in self._recording_observables)
-            grenade_generator = grenade.network\
+            grenade_generator = grenade.network.placed_atomic\
                 .OnlyRecordingPlasticityRuleGenerator(observables)
             return grenade_generator.generate().recording.observables
 
@@ -78,21 +78,21 @@ class StaticRecordingSynapse(
         observables = property(_get_observables, _set_observables)
 
         def add_to_network_graph(
-                self, builder: grenade.logical_network.NetworkBuilder) \
-                -> grenade.logical_network.PlasticityRuleDescriptor:
+                self, builder: grenade.network.placed_logical.NetworkBuilder) \
+                -> grenade.network.placed_logical.PlasticityRuleDescriptor:
             observables = set(
                 getattr(
-                    grenade.network
+                    grenade.network.placed_atomic
                     .OnlyRecordingPlasticityRuleGenerator.Observable,
                     obs)
                 for obs in self._recording_observables)
-            grenade_generator = grenade.network\
+            grenade_generator = grenade.network.placed_atomic\
                 .OnlyRecordingPlasticityRuleGenerator(observables)
             plasticity_rule = grenade_generator.generate()
             logical_plasticity_rule = \
-                grenade.logical_network.PlasticityRule()
+                grenade.network.placed_logical.PlasticityRule()
             logical_plasticity_rule.projections = [
-                grenade.logical_network.ProjectionDescriptor(
+                grenade.network.placed_logical.ProjectionDescriptor(
                     self._simulator.state.projections.index(proj))
                 for proj in self._projections]
             logical_plasticity_rule.timer = self.timer.to_grenade()

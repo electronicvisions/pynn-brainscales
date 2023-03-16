@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC
 
 from pyNN.common import Population
-import pygrenade_vx.logical_network as grenade
+import pygrenade_vx.network.placed_logical as grenade
 
 
 class NetworkAddableCell(ABC):

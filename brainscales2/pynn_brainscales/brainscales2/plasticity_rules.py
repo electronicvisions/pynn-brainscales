@@ -3,7 +3,7 @@ from typing import Dict, Optional, Union
 import textwrap
 from pyNN.common import Projection, Population
 from pynn_brainscales.brainscales2 import simulator
-import pygrenade_vx.logical_network as grenade
+import pygrenade_vx.network.placed_logical as grenade
 import pygrenade_vx.signal_flow as grenade_signal_flow
 from dlens_vx_v3 import hal, halco
 
