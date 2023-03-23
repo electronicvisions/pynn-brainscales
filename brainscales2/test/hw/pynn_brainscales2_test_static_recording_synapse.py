@@ -9,8 +9,8 @@ class TestStaticRecordingSynapse(unittest.TestCase):
     def test_main(self):
         weights = main()
         self.assertEqual(len(weights), 1)
-        self.assertGreaterEqual(weights[0].chip_time, 4 * 125 * 1000)
-        self.assertLessEqual(weights[0].chip_time, 6 * 125 * 1000)
+        self.assertGreaterEqual(weights[0].time, 4 * 125 * 1000)
+        self.assertLessEqual(weights[0].time, 6 * 125 * 1000)
         self.assertEqual(len(weights[0].data), 1)
         self.assertEqual(weights[0].data[0], [63])
 
