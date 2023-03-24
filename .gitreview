@@ -2,6 +2,6 @@
 host=gerrit.bioai.eu
 port=29418
 project=pynn-brainscales
-defaultbranch=master
+defaultbranch=ebrains-4.0
 defaultremote=review
 defaultrebase=0

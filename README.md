@@ -46,7 +46,7 @@ c make -C symwaf2ic
 ln -s symwaf2ic/waf
 
 # 5) Setup your workspace and clone all dependencies (--clone-depth=1 to skip history)
-c ./waf setup --repo-db-url=https://github.com/electronicvisions/projects --project=pynn-brainscales
+c ./waf setup --repo-db-url=https://github.com/electronicvisions/projects --project=pynn-brainscales --release-branch=ebrains-4.0
 
 # 6) Build the project
 #    Adjust -j1 to your own needs, beware that high parallelism will increase memory consumption!
