@@ -99,7 +99,8 @@ class Recorder(pyNN.recording.Recorder):
         """Returns a dict containing the neuron_id and its spiketimes."""
         all_spiketimes = {}
         for cell_id in ids:
-            index_on_pop = np.where(self.population.all_cells == cell_id)[0]
+            index_on_pop = np.where(
+                self.population.all_cells == int(cell_id))[0]
             assert len(index_on_pop) == 1
             neuron_idx = (simulator.state.populations.index(self.population),
                           index_on_pop[0],
