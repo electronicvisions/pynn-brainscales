@@ -364,14 +364,15 @@ class State(BaseState):
     def _get_synaptic_observables(
             self,
             network_graph: grenade.network.placed_logical.NetworkGraph,
-            outputs: grenade.signal_flow.IODataMap) -> Dict[str, np.ndarray]:
+            outputs: grenade.signal_flow.IODataMap
+    ) -> List[Dict[str, np.ndarray]]:
         """
         Get synaptic observables.
         :param network_graph: Network graph to use for lookup of
-                              plasticity rule descriptor
+                              plasticity rule descriptor.
         :param outputs: All outputs of a single execution to extract
-                        samples from
-        :return: Dict over projections and recorded data
+                        samples from.
+        :return: List over projections and recorded data.
         """
 
         observables = [{} for projection in self.projections]

@@ -143,8 +143,8 @@ class PlasticityRule:
         :return: PPU-code of plasticity-rule kernel as string.
         """
         return textwrap.dedent("""
-        #include "libnux/vx/location.h"
         #include "grenade/vx/ppu/synapse_array_view_handle.h"
+        #include "grenade/vx/ppu/neuron_view_handle.h"
 
         using namespace grenade::vx::ppu;
         using namespace libnux::vx;
@@ -152,7 +152,7 @@ class PlasticityRule:
         template <size_t N>
         void PLASTICITY_RULE_KERNEL(
             [[maybe_unused]] std::array<SynapseArrayViewHandle, N>& synapses,
-            [[maybe_unused]] std::array<PPUOnDLS, N> const& synrams)
+            [[maybe_unused]] std::array<NeuronViewHandle, 0>& neurons)
         {}
         """)
 
@@ -182,12 +182,13 @@ class PlasticityRule:
             outputs: grenade_signal_flow.IODataMap) \
             -> grenade.PlasticityRule.RecordingData:
         """
-        Get synaptic observables of plasticity rule.
+        Get synaptic and neuron observables of plasticity rule.
+
         :param network_graph: Network graph to use for lookup of
-                              MADC output vertex descriptor
+                              MADC output vertex descriptor.
         :param outputs: All outputs of a single execution to extract
-                        samples from
-        :return: Recording data
+                        samples from.
+        :return: Recording data.
         """
 
         recording_data = grenade\
