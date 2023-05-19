@@ -4,6 +4,8 @@ import unittest
 import numpy as np
 import pynn_brainscales.brainscales2 as pynn
 from pynn_brainscales import errors, parameters
+from pynn_brainscales.brainscales2.morphology import create_mc_neuron, \
+    Compartment, SharedLineConnection
 
 
 # To be added: PopulationView Test
@@ -11,6 +13,17 @@ _simulator = pynn.simulator
 
 
 class TestAPopulation(unittest.TestCase):
+
+    @staticmethod
+    def _define_mc_neuron_class():
+        comp_0 = Compartment(positions=[0], label='label0',
+                             connect_shared_line=[0])
+        comp_1 = Compartment(positions=[1], label='label1',
+                             connect_conductance=[(1, 200)])
+        return create_mc_neuron(
+            'McNeuron',
+            compartments=[comp_0, comp_1],
+            connections=[SharedLineConnection(start=0, stop=1, row=0)])
 
     def setUp(self):
         pynn.setup()
@@ -24,6 +37,10 @@ class TestAPopulation(unittest.TestCase):
                 exponential_enable=True))
         self.hxpop4 = pynn.Population(
             2, pynn.cells.HXNeuron(leak_i_bias=[100, 150]))
+
+        McNeuron = self._define_mc_neuron_class()
+        self.mcpop1 = pynn.Population(1, McNeuron())
+
         # test old API support
         self.hxpop5 = pynn.Population(
             2, pynn.cells.HXNeuron, cellparams={'leak_i_bias': [100, 200]})
@@ -178,6 +195,22 @@ class TestAPopulation(unittest.TestCase):
         # MADC record for pop view of size larger one should throw
         with self.assertRaises(ValueError):
             self.hxpop2[0, 2].record("v")
+
+        # test locations argument
+        for location in ['label0', 'label1']:
+            self.mcpop1.record('v', locations=[location])
+            self.mcpop1.record(None)
+            self.mcpop1[0:1].record('v', locations=[location])
+            self.mcpop1[0:1].record(None)
+
+        # non-existent label
+        with self.assertRaises(ValueError):
+            self.mcpop1.record('v', locations=['non_existent_label'])
+        self.mcpop1.record(None)
+
+        # MADC can only record a single site
+        with self.assertRaises(ValueError):
+            self.mcpop1.record('v', locations=['label0', 'label1'])
 
 
 class TestLolaNeuronConstruction(unittest.TestCase):

@@ -209,9 +209,9 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
         # get recorder configuration
         enable_record_spikes = np.zeros((len(coords)), dtype=bool)
         if "spikes" in population.recorder.recorded:
-            enable_record_spikes = np.isin(
-                pop_cells_int,
-                list(population.recorder.recorded["spikes"]))
+            recording_ids = [neuron_comp[0] for neuron_comp in
+                             population.recorder.recorded["spikes"]]
+            enable_record_spikes = np.isin(pop_cells_int, recording_ids)
         # create neurons
         neurons: List[grenade.Population.Neuron] = [
             grenade.Population.Neuron(
@@ -249,7 +249,7 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
         madc_recording.source = simulator.state.madc_recorder.readout_source
         madc_recording.neuron_on_population = readout_cell_idxs[0]
         madc_recording.compartment_on_neuron = \
-            halco.CompartmentOnLogicalNeuron()
+            simulator.state.madc_recorder.comp_id
         madc_recording.atomic_neuron_on_compartment = 0
         builder.add(madc_recording)
 

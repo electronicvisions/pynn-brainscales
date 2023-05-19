@@ -9,6 +9,27 @@ from pynn_brainscales.brainscales2.recording import Recorder
 class Assembly(pyNN.common.Assembly):
     _simulator = simulator
 
+    # Note: Forward `location` argument. Rest of implementation identical to
+    # upstream PyNN.
+    def record(self, variables, to_file=None, sampling_interval=None,
+               locations=None):
+        """
+        Record the specified variable or variables for all cells in the
+        Assembly.
+
+        `variables` may be either a single variable name or a list of variable
+        names. For a given celltype class, `celltype.recordable` contains a
+        list of variables that can be recorded for that celltype.
+
+        If specified, `to_file` should be either a filename or a Neo IO
+        instance and `write_data()` will be automatically called when `end()`
+        is called.
+
+        `locations` defines where the variables should be recorded.
+        """
+        for pop in self.populations:
+            pop.record(variables, to_file, sampling_interval, locations)
+
 
 # pylint:disable=abstract-method
 class Population(pyNN.common.Population):
@@ -145,6 +166,48 @@ class Population(pyNN.common.Population):
             raise AttributeError("calib_target not available for celltype "
                                  f"{type(self.celltype)}")
 
+    # Note: Forward `location` argument. Rest of implementation identical to
+    # upstream PyNN.
+    def record(self, variables, to_file=None, sampling_interval=None,
+               locations=None):
+        """
+        Record the specified variable or variables for all cells in the
+        Population or view.
+
+        `variables` may be either a single variable name or a list of variable
+        names. For a given celltype class, `celltype.recordable` contains a
+        list of variables that can be recorded for that celltype.
+
+        If specified, `to_file` should be either a filename or a Neo IO
+        instance and `write_data()` will be automatically called when `end()`
+        is called.
+
+        `sampling_interval` should be a value in milliseconds, and an integer
+        multiple of the simulation timestep.
+
+        `locations` defines where the variables should be recorded.
+        """
+        if variables is None:  # reset the list of things to record
+            # note that if record(None) is called on a view of a population
+            # recording will be reset for the entire population, not just the
+            # view
+            self.recorder.reset()
+        else:
+            self._simulator.state.log.debug("%s.record('%s')",
+                                            self.label, variables)
+            if self._record_filter is None:
+                self.recorder.record(variables, self.all_cells,
+                                     sampling_interval,
+                                     locations)
+            else:
+                self.recorder.record(variables, self._record_filter,
+                                     sampling_interval,
+                                     locations)
+        if isinstance(to_file, str):
+            self.recorder.file = to_file
+            self._simulator.state.write_on_end.append((self, variables,
+                                                      self.recorder.file))
+
 
 # pylint:disable=abstract-method
 class PopulationView(pyNN.common.PopulationView):
@@ -198,3 +261,5 @@ class PopulationView(pyNN.common.PopulationView):
             # pylint:disable=raise-missing-from
             raise AttributeError("calib_target not available for celltype "
                                  f"{type(self.celltype)}")
+
+    record = Population.record

@@ -15,7 +15,7 @@ import pygrenade_vx.network.placed_logical as grenade
 from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.standardmodels.cells_base import \
     NetworkAddableCell
-from pynn_brainscales.brainscales2.recording import Recorder
+from pynn_brainscales.brainscales2.recording import Recorder, RecordingSite
 from pynn_brainscales.brainscales2.helper import decompose_in_member_names, \
     get_values_of_atomic_neuron
 from pynn_brainscales.brainscales2.morphology.parameters import \
@@ -144,13 +144,10 @@ class McNeuronBase(StandardCellType, NetworkAddableCell, ABC):
     def add_to_network_graph(population: Population,
                              builder: grenade.NetworkBuilder) \
             -> grenade.PopulationDescriptor:
-        # pyNN is more performant when operating on integer cell ids
-        pop_cells_int = np.asarray(population.all_cells, dtype=int)
-
         # get neuron coordinates
         coords: List[halco.LogicalNeuronOnDLS] = \
             simulator.state.neuron_placement.id2logicalneuron(
-                population.all_cells)  # pop_cells_int is slower here
+                population.all_cells)
 
         # create receptors
         receptors = set([
@@ -163,11 +160,13 @@ class McNeuronBase(StandardCellType, NetworkAddableCell, ABC):
         ])
 
         neurons = []
-        for coord in coords:
+        for cell_id, coord in zip(population.all_cells, coords):
             comps = {}
             for comp_id, comp in population.celltype.compartments.items():
+                record = RecordingSite(cell_id, comp_id) in \
+                    population.recorder.recorded["spikes"]
                 spike_master = grenade.Population.Neuron\
-                    .Compartment.SpikeMaster(0, True)
+                    .Compartment.SpikeMaster(0, record)
                 comps[comp_id] = grenade.Population.Neuron\
                     .Compartment(spike_master, [receptors] * comp.size)
 
@@ -186,12 +185,24 @@ class McNeuronBase(StandardCellType, NetworkAddableCell, ABC):
                 & set(Recorder.madc_variables)):
             return descriptor
 
+        madc_recording = McNeuronBase._get_madc_recording(population,
+                                                          descriptor)
+        builder.add(madc_recording)
+
+        return descriptor
+
+    @staticmethod
+    def _get_madc_recording(population: Population,
+                            descriptor: grenade.PopulationDescriptor
+                            ) -> grenade.MADCRecording:
+        # pyNN is more performant when operating on integer cell ids
+        pop_cells_int = np.asarray(population.all_cells, dtype=int)
+
         # Find the recorded cell
         readout_cell_idxs = np.where(pop_cells_int
                                      == int(simulator.state.
                                             madc_recorder.cell_id))[0]
 
-        # TODO JJK: allow to record different compartments (and circuits)
         # add MADC recording
         assert len(readout_cell_idxs) == 1, "Number of readout cells != 1."
         madc_recording = grenade.MADCRecording()
@@ -199,11 +210,9 @@ class McNeuronBase(StandardCellType, NetworkAddableCell, ABC):
         madc_recording.source = simulator.state.madc_recorder.readout_source
         madc_recording.neuron_on_population = readout_cell_idxs[0]
         madc_recording.compartment_on_neuron = \
-            halco.CompartmentOnLogicalNeuron()
+            simulator.state.madc_recorder.comp_id
         madc_recording.atomic_neuron_on_compartment = 0
-        builder.add(madc_recording)
-
-        return descriptor
+        return madc_recording
 
     @staticmethod
     def add_to_input_generator(
