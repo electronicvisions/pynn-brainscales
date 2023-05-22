@@ -4,8 +4,9 @@ from typing import Dict, Union, Set
 from pyNN import common, space, errors
 from pyNN.recording import get_io
 from pyNN.common.control import DEFAULT_MAX_DELAY, DEFAULT_MIN_DELAY
-from pyNN.connectors import AllToAllConnector, OneToOneConnector, \
-    FixedProbabilityConnector, DistanceDependentProbabilityConnector, \
+from pynn_brainscales.brainscales2.connectors import AllToAllConnector, \
+    OneToOneConnector, FixedProbabilityConnector, \
+    DistanceDependentProbabilityConnector, \
     DisplacementDependentProbabilityConnector, \
     IndexBasedProbabilityConnector, FromListConnector, FromFileConnector, \
     FixedNumberPreConnector, FixedNumberPostConnector, SmallWorldConnector, \

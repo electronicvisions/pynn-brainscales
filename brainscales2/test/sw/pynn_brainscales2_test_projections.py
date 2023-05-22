@@ -3,11 +3,24 @@
 import unittest
 import pynn_brainscales.brainscales2 as pynn
 
+from pynn_brainscales.brainscales2.morphology import create_mc_neuron, \
+    Compartment, SharedLineConnection
+from dlens_vx_v3 import halco
+
 
 # TODO: Add test for other connectors (cf. feature #3646)
 # TODO: Add test for random numbers (cf. feature #3647)
 
 class TestProjection(unittest.TestCase):
+    @staticmethod
+    def _define_mc_neuron_class():
+        comp_0 = Compartment(positions=[0], label='label0',
+                             connect_shared_line=[0])
+        comp_1 = Compartment(positions=[1], label='label1',
+                             connect_conductance=[(1, 200)])
+        return create_mc_neuron(
+            'McNeuron', compartments=[comp_0, comp_1],
+            connections=[SharedLineConnection(start=0, stop=1, row=0)])
 
     def setUp(self):
         pynn.setup()
@@ -15,6 +28,10 @@ class TestProjection(unittest.TestCase):
         self.pop2 = pynn.Population(1, pynn.cells.HXNeuron())
         self.pop3 = pynn.Population(2, pynn.cells.HXNeuron())
         self.pop4 = pynn.Population(3, pynn.cells.HXNeuron())
+
+        McNeuron = self._define_mc_neuron_class()
+        self.mc_pop1 = pynn.Population(1, McNeuron())
+        self.mc_pop2 = pynn.Population(2, McNeuron())
 
     def tearDown(self):
         pynn.end()
@@ -106,6 +123,54 @@ class TestProjection(unittest.TestCase):
                                pynn.AllToAllConnector(),
                                synapse_type=synapse)
         self.assertEqual(proj.get("weight", format="list"), [(0, 0, 32)])
+
+    def test_locations(self):
+        # default to first compartment if no location is specified
+        proj = pynn.Projection(self.pop1, self.mc_pop1,
+                               pynn.AllToAllConnector())
+        self.assertEqual(proj.pre_compartment,
+                         halco.CompartmentOnLogicalNeuron())
+        self.assertEqual(proj.post_compartment,
+                         halco.CompartmentOnLogicalNeuron())
+
+        # location_selector
+        proj = pynn.Projection(
+            self.pop1, self.mc_pop1,
+            pynn.AllToAllConnector(location_selector='label1'))
+        self.assertEqual(proj.pre_compartment,
+                         halco.CompartmentOnLogicalNeuron())
+        self.assertEqual(proj.post_compartment,
+                         halco.CompartmentOnLogicalNeuron(1))
+
+        # source_locations
+        proj = pynn.Projection(
+            self.mc_pop1, self.pop3,
+            pynn.AllToAllConnector(source_location_selector='label1'))
+        self.assertEqual(proj.pre_compartment,
+                         halco.CompartmentOnLogicalNeuron(1))
+        self.assertEqual(proj.post_compartment,
+                         halco.CompartmentOnLogicalNeuron())
+
+        # both set
+        proj = pynn.Projection(
+            self.mc_pop1, self.mc_pop2,
+            pynn.AllToAllConnector(source_location_selector='label1',
+                                   location_selector='label1'))
+        self.assertEqual(proj.pre_compartment,
+                         halco.CompartmentOnLogicalNeuron(1))
+        self.assertEqual(proj.post_compartment,
+                         halco.CompartmentOnLogicalNeuron(1))
+
+        # location for point neuron
+        with self.assertRaises(ValueError):
+            proj = pynn.Projection(
+                self.pop1, self.mc_pop1,
+                pynn.AllToAllConnector(source_location_selector='label1'))
+        # undefined location
+        with self.assertRaises(ValueError):
+            proj = pynn.Projection(
+                self.pop1, self.mc_pop1,
+                pynn.AllToAllConnector(location_selector='undefined_location'))
 
 
 if __name__ == '__main__':

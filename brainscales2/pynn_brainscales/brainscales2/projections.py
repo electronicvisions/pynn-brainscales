@@ -9,6 +9,7 @@ from pynn_brainscales.brainscales2.standardmodels.synapses import StaticSynapse
 from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.plasticity_rules import PlasticityRuleHandle
 import pygrenade_vx.network as grenade
+from dlens_vx_v3 import halco
 
 
 class Projection(pyNN.common.Projection):
@@ -73,6 +74,39 @@ class Projection(pyNN.common.Projection):
 
         self._simulator.state.projections.append(self)
         self.changed_since_last_run = True
+
+        # determine from which to which compartment the connection will be
+        # established
+        self.pre_compartment = halco.CompartmentOnLogicalNeuron()
+        if connector.source_location_selector is not None:
+            pre = self.pre.grandparent if hasattr(self.pre, "grandparent")\
+                else self.pre
+            self.pre_compartment = \
+                self._get_comp_id_from_location(
+                    connector.source_location_selector, pre.celltype)
+        self.post_compartment = halco.CompartmentOnLogicalNeuron()
+        if connector.location_selector is not None:
+            post = self.post.grandparent if hasattr(self.post, "grandparent")\
+                else self.post
+            self.post_compartment = \
+                self._get_comp_id_from_location(connector.location_selector,
+                                                post.celltype)
+
+    @staticmethod
+    def _get_comp_id_from_location(location: str, celltype
+                                   ) -> halco.CompartmentOnLogicalNeuron:
+        try:
+            comp_ids = celltype.get_compartment_ids([location])
+        except AttributeError as err:
+            raise ValueError(
+                'Can not extract recording locations for celltype '
+                f'"{celltype.__class__.__name__}".') from err
+        if len(comp_ids) == 0:
+            raise ValueError(f'Label "{location}" does not exist.')
+        if len(comp_ids) > 1:
+            raise ValueError(f'Label "{location}" matches more than one '
+                             'compartment.')
+        return comp_ids[0]
 
     def __setattr__(self, name, value):
         # Handle (de-)registering of projection in plasticity rule.
@@ -162,9 +196,9 @@ class Projection(pyNN.common.Projection):
         connections = np.empty((len(projection.connections), 5), dtype=int)
         for i, conn in enumerate(projection.connections):
             connections[i, 0] = conn.pop_pre_index
-            connections[i, 1] = 0
+            connections[i, 1] = int(projection.pre_compartment)
             connections[i, 2] = conn.pop_post_index
-            connections[i, 3] = 0
+            connections[i, 3] = int(projection.post_compartment)
             connections[i, 4] = int(abs(conn.weight))
 
         if projection.receptor_type == "excitatory":
