@@ -230,6 +230,8 @@ class State(BaseState):
     def __init__(self):
         super().__init__()
 
+        # BSS hardware can only record IrregularlySampledSignal
+        self.record_sample_times = True
         self.spikes = []
         self.times = []
         self.madc_samples = []

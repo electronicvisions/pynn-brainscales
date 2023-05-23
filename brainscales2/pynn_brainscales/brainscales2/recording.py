@@ -164,77 +164,151 @@ class Recorder(pyNN.recording.Recorder):
 
     # Patch to support multi-compartmental neuron models and to allow recording
     # observables at different locations.
-    # pylint: disable=too-many-locals,consider-using-f-string
-    def _get_current_segment(
-            self,
-            filter_ids=None,
-            variables='all',
-            clear=False):
-        segment = neo.Segment(
-            name="segment%03d" % self._simulator.state.segment_counter,
-            description=self.population.describe(),
-            rec_datetime=datetime.now())
+    # Specifically, we add the location infomation as well the compartment id
+    # as an annotation to recorded spike trains and analog signals.
+    # Furthermore, we return `RecordingSite` in `filter_recorded()` which
+    # consist of the cell id as well as comaprtment id. This has to be handled.
+    # pylint: disable=too-many-locals,consider-using-f-string,line-too-long,invalid-name,unreachable,no-member,no-else-raise,too-many-branches,too-many-statements,redefined-builtin
+    def _get_current_segment(self, filter_ids=None, variables='all', clear=False):
+        segment = neo.Segment(name="segment%03d" % self._simulator.state.segment_counter,
+                              description=self.population.describe(),
+                              # would be nice to get the time at the start of the recording,
+                              # not the end
+                              rec_datetime=datetime.now())
         variables_to_include = set(self.recorded.keys())
         if variables != 'all':
-            variables_to_include = variables_to_include.\
-                intersection(set(variables))
+            variables_to_include = variables_to_include.intersection(set(variables))
         for variable in variables_to_include:
             if variable == 'spikes':
-                t_stop = self._simulator.state.t * pq.ms
+                t_stop = self._simulator.state.t * pq.ms  # must run on all MPI nodes
                 sids = sorted(self.filter_recorded('spikes', filter_ids))
                 data = self._get_spiketimes(sids, clear=clear)
 
-                segment.spiketrains = []
-                for identifier in sids:
-                    times = pq.Quantity(data.get(identifier, []), pq.ms)
+                if isinstance(data, dict):
+                    for id in sids:
+                        times = pq.Quantity(data.get(id, []), pq.ms)
+                        if times.size > 0 and times.max() > t_stop:
+                            warn("Recorded at least one spike after t_stop")
+                            times = times[times <= t_stop]
+                        location = self._get_location_label(id.comp_id)
+                        segment.spiketrains.append(
+                            neo.SpikeTrain(
+                                times,
+                                t_start=self._recording_start_time,
+                                t_stop=t_stop,
+                                units='ms',
+                                source_population=self.population.label,
+                                source_id=int(id.cell_id),
+                                source_location=location,
+                                source_compartment=int(id.comp_id),
+                                source_index=self.population.id_to_index(int(id.cell_id)))
+                        )
+                        for train in segment.spiketrains:
+                            train.segment = segment
+                else:
+                    raise RuntimeError("This code path is not needed for "
+                                       "BSS-2 and should not be reached.")
+
+                    assert isinstance(data, tuple)
+                    id_array, times = data
+                    times *= pq.ms
                     if times.size > 0 and times.max() > t_stop:
                         warn("Recorded at least one spike after t_stop")
-                        times = times[times <= t_stop]
-                    location = self._get_location_label(identifier.comp_id)
-                    segment.spiketrains.append(
-                        neo.SpikeTrain(
-                            times,
-                            t_start=self._recording_start_time,
-                            t_stop=t_stop,
-                            units='ms',
-                            source_population=self.population.label,
-                            source_id=int(identifier.cell_id),
-                            source_location=location,
-                            source_compartment=int(identifier.comp_id),
-                            source_index=self.population.id_to_index(
-                                int(identifier.cell_id)))
+                        mask = times <= t_stop
+                        times = times[mask]
+                        id_array = id_array[mask]
+                    segment.spiketrains = neo.spiketrainlist.SpikeTrainList.from_spike_time_array(
+                        times, id_array,
+                        np.array(sids, dtype=int),
+                        t_stop=t_stop,
+                        units="ms",
+                        t_start=self._recording_start_time,
+                        source_population=self.population.label
                     )
+                    segment.spiketrains.segment = segment
             else:
-                if variable not in Recorder.madc_variables:
-                    raise ValueError(
-                        "Only implemented for membrane potential 'v' and "
-                        + "technical parameters: '{exc,inh}_synin', "
-                        + "'adaptation'.")
                 ids = sorted(self.filter_recorded(variable, filter_ids))
-                if not ids:
-                    # don't add a signal when no ids of the requested selection
-                    # were recorded
-                    continue
-                assert len(ids) == 1
-                if simulator.state.times.size > 0:
+                signal_array, times_array = self._get_all_signals(variable, ids, clear=clear)
+                mpi_node = self._simulator.state.mpi_rank  # for debugging
+                if signal_array.size > 0:
+                    # may be empty if none of the recorded cells are on this MPI node
                     units = self.population.find_units(variable)
-                    index_array = np.array(
-                        [self.population.id_to_index(myid.cell_id) for myid in
-                         ids])
-                    location = self._get_location_label(ids[0].comp_id)
-                    signal = neo.IrregularlySampledSignal(
-                        times=simulator.state.times,
-                        signal=simulator.state.madc_samples,
-                        units=units,
-                        time_units='ms',
-                        name=variable,
-                        source_population=self.population.label,
-                        source_ids=np.array([ids[0].cell_id]),
-                        source_locations=np.array([location]),
-                        source_compartments=np.array([int(ids[0].comp_id)]),
-                        array_annotations={"channel_index": index_array})
-                    segment.irregularlysampledsignals.append(signal)  # pylint: disable=no-member
+                    source_ids = np.array([int(id.cell_id) for id in ids])
+                    channel_index = np.array([self.population.id_to_index(id.cell_id) for id in ids])
+                    if self.record_times:
+                        if signal_array.shape == times_array.shape:
+                            raise RuntimeError("This code path is not needed for "
+                                               "BSS-2 and should not be reached.")
+                            # in the current version of Neo, all channels in
+                            # IrregularlySampledSignal must have the same sample times,
+                            # so we need to create here a list of signals
+                            signals = [
+                                neo.IrregularlySampledSignal(
+                                    times_array[:, i],
+                                    signal_array[:, i],
+                                    units=units,
+                                    time_units=pq.ms,
+                                    name=variable,
+                                    source_ids=[int(cell_id.cell_id)],
+                                    source_population=self.population.label,
+                                    array_annotations={"channel_index": [self.population.id_to_index(cell_id.cell_id)]}
+                                )
+                                for i, cell_id in enumerate(ids)
+                            ]
+                        else:
+
+                            # all channels have the same sample times
+                            assert signal_array.shape[0] == times_array.size
+                            signals = [
+                                neo.IrregularlySampledSignal(
+                                    times_array, signal_array, units=units, time_units=pq.ms,
+                                    name=variable, source_ids=source_ids,
+                                    source_population=self.population.label,
+                                    source_locations=[self._get_location_label(cell_id.comp_id) for cell_id in ids],
+                                    source_compartments=[int(cell_id.comp_id) for cell_id in ids],
+                                    array_annotations={"channel_index": channel_index}
+                                )
+                            ]
+                        segment.irregularlysampledsignals.extend(signals)
+                        for signal in signals:
+                            signal.segment = segment
+                    else:
+                        raise RuntimeError("This code path is not needed for "
+                                           "BSS-2 and should not be reached.")
+
+                        t_start = self._recording_start_time
+                        t_stop = self._simulator.state.t * pq.ms
+                        sampling_period = self.sampling_interval * pq.ms
+                        current_time = self._simulator.state.t * pq.ms
+                        signal = neo.AnalogSignal(
+                            signal_array,
+                            units=units,
+                            t_start=t_start,
+                            sampling_period=sampling_period,
+                            name=variable, source_ids=source_ids,
+                            source_population=self.population.label,
+                            array_annotations={"channel_index": channel_index}
+                        )
+                        assert signal.t_stop - current_time - 2 * sampling_period < 1e-10
+                        self._simulator.state.log.debug(
+                            "%d **** ids=%s, channels=%s", mpi_node,
+                            source_ids, signal.array_annotations["channel_index"])
+                        segment.analogsignals.append(signal)
+                        signal.segment = segment
         return segment
+
+    def _get_all_signals(self, variable, ids, clear=None):
+        del clear  # not implemented
+        assert len(ids) < 2
+        if len(ids) == 0:
+            return np.array([]), np.array([])
+        if variable not in Recorder.madc_variables:
+            raise ValueError("Only implemented for membrane potential 'v' and"
+                             + "technical parameters: '{exc,inh}_synin', "
+                             + "'adaptation'.")
+        signals = np.array([self._simulator.state.madc_samples]).T, \
+            self._simulator.state.times
+        return signals
 
     def _local_count(self, variable, filter_ids):
         counts = {}
