@@ -5,7 +5,7 @@ from pathlib import Path
 from dlens_vx_v3 import sta, hxcomm, lola
 
 
-def chip_from_portable_binary(data: bytes) -> dict:
+def chip_from_portable_binary(data: bytes) -> lola.Chip:
     """
     Convert portable binary data to chip object.
 
@@ -17,7 +17,7 @@ def chip_from_portable_binary(data: bytes) -> dict:
     return sta.convert_to_chip(dumper)
 
 
-def chip_from_file(path: str) -> dict:
+def chip_from_file(path: Path) -> lola.Chip:
     """
     Extract chip config from coco file dump
 
@@ -60,7 +60,7 @@ def nightly_calib_url() -> str:
            "spiking_cocolist.pbin"
 
 
-def chip_from_nightly() -> (dict):
+def chip_from_nightly() -> lola.Chip:
     """
     Extract chip config from nightly calibration.
     """
