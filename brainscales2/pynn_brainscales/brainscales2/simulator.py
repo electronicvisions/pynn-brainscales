@@ -329,7 +329,7 @@ class State(BaseState):
         self.segment_counter += 1
 
     @staticmethod
-    def _get_spikes(network_graph: grenade.network.placed_logical.NetworkGraph,
+    def _get_spikes(network_graph: grenade.network.NetworkGraph,
                     outputs: grenade.signal_flow.IODataMap) \
             -> Dict[int, np.ndarray]:
         """
@@ -341,7 +341,7 @@ class State(BaseState):
         :return: Spikes as dict with atomic neuron enum value as key and
                  numpy array of times as value
         """
-        spikes = grenade.network.placed_logical.extract_neuron_spikes(
+        spikes = grenade.network.extract_neuron_spikes(
             outputs, network_graph)
         if not spikes:
             return {}
@@ -349,7 +349,7 @@ class State(BaseState):
         return spikes[0]
 
     @staticmethod
-    def _get_v(network_graph: grenade.network.placed_logical.NetworkGraph,
+    def _get_v(network_graph: grenade.network.NetworkGraph,
                outputs: grenade.signal_flow.IODataMap) -> np.ndarray:
         """
         Get MADC samples with times in ms.
@@ -359,7 +359,7 @@ class State(BaseState):
                         samples from
         :return: Times and sample values as numpy array
         """
-        samples = grenade.network.placed_logical.extract_madc_samples(
+        samples = grenade.network.extract_madc_samples(
             outputs, network_graph)
         if not samples:
             return np.array([], dtype=np.float32), np.array([], dtype=np.int32)
@@ -368,7 +368,7 @@ class State(BaseState):
 
     def _get_synaptic_observables(
             self,
-            network_graph: grenade.network.placed_logical.NetworkGraph,
+            network_graph: grenade.network.NetworkGraph,
             outputs: grenade.signal_flow.IODataMap
     ) -> List[Dict[str, np.ndarray]]:
         """
@@ -392,7 +392,7 @@ class State(BaseState):
 
     def _get_neuronal_observables(
             self,
-            network_graph: grenade.network.placed_logical.NetworkGraph,
+            network_graph: grenade.network.NetworkGraph,
             outputs: grenade.signal_flow.IODataMap) -> Dict[str, np.ndarray]:
         """
         Get neuronal observables.
@@ -415,7 +415,7 @@ class State(BaseState):
 
     def _get_array_observables(
             self,
-            network_graph: grenade.network.placed_logical.NetworkGraph,
+            network_graph: grenade.network.NetworkGraph,
             outputs: grenade.signal_flow.IODataMap) \
             -> List[Dict[str, np.ndarray]]:
         """
@@ -525,7 +525,7 @@ class State(BaseState):
                 return
 
         # generate network
-        network_builder = grenade.network.placed_logical.NetworkBuilder()
+        network_builder = grenade.network.NetworkBuilder()
         for pop in self.populations:
             pop.celltype.add_to_network_graph(
                 pop, network_builder)
@@ -539,20 +539,20 @@ class State(BaseState):
         # route network if required
         routing_result = None
         if self.grenade_network_graph is None \
-                or grenade.network.placed_logical.requires_routing(
+                or grenade.network.requires_routing(
                     network, self.grenade_network_graph):
-            routing_result = grenade.network.placed_logical.build_routing(
+            routing_result = grenade.network.build_routing(
                 network)
 
         self.grenade_network = network
 
         # build or update network graph
         if routing_result is not None:
-            self.grenade_network_graph = grenade.network.placed_logical\
+            self.grenade_network_graph = grenade.network\
                 .build_network_graph(
                     self.grenade_network, routing_result)
         else:
-            grenade.network.placed_logical.update_network_graph(
+            grenade.network.update_network_graph(
                 self.grenade_network_graph, self.grenade_network)
 
     def _reset_changed_since_last_run(self):
@@ -570,7 +570,7 @@ class State(BaseState):
             plasticity_rule.changed_since_last_run = False
 
     def _generate_inputs(
-            self, network_graph: grenade.network.placed_logical.NetworkGraph) \
+            self, network_graph: grenade.network.NetworkGraph) \
             -> grenade.signal_flow.IODataMap:
         """
         Generate external input events from the routed network graph
@@ -578,7 +578,7 @@ class State(BaseState):
         """
         if network_graph.event_input_vertex is None:
             return grenade.signal_flow.IODataMap()
-        input_generator = grenade.network.placed_logical.InputGenerator(
+        input_generator = grenade.network.InputGenerator(
             network_graph)
         for population in self.populations:
             population.celltype.add_to_input_generator(
@@ -813,7 +813,7 @@ class State(BaseState):
         self.log.DEBUG("run(): Preparations finished in "
                        f"{(time_after_preparations - time_begin):.3f}s")
 
-        outputs = grenade.network.placed_logical.run(
+        outputs = grenade.network.run(
             self.conn, self.grenade_chip_config, self.grenade_network_graph,
             inputs, self._generate_playback_hooks())
 

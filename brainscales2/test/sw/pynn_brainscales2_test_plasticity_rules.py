@@ -2,7 +2,7 @@
 
 import unittest
 import numpy as np
-import pygrenade_vx.network.placed_logical as grenade
+import pygrenade_vx.network as grenade
 from dlens_vx_v3 import halco
 import pynn_brainscales.brainscales2 as pynn
 

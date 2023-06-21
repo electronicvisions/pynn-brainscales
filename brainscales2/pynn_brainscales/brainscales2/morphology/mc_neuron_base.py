@@ -10,7 +10,7 @@ from pyNN.common import Population
 from pyNN.standardmodels import build_translations, StandardCellType
 
 from dlens_vx_v3 import lola, halco, hal
-import pygrenade_vx.network.placed_logical as grenade
+import pygrenade_vx.network as grenade
 
 from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.standardmodels.cells_base import \

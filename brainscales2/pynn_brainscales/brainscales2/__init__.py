@@ -261,7 +261,7 @@ def get_pre_realtime_read() -> Dict[halco.Coordinate, hal.Container]:
 
 
 def get_backend_statistics() \
-        -> grenade.network.placed_logical.NetworkGraphStatistics:
+        -> grenade.network.NetworkGraphStatistics:
     """
     Get statistics of placement and routing like amount of time spent and
     number of hardware entities used.
@@ -278,7 +278,7 @@ def get_backend_statistics() \
         raise RuntimeError(
             "Backend statistics are only available after first mapping and"
             " routing execution, which happens in pynn.run().")
-    return grenade.network.placed_logical.extract_statistics(
+    return grenade.network.extract_statistics(
         simulator.state.grenade_network_graph)
 
 

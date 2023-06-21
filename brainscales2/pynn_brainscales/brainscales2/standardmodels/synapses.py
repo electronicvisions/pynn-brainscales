@@ -1,7 +1,7 @@
 from typing import Final, List, Set
 from pyNN.standardmodels import synapses, build_translations
 from pynn_brainscales.brainscales2 import simulator, plasticity_rules
-import pygrenade_vx.network.placed_logical as grenade
+import pygrenade_vx.network as grenade
 
 
 class StaticSynapse(synapses.StaticSynapse):
