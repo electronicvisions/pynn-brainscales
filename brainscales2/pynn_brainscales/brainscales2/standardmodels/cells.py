@@ -841,7 +841,7 @@ class SpikeSourcePoissonOnChip(StandardCellType, NetworkAddableCell):
                 .background_source_clock_frequency / hwrate * prob) - 1))
         # create grenade population
         config = \
-            grenade.BackgroundSpikeSourcePopulation.Config()
+            grenade.BackgroundSourcePopulation.Config()
         config.period = period
         config.rate = rate
         config.seed = hal.BackgroundSpikeSource.Seed(
@@ -849,7 +849,7 @@ class SpikeSourcePoissonOnChip(StandardCellType, NetworkAddableCell):
         config.enable_random = True
         # we need both hemispheres because of possibly arbitrary connection
         # targets
-        gpopulation = grenade.BackgroundSpikeSourcePopulation(
+        gpopulation = grenade.BackgroundSourcePopulation(
             population.size,
             {halco.HemisphereOnDLS(0): population.celltype._padi_bus,
              halco.HemisphereOnDLS(1): population.celltype._padi_bus},
@@ -955,7 +955,7 @@ class SpikeSourcePoisson(cells.SpikeSourcePoisson, NetworkAddableCell):
                              builder: grenade.NetworkBuilder) \
             -> grenade.PopulationDescriptor:
         # create grenade population
-        gpopulation = grenade.ExternalPopulation(
+        gpopulation = grenade.ExternalSourcePopulation(
             population.size)
         # add to builder
         return builder.add(gpopulation)
@@ -996,7 +996,7 @@ class SpikeSourceArray(cells.SpikeSourceArray, NetworkAddableCell):
                              builder: grenade.NetworkBuilder) \
             -> grenade.PopulationDescriptor:
         # create grenade population
-        gpopulation = grenade.ExternalPopulation(
+        gpopulation = grenade.ExternalSourcePopulation(
             population.size)
         # add to builder
         return builder.add(gpopulation)
