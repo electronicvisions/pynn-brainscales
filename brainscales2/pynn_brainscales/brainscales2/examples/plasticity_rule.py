@@ -40,13 +40,13 @@ class PlasticityRule(pynn.PlasticityRule):
         #include "libnux/vx/location.h"
         using namespace grenade::vx::ppu;
         using namespace libnux::vx;
+        extern volatile PPUOnDLS ppu;
+
         void PLASTICITY_RULE_KERNEL(
             std::array<SynapseArrayViewHandle, 1>& synapses,
             std::array<NeuronViewHandle, 0>& /* neurons */)
         {
-            PPUOnDLS location;
-            get_location(location);
-            if (synapses[0].hemisphere != location) {
+            if (synapses[0].hemisphere != ppu) {
                 return;
             }
             SynapseArrayViewHandle::Row zeros;
