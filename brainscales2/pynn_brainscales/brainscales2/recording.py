@@ -82,21 +82,10 @@ class Recorder(pyNN.recording.Recorder):
         else:
             celltype = self.population.celltype
             try:
-                labels = np.asarray(celltype.get_labels())
+                comp_ids = celltype.get_compartment_ids(locations)
             except AttributeError as err:
                 raise RuntimeError('Can not extract recording locations for '
                                    f'celltype "{celltype.__name__}".') from err
-
-            def location_to_ids(location: str) -> np.ndarray:
-                ids = np.where(labels == location)[0]
-                if len(ids) == 0:
-                    raise ValueError(f'Label "{location}" does not exist.')
-                return ids
-
-            indices = np.array([location_to_ids(location) for location
-                                in locations]).flatten()
-            comp_ids = [
-                halco.CompartmentOnLogicalNeuron(index) for index in indices]
 
         return {RecordingSite(n_id, c_id) for n_id, c_id in
                 product(neuron_ids, comp_ids)}

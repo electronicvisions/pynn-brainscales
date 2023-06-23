@@ -2,7 +2,7 @@ from abc import ABC
 from collections.abc import Iterable
 from copy import deepcopy
 import numbers
-from typing import List, Final, Dict, Any
+from typing import List, Final, Dict, Any, Sequence
 
 import numpy as np
 
@@ -219,6 +219,29 @@ class McNeuronBase(StandardCellType, NetworkAddableCell, ABC):
             population: Population,
             builder: grenade.InputGenerator):
         pass
+
+    @classmethod
+    def get_compartment_ids(cls, labels: Sequence[str]
+                            ) -> List[halco.CompartmentOnLogicalNeuron]:
+        '''
+        Get compartment Ids of compartments with the specified labels.
+
+        :param labels: Labels for which to extract the compartment IDs.
+        :return: IDs of compartments for which the given labels match.
+            Note that a single label can match one or more compartment IDS.
+        :raises ValueError: If no compartment can be matched to one of the
+            given labels.
+        '''
+        all_labels = np.asarray(cls.get_labels())
+
+        def label_to_ids(label: str) -> np.ndarray:
+            ids = np.where(all_labels == label)[0]
+            if len(ids) == 0:
+                raise ValueError(f'Label "{label}" does not exist.')
+            return ids
+
+        indices = np.array([label_to_ids(label) for label in labels]).flatten()
+        return [halco.CompartmentOnLogicalNeuron(index) for index in indices]
 
     @classmethod
     def get_labels(cls) -> List[str]:
