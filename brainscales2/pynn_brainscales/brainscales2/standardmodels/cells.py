@@ -228,31 +228,6 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
         # add to builder
         descriptor = builder.add(gpopulation)
 
-        # Terminate early if we don't record
-        if simulator.state.madc_recorder is None:
-            return descriptor
-
-        # MADC enabled, but nothing to record in this population
-        if not (set(population.recorder.recorded)
-                & set(Recorder.madc_variables)):
-            return descriptor
-
-        # Find the recorded cell
-        readout_cell_idxs = np.where(pop_cells_int
-                                     == int(simulator.state.
-                                            madc_recorder.cell_id))[0]
-
-        # add MADC recording
-        assert len(readout_cell_idxs) == 1, "Number of readout cells != 1."
-        madc_recording = grenade.MADCRecording()
-        madc_recording.population = descriptor
-        madc_recording.source = simulator.state.madc_recorder.readout_source
-        madc_recording.neuron_on_population = readout_cell_idxs[0]
-        madc_recording.compartment_on_neuron = \
-            simulator.state.madc_recorder.comp_id
-        madc_recording.atomic_neuron_on_compartment = 0
-        builder.add(madc_recording)
-
         return descriptor
 
     @staticmethod

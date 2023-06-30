@@ -18,8 +18,9 @@ class RecordingSite(NamedTuple):
 
 
 class MADCRecorderSetting(NamedTuple):
-    cell_id: int
-    comp_id: halco.CompartmentOnLogicalNeuron
+    population: int
+    neuron_on_population: int
+    compartment_on_neuron: halco.CompartmentOnLogicalNeuron
     readout_source: hal.NeuronConfig.ReadoutSource
 
 
@@ -32,46 +33,58 @@ class Recorder(pyNN.recording.Recorder):
         super().__init__(population, file=file)
         self.changed_since_last_run = True
 
+    # pylint: disable=too-many-branches
     def _configure_madc(self, variables: Set[str],
                         recording_sites: Set[RecordingSite]):
         if len(variables) == 0 or len(recording_sites) == 0:
             return
         if len(variables) > 1:
-            raise ValueError("Can only set 1 analog record type per chip.")
-        if len(recording_sites) > 1:
-            raise ValueError("Can only record single neuron/location via "
-                             "MADC.")
+            raise ValueError("Can only set 1 analog record type per neuron.")
+        if len(recording_sites) > 2:
+            raise ValueError("Can only record at most two neurons/locations "
+                             "via MADC.")
 
         variable = next(iter(variables))
         assert variable in Recorder.madc_variables
-        recording_site = next(iter(recording_sites))
 
-        readout_source = None
-        if variable == "v":
-            readout_source = hal.NeuronConfig.ReadoutSource.membrane
-        elif variable == "exc_synin":
-            readout_source = hal.NeuronConfig.ReadoutSource.exc_synin
-        elif variable == "inh_synin":
-            readout_source = hal.NeuronConfig.ReadoutSource.inh_synin
-        elif variable == "adaptation":
-            readout_source = hal.NeuronConfig.ReadoutSource.adaptation
-        else:
-            raise RuntimeError("Encountered not handled MADC case.")
+        for recording_site in recording_sites:
+            readout_source = None
+            if variable == "v":
+                readout_source = hal.NeuronConfig.ReadoutSource.membrane
+            elif variable == "exc_synin":
+                readout_source = hal.NeuronConfig.ReadoutSource.exc_synin
+            elif variable == "inh_synin":
+                readout_source = hal.NeuronConfig.ReadoutSource.inh_synin
+            elif variable == "adaptation":
+                readout_source = hal.NeuronConfig.ReadoutSource.adaptation
+            else:
+                raise RuntimeError("Encountered not handled MADC case.")
 
-        madc_recorder = MADCRecorderSetting(cell_id=recording_site.cell_id,
-                                            comp_id=recording_site.comp_id,
-                                            readout_source=readout_source)
+            madc_recorder = MADCRecorderSetting(
+                population=self._simulator.state.populations.index(
+                    self.population),
+                neuron_on_population=int(np.where(
+                    self.population.all_cells
+                    == recording_site.cell_id)[0][0]),
+                compartment_on_neuron=recording_site.comp_id,
+                readout_source=readout_source)
 
-        # check if MADC recorder already set. Ignore if already
-        # existing config is set again.
-        global_madc_rec = self._simulator.state.madc_recorder
-        if global_madc_rec is not None and (global_madc_rec != madc_recorder):
-            raise ValueError(
-                f"Analog record for ID {global_madc_rec.cell_id} of "
-                f"type {global_madc_rec.readout_source} at compartment "
-                f"{global_madc_rec.comp_id} is already active. Only one "
-                "concurrent analog readout supported.")
-        self._simulator.state.madc_recorder = madc_recorder
+            # check if MADC recorder already set. Ignore if already
+            # existing config is set again.
+            if madc_recorder not in self._simulator.state.madc_recorder:
+                if not len(self._simulator.state.madc_recorder) < 2:
+                    raise ValueError(
+                        "Can only record at most two neurons/locations via "
+                        "MADC")
+                for present in self._simulator.state.madc_recorder:
+                    if present.population == madc_recorder.population \
+                            and present.neuron_on_population \
+                            == madc_recorder.neuron_on_population \
+                            and present.compartment_on_neuron \
+                            == madc_recorder.compartment_on_neuron:
+                        raise ValueError(
+                            "Only one source can be recorded per neuron.")
+                self._simulator.state.madc_recorder.add(madc_recorder)
 
     def _get_recording_sites(self, neuron_ids: List[int],
                              locations: Optional[Sequence[str]] = None
@@ -134,7 +147,7 @@ class Recorder(pyNN.recording.Recorder):
         # a global state we check if a record parameters is MADC based
         for variable in self.recorded:
             if variable in Recorder.madc_variables:
-                self._simulator.state.madc_recorder = None
+                self._simulator.state.madc_recorder = set()
 
     def _clear_simulator(self):
         self._simulator.state.spikes = []
@@ -237,25 +250,27 @@ class Recorder(pyNN.recording.Recorder):
                     channel_index = np.array([self.population.id_to_index(id.cell_id) for id in ids])
                     if self.record_times:
                         if signal_array.shape == times_array.shape:
-                            raise RuntimeError("This code path is not needed for "
-                                               "BSS-2 and should not be reached.")
                             # in the current version of Neo, all channels in
                             # IrregularlySampledSignal must have the same sample times,
                             # so we need to create here a list of signals
                             signals = [
                                 neo.IrregularlySampledSignal(
-                                    times_array[:, i],
-                                    signal_array[:, i],
+                                    np.array(times_array[i], dtype=np.float32),
+                                    np.array(signal_array[i], dtype=np.float32),
                                     units=units,
                                     time_units=pq.ms,
                                     name=variable,
                                     source_ids=[int(cell_id.cell_id)],
+                                    source_locations=[self._get_location_label(cell_id.comp_id)],
                                     source_population=self.population.label,
+                                    source_compartments=[int(cell_id.comp_id)],
                                     array_annotations={"channel_index": [self.population.id_to_index(cell_id.cell_id)]}
                                 )
                                 for i, cell_id in enumerate(ids)
                             ]
                         else:
+                            raise RuntimeError("This code path is not needed for "
+                                               "BSS-2 and should not be reached.")
 
                             # all channels have the same sample times
                             assert signal_array.shape[0] == times_array.size
@@ -299,15 +314,15 @@ class Recorder(pyNN.recording.Recorder):
 
     def _get_all_signals(self, variable, ids, clear=None):
         del clear  # not implemented
-        assert len(ids) < 2
+        assert len(ids) <= 2
         if len(ids) == 0:
             return np.array([]), np.array([])
         if variable not in Recorder.madc_variables:
             raise ValueError("Only implemented for membrane potential 'v' and"
                              + "technical parameters: '{exc,inh}_synin', "
                              + "'adaptation'.")
-        signals = np.array([self._simulator.state.madc_samples]).T, \
-            self._simulator.state.times
+        signals = np.array(self._simulator.state.madc_samples, dtype=object), \
+            np.array(self._simulator.state.times, dtype=object)
         return signals
 
     def _local_count(self, variable, filter_ids):

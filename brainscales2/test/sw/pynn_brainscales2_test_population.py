@@ -176,25 +176,16 @@ class TestAPopulation(unittest.TestCase):
         self.hxpop2[0:1].record("v")
         self.hxpop2.record(None)
 
-        # only one MADC readout per chip allowed
+        # only one MADC readout per neuron allowed
         self.hxpop1.record("v")
         with self.assertRaises(ValueError):
             self.hxpop1.record("inh_synin")
-        with self.assertRaises(ValueError):
-            self.hxpop2[0:1].record("inh_synin")
         self.hxpop1.record(None)
         with self.assertRaises(ValueError):
             self.hxpop1.record(["v", "inh_synin"])
 
         with self.assertRaises(errors.RecordingError):
             self.hxpop1.record("undefined_variable")
-
-        # MADC record for pop of size larger one should throw
-        with self.assertRaises(ValueError):
-            self.hxpop2.record("v")
-        # MADC record for pop view of size larger one should throw
-        with self.assertRaises(ValueError):
-            self.hxpop2[0, 2].record("v")
 
         # test locations argument
         for location in ['label0', 'label1']:
@@ -207,10 +198,6 @@ class TestAPopulation(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.mcpop1.record('v', locations=['non_existent_label'])
         self.mcpop1.record(None)
-
-        # MADC can only record a single site
-        with self.assertRaises(ValueError):
-            self.mcpop1.record('v', locations=['label0', 'label1'])
 
 
 class TestLolaNeuronConstruction(unittest.TestCase):

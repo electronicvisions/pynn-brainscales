@@ -234,7 +234,7 @@ class State(BaseState):
         self.record_sample_times = True
         self.spikes = []
         self.times = []
-        self.madc_samples = []
+        self.madc_samples = {}
 
         self.mpi_rank = 0        # disabled
         self.num_processes = 1   # number of MPI processes
@@ -247,7 +247,7 @@ class State(BaseState):
         self.background_spike_source_placement = None
         self.populations: List[Population] = []
         self.recorders = set([])
-        self.madc_recorder = None
+        self.madc_recorder = set()
         self.projections: List[Projection] = []
         self.plasticity_rules: List["PlasticityRule"] = []
         self.synaptic_observables: List[Dict[str, object]] = []
@@ -288,7 +288,7 @@ class State(BaseState):
     def clear(self):
         self.recorders = set([])
         self.populations = []
-        self.madc_recorder = None
+        self.madc_recorder = set()
         self.projections = []
         self.plasticity_rules = []
         self.synaptic_observables = []
@@ -350,8 +350,8 @@ class State(BaseState):
         assert len(spikes) == 1  # only one batch
         return spikes[0]
 
-    @staticmethod
-    def _get_v(network_graph: grenade.network.NetworkGraph,
+    def _get_v(self,
+               network_graph: grenade.network.NetworkGraph,
                outputs: grenade.signal_flow.IODataMap) -> np.ndarray:
         """
         Get MADC samples with times in ms.
@@ -364,9 +364,22 @@ class State(BaseState):
         samples = grenade.network.extract_madc_samples(
             outputs, network_graph)
         if not samples:
-            return np.array([], dtype=np.float32), np.array([], dtype=np.int32)
+            return [np.array([], dtype=np.float32)] * len(
+                self.madc_recorder), \
+                [np.array([], dtype=np.int32)] * len(self.madc_recorder)
+
         assert len(samples) == 1  # only one batch
-        return samples[0]
+        times = []
+        values = []
+        for source in self.madc_recorder:
+            local_times, population, neuron_on_population, \
+                compartment_on_neuron, _, local_values = samples[0]
+            local_filter = (population == source.population) \
+                & (neuron_on_population == source.neuron_on_population) \
+                & (compartment_on_neuron == source.compartment_on_neuron)
+            times.append(local_times[local_filter])
+            values.append(local_values[local_filter])
+        return times, values
 
     def _get_synaptic_observables(
             self,
@@ -536,6 +549,25 @@ class State(BaseState):
                 self.populations, proj, network_builder)
         for plasticity_rule in self.plasticity_rules:
             plasticity_rule.add_to_network_graph(network_builder)
+        # generate MADC recording
+        if self.madc_recorder:
+            assert 1 <= len(self.madc_recorder) <= 2
+            madc_recording_neurons = []
+            for source in self.madc_recorder:
+                neuron = grenade.network.MADCRecording.Neuron()
+                neuron.coordinate.population = grenade.network\
+                    .PopulationDescriptor(source.population)
+                neuron.source = source.readout_source
+                neuron.coordinate.neuron_on_population \
+                    = source.neuron_on_population
+                neuron.coordinate.compartment_on_neuron \
+                    = source.compartment_on_neuron
+                neuron.coordinate.atomic_neuron_on_compartment = 0
+                madc_recording_neurons.append(neuron)
+            madc_recording = grenade.network.MADCRecording(
+                madc_recording_neurons)
+            network_builder.add(madc_recording)
+
         network = network_builder.done()
 
         # route network if required

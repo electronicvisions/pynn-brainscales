@@ -15,7 +15,7 @@ import pygrenade_vx.network as grenade
 from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.standardmodels.cells_base import \
     NetworkAddableCell
-from pynn_brainscales.brainscales2.recording import Recorder, RecordingSite
+from pynn_brainscales.brainscales2.recording import RecordingSite
 from pynn_brainscales.brainscales2.helper import decompose_in_member_names, \
     get_values_of_atomic_neuron
 from pynn_brainscales.brainscales2.morphology.parameters import \
@@ -176,43 +176,7 @@ class McNeuronBase(StandardCellType, NetworkAddableCell, ABC):
         # add to builder
         descriptor = builder.add(gpopulation)
 
-        # Terminate early if we don't record
-        if simulator.state.madc_recorder is None:
-            return descriptor
-
-        # MADC enabled, but nothing to record in this population
-        if not (set(population.recorder.recorded)
-                & set(Recorder.madc_variables)):
-            return descriptor
-
-        madc_recording = McNeuronBase._get_madc_recording(population,
-                                                          descriptor)
-        builder.add(madc_recording)
-
         return descriptor
-
-    @staticmethod
-    def _get_madc_recording(population: Population,
-                            descriptor: grenade.PopulationDescriptor
-                            ) -> grenade.MADCRecording:
-        # pyNN is more performant when operating on integer cell ids
-        pop_cells_int = np.asarray(population.all_cells, dtype=int)
-
-        # Find the recorded cell
-        readout_cell_idxs = np.where(pop_cells_int
-                                     == int(simulator.state.
-                                            madc_recorder.cell_id))[0]
-
-        # add MADC recording
-        assert len(readout_cell_idxs) == 1, "Number of readout cells != 1."
-        madc_recording = grenade.MADCRecording()
-        madc_recording.population = descriptor
-        madc_recording.source = simulator.state.madc_recorder.readout_source
-        madc_recording.neuron_on_population = readout_cell_idxs[0]
-        madc_recording.compartment_on_neuron = \
-            simulator.state.madc_recorder.comp_id
-        madc_recording.atomic_neuron_on_compartment = 0
-        return madc_recording
 
     @staticmethod
     def add_to_input_generator(

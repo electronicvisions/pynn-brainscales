@@ -136,6 +136,57 @@ class TestMembraneRecording(unittest.TestCase):
             samples = pop[1:2].get_data("v").segments[-1]\
                 .irregularlysampledsignals[0]
 
+    def test_2ch_analog_recording_split(self):
+        """
+        Here we test that an analog trace is recorded for (and only for) the
+        indicated neurons.
+        NOTE: We do not test the correctness of the hardware configuration.
+        """
+
+        pop = pynn.Population(3, pynn.cells.HXNeuron())
+        pop[0:1].record(["v"])
+        pop[1:2].record(["v"])
+
+        pynn.run(0.42)
+
+        # check that analog samples were recorded for the target neuron
+        samples_0 = pop[0:1].get_data("v").segments[-1]\
+            .irregularlysampledsignals[0]
+        self.assertTrue(samples_0.size > 0)
+
+        samples_1 = pop[1:2].get_data("v").segments[-1]\
+            .irregularlysampledsignals[0]
+        self.assertTrue(samples_1.size > 0)
+
+        # check that the recorded samples are assigned only to the selected
+        # neurons (and not the other one)
+        with self.assertRaises(IndexError):
+            samples_0 = pop[2:3].get_data("v").segments[-1]\
+                .irregularlysampledsignals[0]
+
+    def test_2ch_analog_recording(self):
+        """
+        Here we test that an analog trace is recorded for (and only for) the
+        indicated neurons.
+        NOTE: We do not test the correctness of the hardware configuration.
+        """
+
+        pop = pynn.Population(3, pynn.cells.HXNeuron())
+        pop[0:2].record(["v"])
+
+        pynn.run(0.42)
+
+        # check that analog samples were recorded for the target neuron
+        samples = pop[0:2].get_data("v").segments[-1]\
+            .irregularlysampledsignals[0]
+        self.assertTrue(samples.size > 0)
+
+        # check that the recorded samples are assigned only to the selected
+        # neurons (and not the other one)
+        with self.assertRaises(IndexError):
+            samples = pop[2:3].get_data("v").segments[-1]\
+                .irregularlysampledsignals[0]
+
 
 if __name__ == "__main__":
     unittest.main()
