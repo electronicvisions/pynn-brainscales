@@ -7,14 +7,14 @@ from typing import List, Final, Dict, Any, Sequence
 import numpy as np
 
 from pyNN.common import Population
-from pyNN.standardmodels import build_translations, StandardCellType
+from pyNN.standardmodels import build_translations
 
 from dlens_vx_v3 import lola, halco, hal
 import pygrenade_vx.network as grenade
 
 from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.standardmodels.cells_base import \
-    NetworkAddableCell
+    StandardCellType
 from pynn_brainscales.brainscales2.recording import RecordingSite
 from pynn_brainscales.brainscales2.helper import decompose_in_member_names, \
     get_values_of_atomic_neuron
@@ -48,7 +48,7 @@ def _expand_to_size(value: Any, size: int) -> Iterable:
     return value
 
 
-class McNeuronBase(StandardCellType, NetworkAddableCell, ABC):
+class McNeuronBase(StandardCellType, ABC):
     '''
     Base class for multi-compartmental neuron models.
 

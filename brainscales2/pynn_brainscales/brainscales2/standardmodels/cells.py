@@ -5,7 +5,7 @@ import numpy as np
 from typing import List, Dict, ClassVar, Final, Optional, Union, Callable, Set
 
 from pyNN.parameters import ArrayParameter, ParameterSpace
-from pyNN.standardmodels import cells, build_translations, StandardCellType
+from pyNN.standardmodels import cells, build_translations
 from pyNN.common import Population
 from pynn_brainscales.brainscales2 import simulator, plasticity_rules
 from pynn_brainscales.brainscales2.recording import Recorder
@@ -16,10 +16,10 @@ import pygrenade_vx.network as grenade
 from quantities.quantity import Quantity
 
 from pynn_brainscales.brainscales2.standardmodels.cells_base import \
-    NetworkAddableCell
+    StandardCellType, NeuronCellType
 
 
-class HXNeuron(StandardCellType, NetworkAddableCell):
+class HXNeuron(NeuronCellType):
     """
     One to one representation of subset of parameter space of a
     lola.AtomicNeuron. Parameter hierarchy is flattened. Defaults to "silent"
@@ -44,7 +44,8 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
     units: Final[Dict[str, str]] = {"v": "dimensionless",
                                     "exc_synin": "dimensionless",
                                     "inh_synin": "dimensionless",
-                                    "adaptation": "dimensionless"}
+                                    "adaptation": "dimensionless",
+                                    **NeuronCellType.units}
     # manual list of all parameters which should not be exposed
     _not_configurable: Final[List[str]] = [
         "event_routing_analog_output",
@@ -70,15 +71,18 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
         """
         `parameters` should be a mapping object, e.g. a dict
         """
-        self._user_provided_parameters = parameters
         super().__init__(**parameters)
+        parameters.pop("plasticity_rule", None)
+        self._user_provided_parameters = parameters
 
     @classmethod
     def get_default_values(cls) -> dict:
-        """Get the default values of a LoLa Neuron."""
+        """Get the default values."""
 
-        return get_values_of_atomic_neuron(lola.AtomicNeuron(),
-                                           cls._not_configurable)
+        return {
+            **NeuronCellType.default_parameters,
+            **get_values_of_atomic_neuron(lola.AtomicNeuron(),
+                                          cls._not_configurable)}
 
     @classmethod
     def _create_translation(cls) -> dict:
@@ -100,7 +104,8 @@ class HXNeuron(StandardCellType, NetworkAddableCell):
 
         cls._hw_entity_setters = dict()
 
-        for param in cls.get_default_values():
+        for param in get_values_of_atomic_neuron(
+                lola.AtomicNeuron(), cls._not_configurable):
             member, attr = decompose_in_member_names(param)
 
             def generate_setter(member, attr, param):
@@ -268,71 +273,7 @@ HXNeuron.translations = HXNeuron._create_translation()  # pylint: disable=protec
 HXNeuron._generate_hw_entity_setters()  # pylint: disable=protected-access
 
 
-class PlasticHXNeuron(HXNeuron, plasticity_rules.PlasticityRuleHandle):
-    """
-    HXNeuron with plasticity rule handle.
-
-    Currently this includes setting the readout source of each neuron
-    to be available to the plasticity rule.
-    """
-
-    ReadoutSource = lola.AtomicNeuron.Readout.Source
-
-    translations = {
-        **HXNeuron.translations, **build_translations(
-            ("plasticity_rule_readout_source",
-             "plasticity_rule_readout_source"),
-            ("plasticity_rule_enable_readout_source",
-             "plasticity_rule_enable_readout_source"),
-        )}
-
-    def __init__(
-            self,
-            plasticity_rule_enable_readout_source: bool = False,
-            plasticity_rule_readout_source: lola.AtomicNeuron.Readout.Source =
-            lola.AtomicNeuron.Readout.Source.membrane,
-            plasticity_rule: Optional[plasticity_rules.PlasticityRule] = None,
-            **parameters):
-        plasticity_rules.PlasticityRuleHandle.__init__(
-            self, plasticity_rule=plasticity_rule)
-        HXNeuron.__init__(self, **{
-            **parameters,
-            "plasticity_rule_readout_source": float(
-                plasticity_rule_readout_source),
-            "plasticity_rule_enable_readout_source":
-                plasticity_rule_enable_readout_source})
-
-    @classmethod
-    def to_plasticity_rule_population_handle(cls, population: Population) \
-            -> grenade.PlasticityRule.PopulationHandle:
-        handle = plasticity_rules.PlasticityRuleHandle\
-            .to_plasticity_rule_population_handle(population)
-        readout_source = population.get(
-            "plasticity_rule_readout_source", simplify=False)
-        enable_readout_source = population.get(
-            "plasticity_rule_enable_readout_source", simplify=False)
-        handle.neuron_readout_sources = [
-            {halco.CompartmentOnLogicalNeuron(): [
-                cls.ReadoutSource(int(readout_source[i])) if
-                enable_readout_source[i] else None]}
-            for i in range(len(readout_source))
-        ]
-        return handle
-
-    @classmethod
-    def get_default_values(cls) -> dict:
-        """Get the default values of a LoLa Neuron."""
-
-        return {**HXNeuron.get_default_values(),
-                "plasticity_rule_readout_source": float(
-                    cls.ReadoutSource.membrane),
-                "plasticity_rule_enable_readout_source": False}
-
-
-PlasticHXNeuron.default_parameters = PlasticHXNeuron.get_default_values()
-
-
-class CalibHXNeuronCuba(StandardCellType, NetworkAddableCell):
+class CalibHXNeuronCuba(NeuronCellType):
     """
     HX Neuron with automated calibration. Cell parameters correspond to
     parameters for Calix spiking calibration.
@@ -394,8 +335,8 @@ class CalibHXNeuronCuba(StandardCellType, NetworkAddableCell):
         'tau_refrac': 2,
         'i_synin_gm_E': 500,
         'i_synin_gm_I': 500,
-        'synapse_dac_bias': 600
-    }
+        'synapse_dac_bias': 600,
+        **NeuronCellType.default_parameters}
 
     units = {
         'v_rest': 'dimensionless',
@@ -405,17 +346,18 @@ class CalibHXNeuronCuba(StandardCellType, NetworkAddableCell):
         'tau_syn_E': 'us',
         'tau_syn_I': 'us',
         'cm': 'dimensionless',
-        'refractory_time': 'us',
+        'tau_refrac': 'us',
         'i_synin_gm_E': 'dimensionless',
         'i_synin_gm_I': 'dimensionless',
         'synapse_dac_bias': 'dimensionless',
         "v": "dimensionless",
         "exc_synin": "dimensionless",
         "inh_synin": "dimensionless",
-        "adaptation": "dimensionless"
+        "adaptation": "dimensionless",
+        **NeuronCellType.units
     }
 
-    translations = build_translations(
+    translations = {**build_translations(
         ('v_rest', 'v_rest'),
         ('v_reset', 'v_reset'),
         ('v_thresh', 'v_thresh'),
@@ -430,8 +372,8 @@ class CalibHXNeuronCuba(StandardCellType, NetworkAddableCell):
         ('v', 'v'),
         ('exc_synin', 'exc_synin'),
         ('inh_synin', 'inh_synin'),
-        ('adaptation', 'adaptation')
-    )
+        ('adaptation', 'adaptation')),
+        **NeuronCellType.translations}
 
     calib_target: ParameterSpace
     calib_hwparams: List[lola.AtomicNeuron]
@@ -474,8 +416,9 @@ class CalibHXNeuronCuba(StandardCellType, NetworkAddableCell):
         'v': 'v',
         'exc_synin': 'exc_synin',
         'inh_synin': 'inh_synin',
-        'adaptation': 'adaptation'
-    }
+        'adaptation': 'adaptation',
+        **{key: translation["translated_name"]
+           for key, translation in NeuronCellType.translations.items()}}
 
     def add_calib_params(self, calib_params: Dict, cell_ids: List) -> Dict:
         self._calib_target = copy.deepcopy(self.parameter_space)
@@ -484,7 +427,10 @@ class CalibHXNeuronCuba(StandardCellType, NetworkAddableCell):
             for param in parameters:
                 coord = simulator.state.neuron_placement.id2first_circuit(cell_id)
                 myparam = self.param_trans[param]
-                if param == "tau_syn_E":
+                if myparam not in paradict:
+                    # no calib parameter
+                    continue
+                elif param == "tau_syn_E":
                     paradict[myparam][0][coord] = Quantity(
                         parameters[param], "us")
                 elif param == "tau_syn_I":
@@ -643,8 +589,8 @@ class CalibHXNeuronCoba(CalibHXNeuronCuba):
         'e_rev_I': 30,
         'i_synin_gm_E': 180,
         'i_synin_gm_I': 250,
-        'synapse_dac_bias': 400
-    }
+        'synapse_dac_bias': 400,
+        **NeuronCellType.default_parameters}
 
     units = {
         'v_rest': 'dimensionless',
@@ -663,10 +609,11 @@ class CalibHXNeuronCoba(CalibHXNeuronCuba):
         "v": "dimensionless",
         "exc_synin": "dimensionless",
         "inh_synin": "dimensionless",
-        "adaptation": "dimensionless"
+        "adaptation": "dimensionless",
+        **NeuronCellType.units
     }
 
-    translations = build_translations(
+    translations = {**build_translations(
         ('v_rest', 'v_rest'),
         ('v_reset', 'v_reset'),
         ('v_thresh', 'v_thresh'),
@@ -683,8 +630,8 @@ class CalibHXNeuronCoba(CalibHXNeuronCuba):
         ('v', 'v'),
         ('exc_synin', 'exc_synin'),
         ('inh_synin', 'inh_synin'),
-        ('adaptation', 'adaptation')
-    )
+        ('adaptation', 'adaptation')),
+        **NeuronCellType.translations}
 
     # map between pynn and hardware parameter names. Cannot utilize pyNN
     # translations as it need to be bijective
@@ -705,8 +652,9 @@ class CalibHXNeuronCoba(CalibHXNeuronCuba):
         'v': 'v',
         'exc_synin': 'exc_synin',
         'inh_synin': 'inh_synin',
-        'adaptation': 'adaptation'
-    }
+        'adaptation': 'adaptation',
+        **{key: translation["translated_name"]
+           for key, translation in NeuronCellType.translations.items()}}
 
     def add_calib_params(self, calib_params: Dict, cell_ids: List) -> Dict:
         self._calib_target = copy.deepcopy(self.parameter_space)
@@ -715,7 +663,10 @@ class CalibHXNeuronCoba(CalibHXNeuronCuba):
             for param in parameters:
                 coord = simulator.state.neuron_placement.id2first_circuit(cell_id)
                 myparam = self.param_trans[param]
-                if param == "tau_syn_E":
+                if myparam not in paradict:
+                    # no calib parameter
+                    continue
+                elif param == "tau_syn_E":
                     paradict[myparam][0][coord] = Quantity(
                         parameters[param], "us")
                 elif param == "tau_syn_I":
@@ -757,7 +708,7 @@ class CalibHXNeuronCoba(CalibHXNeuronCuba):
         return calib_params
 
 
-class SpikeSourcePoissonOnChip(StandardCellType, NetworkAddableCell):
+class SpikeSourcePoissonOnChip(StandardCellType):
     """
     Spike source, generating spikes according to a Poisson process.
     """
@@ -849,7 +800,7 @@ SpikeSourcePoissonOnChip.background_source_clock_frequency = \
         ).select_adpll_output) / 2.  # spl1_clk
 
 
-class SpikeSourcePoisson(cells.SpikeSourcePoisson, NetworkAddableCell):
+class SpikeSourcePoisson(StandardCellType, cells.SpikeSourcePoisson):
     """
     Spike source, generating spikes according to a Poisson process.
     """
@@ -948,7 +899,7 @@ class SpikeSourcePoisson(cells.SpikeSourcePoisson, NetworkAddableCell):
         builder.add(spiketimes, descriptor)
 
 
-class SpikeSourceArray(cells.SpikeSourceArray, NetworkAddableCell):
+class SpikeSourceArray(StandardCellType, cells.SpikeSourceArray):
     """
     Spike source generating spikes at the times [ms] given in the spike_times
     array.

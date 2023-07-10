@@ -40,7 +40,7 @@ class TestPlasticityRule(unittest.TestCase):
 
     def test_population_no_readout(self):
         timer = pynn.Timer(start=5, period=10, num_periods=1)
-        neuron = pynn.cells.PlasticHXNeuron(
+        neuron = pynn.cells.HXNeuron(
             plasticity_rule=pynn.plasticity_rules.PlasticityRule(timer=timer))
 
         pop = pynn.Population(3, neuron)
@@ -63,9 +63,9 @@ class TestPlasticityRule(unittest.TestCase):
 
     def test_population_readout(self):
         timer = pynn.Timer(start=5, period=10, num_periods=1)
-        neuron = pynn.cells.PlasticHXNeuron(
+        neuron = pynn.cells.HXNeuron(
             plasticity_rule_enable_readout_source=True,
-            plasticity_rule_readout_source=pynn.cells.PlasticHXNeuron
+            plasticity_rule_readout_source=pynn.cells.HXNeuron
             .ReadoutSource.membrane,
             plasticity_rule=pynn.plasticity_rules.PlasticityRule(timer=timer))
 
@@ -81,7 +81,7 @@ class TestPlasticityRule(unittest.TestCase):
             grenade.PlasticityRule.PopulationHandle()
         expectation.neuron_readout_sources = [
             {halco.CompartmentOnLogicalNeuron(): [
-             pynn.cells.PlasticHXNeuron.ReadoutSource.membrane]}
+             pynn.cells.HXNeuron.ReadoutSource.membrane]}
         ] * len(pop)
 
         self.assertEqual(handle, expectation)
@@ -92,20 +92,20 @@ class TestPlasticityRule(unittest.TestCase):
                 [True, True, True]))
 
         self.assertEqual(
-            [pynn.cells.PlasticHXNeuron.ReadoutSource(int(e)) for e in pop.get(
+            [pynn.cells.HXNeuron.ReadoutSource(int(e)) for e in pop.get(
                 "plasticity_rule_readout_source", simplify=False)],
-            [pynn.cells.PlasticHXNeuron.ReadoutSource.membrane] * len(pop))
+            [pynn.cells.HXNeuron.ReadoutSource.membrane] * len(pop))
 
         expectation = [
-            pynn.cells.PlasticHXNeuron.ReadoutSource.membrane,
-            pynn.cells.PlasticHXNeuron.ReadoutSource.adaptation,
-            pynn.cells.PlasticHXNeuron.ReadoutSource.exc_synin,
+            pynn.cells.HXNeuron.ReadoutSource.membrane,
+            pynn.cells.HXNeuron.ReadoutSource.adaptation,
+            pynn.cells.HXNeuron.ReadoutSource.exc_synin,
         ]
 
         pop.set(plasticity_rule_readout_source=expectation)
 
         self.assertEqual(
-            [pynn.cells.PlasticHXNeuron.ReadoutSource(int(rs)) for rs in
+            [pynn.cells.HXNeuron.ReadoutSource(int(rs)) for rs in
              pop.get("plasticity_rule_readout_source", simplify=False)],
             expectation)
 
@@ -116,9 +116,9 @@ class TestPlasticityRule(unittest.TestCase):
         plasticity_rule = pynn.plasticity_rules.PlasticityRule(
             timer=timer)
 
-        neuron = pynn.cells.PlasticHXNeuron(
+        neuron = pynn.cells.HXNeuron(
             plasticity_rule_enable_readout_source=True,
-            plasticity_rule_readout_source=pynn.cells.PlasticHXNeuron
+            plasticity_rule_readout_source=pynn.cells.HXNeuron
             .ReadoutSource.membrane,
             plasticity_rule=plasticity_rule)
 
