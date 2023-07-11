@@ -1,7 +1,7 @@
 import time
 import itertools
 from copy import copy
-from typing import Optional, Final, List, Dict, Union, Set
+from typing import Optional, Final, List, Dict, Union
 import numpy as np
 from pyNN.common import IDMixin, Population, Projection
 from pyNN.common.control import BaseState
@@ -453,33 +453,11 @@ class State(BaseState):
                 observables.append(data.data_array)
         return observables
 
-    def _recorders_populations_changed(self) -> Set[Population]:
-        """
-        Collect populations which configurations were changed.
-
-        This includes changes in:
-            - neuron parameters
-            - recorder settings
-            - out-going synaptic connections
-
-        :return: Populations which were subject to a change mentioned above.
-        """
-        changed = set()
-        for recorder in self.recorders:
-            population = recorder.population
-            if (population.changed_since_last_run
-                    or recorder.changed_since_last_run):
-                changed.add(population)
-        for projection in self.projections:
-            pre_has_grandparent = hasattr(projection.pre, "grandparent")
-            pre = projection.pre.grandparent if \
-                pre_has_grandparent else projection.pre
-            if projection.changed_since_last_run:
-                changed.add(pre)
-        return changed
-
     def _configure_recorders_populations(self):
-        changed = self._recorders_populations_changed()
+        changed = set()
+        for population in self.populations:
+            if population.changed_since_last_run:
+                changed.add(population)
         if not changed:
             return
 
@@ -491,10 +469,7 @@ class State(BaseState):
 
         # gather calibration information
         execute_calib = False
-        for recorder in self.recorders:
-            if recorder.population not in changed:
-                continue
-            population = recorder.population
+        for population in changed:
             assert isinstance(population.celltype, NetworkAddableCell)
             if hasattr(population.celltype, 'add_calib_params'):
                 population.celltype.add_calib_params(
@@ -516,10 +491,7 @@ class State(BaseState):
             self.grenade_chip_config = sta.convert_to_chip(
                 dumper.done(), self.grenade_chip_config)
 
-        for recorder in self.recorders:
-            if recorder.population not in changed:
-                continue
-            population = recorder.population
+        for population in changed:
             if hasattr(population.celltype, 'add_to_chip'):
                 population.celltype.add_to_chip(
                     population.all_cells, self.grenade_chip_config)
