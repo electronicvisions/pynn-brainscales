@@ -482,10 +482,17 @@ class State(BaseState):
                               "initial_config. Initial configuration will be "
                               "overwritten")
             calib_target = SpikingCalibTarget(neuron_target=neuron_target)
+            # release JITGraphExecuter connection to establish a new one for
+            # calibration (JITGraphExecuter conenctions can not be shared with
+            # lower layers).
+            if self.conn is not None and not self.conn_comes_from_outside:
+                self.conn_manager.__exit__()
             result = calibrate(
                 calib_target,
                 SpikingCalibOptions(),
                 self.calib_cache_dir)
+            if self.conn is not None and not self.conn_comes_from_outside:
+                self.conn = self.conn_manager.__enter__()
             dumper = sta.PlaybackProgramBuilderDumper()
             result.apply(dumper)
             self.grenade_chip_config = sta.convert_to_chip(
