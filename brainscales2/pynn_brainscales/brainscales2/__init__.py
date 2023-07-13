@@ -51,6 +51,7 @@ class InjectedConfiguration():
                           the realtime events and runtime.
     :param post_realtime: Injection written after the
                            the realtime configuration.
+    :param ppu_symbols: PPU symbol written during static configuration.
     """
     # TODO: replace hal.Container with union over hal and lola containers
     pre_non_realtime: Union[Dict[halco.Coordinate,
@@ -71,6 +72,10 @@ class InjectedConfiguration():
     post_realtime: Union[Dict[halco.Coordinate,
                               hal.Container], sta.PlaybackProgramBuilder] = \
         field(default_factory=dict)
+    ppu_symbols: Dict[str, Union[Dict[halco.HemisphereOnDLS,
+                                      hal.PPUMemoryBlock],
+                                 lola.ExternalPPUMemoryBlock]] = \
+        field(default_factory=dict)
 
 
 @dataclass
@@ -85,11 +90,13 @@ class InjectedReadout():
                            the inside_realtime_end configuration.
     :param post_realtime: Injection of reads after the
                            the post_realtime configuration.
+    :param ppu_symbols: PPU symbol read after inside_realtime_end.
     """
     pre_realtime: Set[halco.Coordinate] = field(default_factory=set)
     inside_realtime_begin: Set[halco.Coordinate] = field(default_factory=set)
     inside_realtime_end: Set[halco.Coordinate] = field(default_factory=set)
     post_realtime: Set[halco.Coordinate] = field(default_factory=set)
+    ppu_symbols: Set[str] = field(default_factory=set)
 
 
 # TODO: handle the delays (cf. feature #3657)
@@ -259,6 +266,25 @@ def get_pre_realtime_read() -> Dict[halco.Coordinate, hal.Container]:
         raise RuntimeError("Pre-realtime reads are only available with valid"
                            " simulator.")
     return simulator.state.pre_realtime_read
+
+
+# pylint: disable=invalid-name
+def get_post_realtime_read_ppu_symbols() -> Dict[
+        str, Union[Dict[halco.HemisphereOnDLS,
+                        hal.PPUMemoryBlock],
+                   lola.ExternalPPUMemoryBlock]]:
+    """
+    Get injected PPU symbol read results of after inside_realtime_end section.
+    :return: Dictionary with symbol name as keys and read container(s) as
+             values.
+    """
+    if not simulator.state:
+        raise RuntimeError("Post-realtime PPU symbol reads are only available "
+                           "with valid simulator.")
+    if not simulator.state.running:
+        raise RuntimeError(
+            "Read PPU symbols are only available after pynn.run().")
+    return simulator.state.ppu_symbols_read
 
 
 def get_backend_statistics() \

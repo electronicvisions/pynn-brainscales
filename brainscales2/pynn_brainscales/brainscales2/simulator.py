@@ -276,6 +276,7 @@ class State(BaseState):
         self.inside_realtime_begin_read = {}
         self.inside_realtime_end_read = {}
         self.post_realtime_read = {}
+        self.ppu_symbols_read = {}
         self.conn_manager = None
         self.conn = None
         self.conn_comes_from_outside = False
@@ -318,6 +319,7 @@ class State(BaseState):
         self.inside_realtime_begin_read = {}
         self.inside_realtime_end_read = {}
         self.post_realtime_read = {}
+        self.ppu_symbols_read = {}
         self.grenade_network = None
         self.grenade_network_graph = None
         self.grenade_chip_config = None
@@ -614,7 +616,9 @@ class State(BaseState):
         self._prepare_post_realtime_read(post_realtime)
         return grenade.signal_flow.ExecutionInstancePlaybackHooks(
             pre_static_config, pre_realtime, inside_realtime_begin,
-            inside_realtime_end, post_realtime)
+            inside_realtime_end, post_realtime,
+            self.injected_config.ppu_symbols,
+            self.injected_readout.ppu_symbols)
 
     def _prepare_pre_realtime_read(self, builder: sta.PlaybackProgramBuilder):
         """
@@ -838,6 +842,11 @@ class State(BaseState):
 
         self.pre_realtime_read = self._get_pre_realtime_read()
         self.post_realtime_read = self._get_post_realtime_read()
+        if outputs.read_ppu_symbols and outputs.read_ppu_symbols[0]:
+            self.ppu_symbols_read = outputs.read_ppu_symbols[0][
+                grenade.common.ExecutionInstanceID()]
+        else:
+            self.ppu_symbols_read = {}
 
         self.execution_time_info = outputs.execution_time_info
         assert self.execution_time_info is not None
