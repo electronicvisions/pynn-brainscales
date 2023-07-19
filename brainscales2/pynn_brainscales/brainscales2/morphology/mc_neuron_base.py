@@ -90,8 +90,6 @@ class McNeuronBase(StandardCellType, NetworkAddableCell, ABC):
         "multicompartment_connect_right",
         "multicompartment_connect_vertical",
         "multicompartment_enable_conductance",
-        "multicompartment_enable_conductance_division",
-        "multicompartment_enable_conductance_multiplication",
         "readout_enable_amplifier",
         "readout_source",
         "readout_enable_buffered_access",
