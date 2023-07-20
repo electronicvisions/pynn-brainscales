@@ -69,6 +69,8 @@ class InjectedConfiguration():
                                       hal.Container],
                                  sta.PlaybackProgramBuilder] = \
         field(default_factory=dict)
+    inside_realtime: sta.AbsoluteTimePlaybackProgramBuilder = \
+        field(default_factory=sta.AbsoluteTimePlaybackProgramBuilder)
     inside_realtime_end: Union[Dict[halco.Coordinate,
                                     hal.Container],
                                sta.PlaybackProgramBuilder] = \

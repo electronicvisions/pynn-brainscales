@@ -284,6 +284,7 @@ class State(BaseState):
         self.injection_pre_static_config = None
         self.injection_pre_realtime = None
         self.injection_inside_realtime_begin = None
+        self.injection_inside_realtime = None
         self.injection_inside_realtime_end = None
         self.injection_post_realtime = None
         self.initial_config = None
@@ -326,6 +327,7 @@ class State(BaseState):
         self.injection_pre_static_config = None
         self.injection_pre_realtime = None
         self.injection_inside_realtime_begin = None
+        self.injection_inside_realtime = None
         self.injection_inside_realtime_end = None
         self.injection_post_realtime = None
         self.initial_config = None
@@ -577,11 +579,13 @@ class State(BaseState):
         assert self.injection_pre_static_config is not None
         assert self.injection_pre_realtime is not None
         assert self.injection_inside_realtime_begin is not None
+        assert self.injection_inside_realtime is not None
         assert self.injection_inside_realtime_end is not None
         assert self.injection_post_realtime is not None
         pre_static_config = sta.PlaybackProgramBuilder()
         pre_realtime = sta.PlaybackProgramBuilder()
         inside_realtime_begin = sta.PlaybackProgramBuilder()
+        inside_realtime = sta.AbsoluteTimePlaybackProgramBuilder()
         inside_realtime_end = sta.PlaybackProgramBuilder()
         post_realtime = sta.PlaybackProgramBuilder()
         pre_static_config.copy_back(
@@ -592,6 +596,8 @@ class State(BaseState):
         inside_realtime_begin.copy_back(
             self.injection_inside_realtime_begin)
         self._prepare_inside_realtime_begin_read(inside_realtime_begin)
+        inside_realtime.copy(
+            self.injection_inside_realtime)
         inside_realtime_end.copy_back(
             self.injection_inside_realtime_end)
         self._prepare_inside_realtime_end_read(inside_realtime_end)
@@ -599,7 +605,8 @@ class State(BaseState):
             self.injection_post_realtime)
         self._prepare_post_realtime_read(post_realtime)
         return grenade.signal_flow.ExecutionInstancePlaybackHooks(
-            pre_static_config, pre_realtime, inside_realtime_begin,
+            pre_static_config, pre_realtime,
+            inside_realtime_begin, inside_realtime,
             inside_realtime_end, post_realtime,
             self.injected_config.ppu_symbols,
             self.injected_readout.ppu_symbols)
@@ -745,6 +752,7 @@ class State(BaseState):
         self.injection_pre_static_config = builder1
         self.injection_pre_realtime = pre_realtime
         self.injection_inside_realtime_begin = inside_realtime_begin
+        self.injection_inside_realtime = self.injected_config.inside_realtime
         self.injection_inside_realtime_end = inside_realtime_end
         self.injection_post_realtime = post_realtime
 
