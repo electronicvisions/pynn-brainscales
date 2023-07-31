@@ -554,7 +554,7 @@ class State(BaseState):
         if self.grenade_network_graph is None \
                 or grenade.network.requires_routing(
                     network, self.grenade_network_graph):
-            routing_result = grenade.network.build_routing(
+            routing_result = grenade.network.routing.PortfolioRouter()(
                 network)
 
         self.grenade_network = network
