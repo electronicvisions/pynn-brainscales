@@ -374,9 +374,11 @@ class State(BaseState):
         for source in self.madc_recorder:
             local_times, population, neuron_on_population, \
                 compartment_on_neuron, _, local_values = samples[0]
+            # converting compartment_on_neuron to an integer increases the
+            # speed of the comparison
             local_filter = (population == source.population) \
                 & (neuron_on_population == source.neuron_on_population) \
-                & (compartment_on_neuron == source.compartment_on_neuron)
+                & (compartment_on_neuron == int(source.compartment_on_neuron))
             times.append(local_times[local_filter])
             values.append(local_values[local_filter])
         return times, values

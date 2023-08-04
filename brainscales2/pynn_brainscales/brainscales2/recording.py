@@ -60,12 +60,14 @@ class Recorder(pyNN.recording.Recorder):
             else:
                 raise RuntimeError("Encountered not handled MADC case.")
 
+            neuron_on_population = int(np.where(
+                self.population.all_cells
+                == int(recording_site.cell_id))[0][0])
+
             madc_recorder = MADCRecorderSetting(
                 population=self._simulator.state.populations.index(
                     self.population),
-                neuron_on_population=int(np.where(
-                    self.population.all_cells
-                    == recording_site.cell_id)[0][0]),
+                neuron_on_population=neuron_on_population,
                 compartment_on_neuron=recording_site.comp_id,
                 readout_source=readout_source)
 
