@@ -171,7 +171,7 @@ class Projection(pyNN.common.Projection):
     def add_to_network_graph(populations: List[Population],
                              projection: Projection,
                              builder: grenade.NetworkBuilder) \
-            -> grenade.ProjectionDescriptor:
+            -> grenade.ProjectionOnNetwork:
 
         if isinstance(projection.pre, Assembly):
             raise NotImplementedError("Assemblies are not supported yet")
@@ -188,9 +188,9 @@ class Projection(pyNN.common.Projection):
         post = projection.post.grandparent if \
             post_has_grandparent else projection.post
 
-        population_pre = grenade.PopulationDescriptor(
+        population_pre = grenade.PopulationOnNetwork(
             populations.index(pre))
-        population_post = grenade.PopulationDescriptor(
+        population_post = grenade.PopulationOnNetwork(
             populations.index(post))
 
         connections = np.empty((len(projection.connections), 5), dtype=int)
@@ -232,7 +232,7 @@ class Projection(pyNN.common.Projection):
                 "placed_connections requires a previous routing run"
                 ", which is executed on pynn.run().")
         return self._simulator.state.grenade_network_graph \
-            .get_placed_connections(grenade.ProjectionDescriptor(
+            .get_placed_connections(grenade.ProjectionOnNetwork(
                 self._simulator.state.projections.index(self)))
 
     def get_data(self, observable: str):

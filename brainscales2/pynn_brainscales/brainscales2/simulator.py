@@ -241,7 +241,7 @@ class State(BaseState):
         # BSS hardware can only record IrregularlySampledSignal
         self.record_sample_times = True
         self.spikes: Dict[Tuple[
-            grenade.network.PopulationDescriptor, int,
+            grenade.network.PopulationOnNetwork, int,
             halco.CompartmentOnLogicalNeuron], List[float]] = {}
         self.madc_recordings = {}
 
@@ -524,7 +524,7 @@ class State(BaseState):
             for rec_site, source in self.madc_recording_sites.items():
                 neuron = grenade.network.MADCRecording.Neuron()
                 neuron.coordinate.population = grenade.network\
-                    .PopulationDescriptor(rec_site.population)
+                    .PopulationOnNetwork(rec_site.population)
                 neuron.source = source
                 neuron.coordinate.neuron_on_population \
                     = rec_site.neuron_on_population

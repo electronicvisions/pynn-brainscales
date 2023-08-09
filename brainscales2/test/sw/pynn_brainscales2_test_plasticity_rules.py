@@ -33,7 +33,7 @@ class TestPlasticityRule(unittest.TestCase):
 
         handle = proj.synapse_type.to_plasticity_rule_projection_handle(proj)
 
-        expectation = grenade.ProjectionDescriptor()
+        expectation = grenade.ProjectionOnNetwork()
         self.assertEqual(handle, expectation)
 
         pynn.run(None)

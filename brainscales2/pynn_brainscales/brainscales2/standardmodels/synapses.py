@@ -78,7 +78,7 @@ class StaticRecordingSynapse(
 
         def add_to_network_graph(
                 self, builder: grenade.NetworkBuilder) \
-                -> grenade.PlasticityRuleDescriptor:
+                -> grenade.PlasticityRuleOnNetwork:
             observables = set(
                 getattr(
                     grenade
@@ -89,7 +89,7 @@ class StaticRecordingSynapse(
                 .OnlyRecordingPlasticityRuleGenerator(observables)
             plasticity_rule = grenade_generator.generate()
             plasticity_rule.projections = [
-                grenade.ProjectionDescriptor(
+                grenade.ProjectionOnNetwork(
                     self._simulator.state.projections.index(proj))
                 for proj in self._projections]
             plasticity_rule.timer = self.timer.to_grenade()

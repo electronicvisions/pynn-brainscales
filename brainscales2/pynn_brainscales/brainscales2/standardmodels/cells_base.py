@@ -21,7 +21,7 @@ class StandardCellType(ABC, UpstreamStandardCellType):
     @abstractmethod
     def add_to_network_graph(population: Population,
                              builder: grenade.NetworkBuilder) \
-            -> grenade.PopulationDescriptor:
+            -> grenade.PopulationOnNetwork:
         """
         Add population to network builder.
         :param population: Population to add featuring this cell's celltype.

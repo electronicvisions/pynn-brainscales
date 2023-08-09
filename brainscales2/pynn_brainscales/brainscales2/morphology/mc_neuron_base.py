@@ -141,7 +141,7 @@ class McNeuronBase(StandardCellType, ABC):
     @staticmethod
     def add_to_network_graph(population: Population,
                              builder: grenade.NetworkBuilder) \
-            -> grenade.PopulationDescriptor:
+            -> grenade.PopulationOnNetwork:
         # get neuron coordinates
         coords: List[halco.LogicalNeuronOnDLS] = \
             simulator.state.neuron_placement.id2logicalneuron(

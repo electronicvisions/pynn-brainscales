@@ -158,7 +158,7 @@ class PlasticityRule:
 
     def add_to_network_graph(self, builder: grenade
                              .NetworkBuilder) \
-            -> grenade.PlasticityRuleDescriptor:
+            -> grenade.PlasticityRuleOnNetwork:
         plasticity_rule = grenade.PlasticityRule()
         plasticity_rule.timer = self.timer.to_grenade()
         if self.observables:
@@ -194,7 +194,7 @@ class PlasticityRule:
         recording_data = grenade\
             .extract_plasticity_rule_recording_data(
                 outputs, network_graph,
-                grenade.PlasticityRuleDescriptor(
+                grenade.PlasticityRuleOnNetwork(
                     self._simulator.state.plasticity_rules.index(self)))
         return recording_data
 
@@ -269,7 +269,7 @@ class PlasticityRuleHandle:
         :return: Representation in grenade
         """
         handle = grenade.PlasticityRule.PopulationHandle()
-        handle.descriptor = grenade.PopulationDescriptor(
+        handle.descriptor = grenade.PopulationOnNetwork(
             cls._simulator.state.populations.index(population))
         handle.neuron_readout_sources = [
             {halco.CompartmentOnLogicalNeuron(): [None]}
@@ -280,7 +280,7 @@ class PlasticityRuleHandle:
     # pylint: disable=invalid-name
     @classmethod
     def to_plasticity_rule_projection_handle(cls, projection: Projection) \
-            -> grenade.ProjectionDescriptor:
+            -> grenade.ProjectionOnNetwork:
         """
         Convert observable options to projection handle of plasticity rule
         to backend representation, when plasticity rule handle is assoiated
@@ -291,5 +291,5 @@ class PlasticityRuleHandle:
         :param projection: Projection for which to convert
         :return: Representation in grenade
         """
-        return grenade.ProjectionDescriptor(
+        return grenade.ProjectionOnNetwork(
             cls._simulator.state.projections.index(projection))

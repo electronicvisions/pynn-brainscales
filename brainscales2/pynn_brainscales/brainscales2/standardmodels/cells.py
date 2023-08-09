@@ -194,7 +194,7 @@ class HXNeuron(NeuronCellType):
     @staticmethod
     def add_to_network_graph(population: Population,
                              builder: grenade.NetworkBuilder) \
-            -> grenade.PopulationDescriptor:
+            -> grenade.PopulationOnNetwork:
         # pyNN is more performant when operating on integer cell ids
         pop_cells_int = np.asarray(population.all_cells, dtype=int)
 
@@ -388,7 +388,7 @@ class CalibHXNeuronCuba(NeuronCellType):
     @staticmethod
     def add_to_network_graph(population: Population,
                              builder: grenade.NetworkBuilder) \
-            -> grenade.PopulationDescriptor:
+            -> grenade.PopulationOnNetwork:
         return HXNeuron.add_to_network_graph(population, builder)
 
     @staticmethod
@@ -738,7 +738,7 @@ class SpikeSourcePoissonOnChip(StandardCellType):
     def add_to_network_graph(
             population: Population,
             builder: grenade.NetworkBuilder) \
-            -> grenade.PopulationDescriptor:
+            -> grenade.PopulationOnNetwork:
         # register hardware utilisation
         if not population.celltype._padi_bus:
             simulator.state.background_spike_source_placement.register_id(
@@ -879,7 +879,7 @@ class SpikeSourcePoisson(StandardCellType, cells.SpikeSourcePoisson):
     @staticmethod
     def add_to_network_graph(population: Population,
                              builder: grenade.NetworkBuilder) \
-            -> grenade.PopulationDescriptor:
+            -> grenade.PopulationOnNetwork:
         # create grenade population
         gpopulation = grenade.ExternalSourcePopulation(
             population.size)
@@ -894,7 +894,7 @@ class SpikeSourcePoisson(StandardCellType, cells.SpikeSourcePoisson):
         spiketimes = population.celltype.get_spike_times()
         spiketimes = [np.sort(spiketimes_neuron) for spiketimes_neuron
                       in spiketimes]
-        descriptor = grenade.PopulationDescriptor(
+        descriptor = grenade.PopulationOnNetwork(
             simulator.state.populations.index(population))
         builder.add(spiketimes, descriptor)
 
@@ -920,7 +920,7 @@ class SpikeSourceArray(StandardCellType, cells.SpikeSourceArray):
     @staticmethod
     def add_to_network_graph(population: Population,
                              builder: grenade.NetworkBuilder) \
-            -> grenade.PopulationDescriptor:
+            -> grenade.PopulationOnNetwork:
         # create grenade population
         gpopulation = grenade.ExternalSourcePopulation(
             population.size)
@@ -933,6 +933,6 @@ class SpikeSourceArray(StandardCellType, cells.SpikeSourceArray):
             builder: grenade.InputGenerator):
         spiketimes = population.celltype.parameter_space["spike_times"]
         spiketimes = [s.value for s in spiketimes]
-        descriptor = grenade.PopulationDescriptor(
+        descriptor = grenade.PopulationOnNetwork(
             simulator.state.populations.index(population))
         builder.add(spiketimes, descriptor)
