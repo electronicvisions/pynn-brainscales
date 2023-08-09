@@ -344,18 +344,13 @@ class State(BaseState):
         :return: Times and sample values as numpy array
         """
         samples = grenade.network.extract_madc_samples(
-            outputs, network_graph)
-        if not samples:
-            return [np.array([], dtype=np.float32)] * len(
-                self.madc_recorder), \
-                [np.array([], dtype=np.int32)] * len(self.madc_recorder)
+            outputs, network_graph)[0]
 
-        assert len(samples) == 1  # only one batch
         times = []
         values = []
         for source in self.madc_recorder:
             local_times, population, neuron_on_population, \
-                compartment_on_neuron, _, local_values = samples[0]
+                compartment_on_neuron, _, local_values = samples
             # converting compartment_on_neuron to an integer increases the
             # speed of the comparison
             local_filter = (population == source.population) \
