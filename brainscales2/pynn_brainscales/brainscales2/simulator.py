@@ -802,7 +802,7 @@ class State(BaseState):
             raise ValueError(f"Runtime of {runtime} to long. "
                              f"Maximum supported runtime {max_runtime}")
 
-        inputs.runtime = [{grenade.signal_flow.ExecutionInstance():
+        inputs.runtime = [{grenade.common.ExecutionInstanceID():
                            runtime_in_clocks}]
 
         if not self.conn_comes_from_outside and \
