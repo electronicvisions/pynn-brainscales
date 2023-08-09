@@ -1,7 +1,7 @@
 import time
 import itertools
 from copy import copy
-from typing import Optional, Final, List, Dict, Union
+from typing import Optional, Final, List, Dict, Union, Tuple
 import numpy as np
 from pyNN.common import IDMixin, Population, Projection
 from pyNN.common.control import BaseState
@@ -232,7 +232,9 @@ class State(BaseState):
 
         # BSS hardware can only record IrregularlySampledSignal
         self.record_sample_times = True
-        self.spikes = []
+        self.spikes: Dict[Tuple[
+            grenade.network.PopulationDescriptor, int,
+            halco.CompartmentOnLogicalNeuron], List[float]] = {}
         self.times = []
         self.madc_samples = {}
 
@@ -329,26 +331,6 @@ class State(BaseState):
         self.t = 0
         self.t_start = 0
         self.segment_counter += 1
-
-    @staticmethod
-    def _get_spikes(network_graph: grenade.network.NetworkGraph,
-                    outputs: grenade.signal_flow.IODataMap) \
-            -> Dict[int, np.ndarray]:
-        """
-        Get spikes indexed via neuron IDs.
-        :param network_graph: Network graph to use for lookup of
-                              spike label <-> ID relation
-        :param outputs: All outputs of a single execution to extract
-                        spikes from
-        :return: Spikes as dict with atomic neuron enum value as key and
-                 numpy array of times as value
-        """
-        spikes = grenade.network.extract_neuron_spikes(
-            outputs, network_graph)
-        if not spikes:
-            return {}
-        assert len(spikes) == 1  # only one batch
-        return spikes[0]
 
     def _get_v(self,
                network_graph: grenade.network.NetworkGraph,
@@ -836,8 +818,8 @@ class State(BaseState):
                        f"{(time.time() - time_after_preparations):.3f}s")
         time_after_hw_run = time.time()
 
-        # make list 'spikes' of tupel (neuron id, spike time)
-        self.spikes = self._get_spikes(self.grenade_network_graph, outputs)
+        self.spikes = grenade.network.extract_neuron_spikes(
+            outputs, self.grenade_network_graph)[0]
 
         # make two list for madc samples: times, madc_samples
         self.times, self.madc_samples = self._get_v(
