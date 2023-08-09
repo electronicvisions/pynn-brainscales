@@ -578,7 +578,7 @@ class State(BaseState):
         Generate external input events from the routed network graph
         representation.
         """
-        if network_graph.event_input_vertex is None:
+        if network_graph.graph_translation.event_input_vertex is None:
             return grenade.signal_flow.IODataMap()
         input_generator = grenade.network.InputGenerator(
             network_graph)
