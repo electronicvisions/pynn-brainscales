@@ -17,11 +17,10 @@ class RecordingSite(NamedTuple):
     comp_id: halco.CompartmentOnLogicalNeuron
 
 
-class MADCRecorderSetting(NamedTuple):
+class MADCRecordingSite(NamedTuple):
     population: int
     neuron_on_population: int
     compartment_on_neuron: halco.CompartmentOnLogicalNeuron
-    readout_source: hal.NeuronConfig.ReadoutSource
 
 
 class Recorder(pyNN.recording.Recorder):
@@ -64,29 +63,25 @@ class Recorder(pyNN.recording.Recorder):
                 self.population.all_cells
                 == int(recording_site.cell_id))[0][0])
 
-            madc_recorder = MADCRecorderSetting(
+            new_rec_site = MADCRecordingSite(
                 population=self._simulator.state.populations.index(
                     self.population),
                 neuron_on_population=neuron_on_population,
-                compartment_on_neuron=recording_site.comp_id,
-                readout_source=readout_source)
+                compartment_on_neuron=recording_site.comp_id)
 
-            # check if MADC recorder already set. Ignore if already
-            # existing config is set again.
-            if madc_recorder not in self._simulator.state.madc_recorder:
-                if not len(self._simulator.state.madc_recorder) < 2:
-                    raise ValueError(
-                        "Can only record at most two neurons/locations via "
-                        "MADC")
-                for present in self._simulator.state.madc_recorder:
-                    if present.population == madc_recorder.population \
-                            and present.neuron_on_population \
-                            == madc_recorder.neuron_on_population \
-                            and present.compartment_on_neuron \
-                            == madc_recorder.compartment_on_neuron:
-                        raise ValueError(
-                            "Only one source can be recorded per neuron.")
-                self._simulator.state.madc_recorder.add(madc_recorder)
+            # check if MADC recording already enabled for this site.
+            all_rec_sites = self._simulator.state.madc_recording_sites
+            if new_rec_site in all_rec_sites:
+                if all_rec_sites[new_rec_site] == readout_source:
+                    # recording already set.
+                    return
+                raise ValueError("Only one source can be recorded per neuron.")
+
+            # MADC recording not enabled for this site.
+            if len(all_rec_sites) >= 2:
+                raise ValueError(
+                    "Can only record at most two neurons/locations via MADC")
+            all_rec_sites[new_rec_site] = readout_source
 
     def _get_recording_sites(self, neuron_ids: List[int],
                              locations: Optional[Sequence[str]] = None
@@ -149,7 +144,7 @@ class Recorder(pyNN.recording.Recorder):
         # a global state we check if a record parameters is MADC based
         for variable in self.recorded:
             if variable in Recorder.madc_variables:
-                self._simulator.state.madc_recorder = set()
+                self._simulator.state.madc_recording_sites = {}
 
     def _clear_simulator(self):
         self._simulator.state.spikes = []

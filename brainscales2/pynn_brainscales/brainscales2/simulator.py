@@ -249,7 +249,7 @@ class State(BaseState):
         self.background_spike_source_placement = None
         self.populations: List[Population] = []
         self.recorders = set([])
-        self.madc_recorder = set()
+        self.madc_recording_sites = {}
         self.projections: List[Projection] = []
         self.plasticity_rules: List["PlasticityRule"] = []
         self.synaptic_observables: List[Dict[str, object]] = []
@@ -290,7 +290,7 @@ class State(BaseState):
     def clear(self):
         self.recorders = set([])
         self.populations = []
-        self.madc_recorder = set()
+        self.madc_recording_sites = {}
         self.projections = []
         self.plasticity_rules = []
         self.synaptic_observables = []
@@ -349,14 +349,14 @@ class State(BaseState):
 
         times = []
         values = []
-        for source in self.madc_recorder:
+        for site in self.madc_recording_sites:
             local_times, population, neuron_on_population, \
                 compartment_on_neuron, _, local_values = samples
             # converting compartment_on_neuron to an integer increases the
             # speed of the comparison
-            local_filter = (population == source.population) \
-                & (neuron_on_population == source.neuron_on_population) \
-                & (compartment_on_neuron == int(source.compartment_on_neuron))
+            local_filter = (population == site.population) \
+                & (neuron_on_population == site.neuron_on_population) \
+                & (compartment_on_neuron == int(site.compartment_on_neuron))
             times.append(local_times[local_filter])
             values.append(local_values[local_filter])
         return times, values
@@ -509,18 +509,18 @@ class State(BaseState):
         for plasticity_rule in self.plasticity_rules:
             plasticity_rule.add_to_network_graph(network_builder)
         # generate MADC recording
-        if self.madc_recorder:
-            assert 1 <= len(self.madc_recorder) <= 2
+        if len(self.madc_recording_sites) > 0:
+            assert len(self.madc_recording_sites) <= 2
             madc_recording_neurons = []
-            for source in self.madc_recorder:
+            for rec_site, source in self.madc_recording_sites.items():
                 neuron = grenade.network.MADCRecording.Neuron()
                 neuron.coordinate.population = grenade.network\
-                    .PopulationDescriptor(source.population)
-                neuron.source = source.readout_source
+                    .PopulationDescriptor(rec_site.population)
+                neuron.source = source
                 neuron.coordinate.neuron_on_population \
-                    = source.neuron_on_population
+                    = rec_site.neuron_on_population
                 neuron.coordinate.compartment_on_neuron \
-                    = source.compartment_on_neuron
+                    = rec_site.compartment_on_neuron
                 neuron.coordinate.atomic_neuron_on_compartment = 0
                 madc_recording_neurons.append(neuron)
             madc_recording = grenade.network.MADCRecording(
