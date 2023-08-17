@@ -236,7 +236,7 @@ class State(BaseState):
             grenade.network.PopulationDescriptor, int,
             halco.CompartmentOnLogicalNeuron], List[float]] = {}
         self.times = []
-        self.madc_samples = {}
+        self.madc_samples = []
 
         self.mpi_rank = 0        # disabled
         self.num_processes = 1   # number of MPI processes
@@ -334,7 +334,8 @@ class State(BaseState):
 
     def _get_v(self,
                network_graph: grenade.network.NetworkGraph,
-               outputs: grenade.signal_flow.IODataMap) -> np.ndarray:
+               outputs: grenade.signal_flow.IODataMap
+               ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         """
         Get MADC samples with times in ms.
         :param network_graph: Network graph to use for lookup of
