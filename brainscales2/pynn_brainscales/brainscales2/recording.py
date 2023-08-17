@@ -26,7 +26,12 @@ class MADCRecordingSite(NamedTuple):
 class Recorder(pyNN.recording.Recorder):
 
     _simulator = simulator
-    madc_variables = ["v", "exc_synin", "inh_synin", "adaptation"]
+    _var_name_to_readout_source = \
+        {"v": hal.NeuronConfig.ReadoutSource.membrane,
+         "exc_synin": hal.NeuronConfig.ReadoutSource.exc_synin,
+         "inh_synin": hal.NeuronConfig.ReadoutSource.inh_synin,
+         "adaptation": hal.NeuronConfig.ReadoutSource.adaptation}
+    madc_variables = list(_var_name_to_readout_source)
 
     def __init__(self, population, file=None):
         super().__init__(population, file=file)
@@ -45,20 +50,9 @@ class Recorder(pyNN.recording.Recorder):
 
         variable = next(iter(variables))
         assert variable in Recorder.madc_variables
+        readout_source = self._var_name_to_readout_source[variable]
 
         for recording_site in recording_sites:
-            readout_source = None
-            if variable == "v":
-                readout_source = hal.NeuronConfig.ReadoutSource.membrane
-            elif variable == "exc_synin":
-                readout_source = hal.NeuronConfig.ReadoutSource.exc_synin
-            elif variable == "inh_synin":
-                readout_source = hal.NeuronConfig.ReadoutSource.inh_synin
-            elif variable == "adaptation":
-                readout_source = hal.NeuronConfig.ReadoutSource.adaptation
-            else:
-                raise RuntimeError("Encountered not handled MADC case.")
-
             neuron_on_population = int(np.where(
                 self.population.all_cells
                 == int(recording_site.cell_id))[0][0])
