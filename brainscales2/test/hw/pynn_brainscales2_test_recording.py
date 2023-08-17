@@ -205,6 +205,43 @@ class TestMembraneRecording(unittest.TestCase):
         data = pop.get_data().segments[-1].irregularlysampledsignals
         self.assertFalse(np.all(data[0].magnitude == data[1].magnitude))
 
+    def test_reseting(self):
+        """
+        Test that reseting of recording works correctly.
+        """
+
+        pop_a = pynn.Population(1, pynn.cells.HXNeuron())
+        pop_b = pynn.Population(1, pynn.cells.HXNeuron())
+        pop_c = pynn.Population(1, pynn.cells.HXNeuron())
+        pop_a.record(["v"])
+        pop_b.record(["v"])
+
+        pynn.run(0.1)
+
+        # check initial config
+        self.assertEqual(
+            len(pop_a.get_data().segments[-1].irregularlysampledsignals), 1)
+        self.assertEqual(
+            len(pop_b.get_data().segments[-1].irregularlysampledsignals), 1)
+        self.assertEqual(
+            len(pop_c.get_data().segments[-1].irregularlysampledsignals), 0)
+
+        pop_a.record(None)
+        pop_c.record(["v"])
+
+        # test that samples of `pop_a` are not assigned to `pop_c`
+        self.assertEqual(
+            len(pop_c.get_data().segments[-1].irregularlysampledsignals), 0)
+
+        pynn.run(0.1)
+
+        self.assertEqual(
+            len(pop_a.get_data().segments[-1].irregularlysampledsignals), 0)
+        self.assertEqual(
+            len(pop_b.get_data().segments[-1].irregularlysampledsignals), 1)
+        self.assertEqual(
+            len(pop_c.get_data().segments[-1].irregularlysampledsignals), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

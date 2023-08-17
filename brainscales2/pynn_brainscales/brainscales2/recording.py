@@ -134,11 +134,24 @@ class Recorder(pyNN.recording.Recorder):
 
     def _reset(self):
         self.changed_since_last_run = True
+
+        pop_idx = self._simulator.state.populations.index(self.population)
         # only MADC record setting needs to be reset for BSS back end. As it's
         # a global state we check if a record parameters is MADC based
         for variable in self.recorded:
-            if variable in Recorder.madc_variables:
-                self._simulator.state.madc_recording_sites = {}
+            if variable not in Recorder.madc_variables:
+                continue
+            for rec_site in self.recorded[variable]:
+                global_rec_site = MADCRecordingSite(
+                    pop_idx, self.population.id_to_index(rec_site.cell_id),
+                    rec_site.comp_id)
+                self._simulator.state.madc_recording_sites.pop(global_rec_site)
+                try:
+                    self._simulator.state.madc_recordings.pop(rec_site)
+                except KeyError:
+                    # samples might already be deleted (for examples when
+                    # `get_data(clear=True)` is called.)
+                    pass
 
     def _clear_simulator(self):
         self._simulator.state.spikes = []
