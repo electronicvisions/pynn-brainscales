@@ -303,19 +303,32 @@ class Recorder(pyNN.recording.Recorder):
         return segment
 
     def _get_all_signals(self, variable, ids, clear=None):
+        pop_idx = self._simulator.state.populations.index(self.population)
         del clear  # not implemented
-        assert len(ids) <= 2
-        if len(ids) == 0:
-            return np.array([]), np.array([])
-        if variable not in Recorder.madc_variables:
-            raise ValueError("Only implemented for membrane potential 'v' and"
-                             + "technical parameters: '{exc,inh}_synin', "
-                             + "'adaptation'.")
+
         times = []
         values = []
-        for madc_recording in self._simulator.state.madc_recordings.values():
+        for id in ids:
+            rec_site = MADCRecordingSite(
+                pop_idx, self.population.id_to_index(id.cell_id), id.comp_id)
+            if rec_site not in self._simulator.state.madc_recording_sites:
+                raise RuntimeError("No samples were recorded for population "
+                                   f"'{self.population.label}' at recording "
+                                   f"{id}.")
+            recorded_var = self._simulator.state.madc_recording_sites[rec_site]
+            if recorded_var != self._var_name_to_readout_source.get(variable):
+                raise RuntimeError(f"'{recorded_var}' was recorded but "
+                                   f"'{variable}' was requested "
+                                   f"(population: {self.population.label}, "
+                                   f"recording_site: {id}).")
+            if rec_site not in self._simulator.state.madc_recordings:
+                # no samples have been recorded yet
+                continue
+
+            madc_recording = self._simulator.state.madc_recordings[rec_site]
             times.append(madc_recording.times)
             values.append(madc_recording.values)
+
         return np.array(values, dtype=object), np.array(times, dtype=object)
 
     def _local_count(self, variable, filter_ids):

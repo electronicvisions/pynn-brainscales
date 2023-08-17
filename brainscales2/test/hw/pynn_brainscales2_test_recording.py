@@ -187,6 +187,24 @@ class TestMembraneRecording(unittest.TestCase):
             samples = pop[2:3].get_data("v").segments[-1]\
                 .irregularlysampledsignals[0]
 
+    def test_2ch_different_recording(self):
+        """
+        Test recording of different observables.
+
+        Make sure that different samples are returned for the different
+        observables.
+        """
+
+        pop = pynn.Population(2, pynn.cells.HXNeuron())
+        pop[0:1].record(["v"])
+        pop[1:2].record(["adaptation"])
+
+        pynn.run(0.1)
+
+        # check that recorded traces are not identical
+        data = pop.get_data().segments[-1].irregularlysampledsignals
+        self.assertFalse(np.all(data[0].magnitude == data[1].magnitude))
+
 
 if __name__ == "__main__":
     unittest.main()
