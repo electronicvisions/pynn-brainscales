@@ -142,8 +142,7 @@ class Recorder(pyNN.recording.Recorder):
 
     def _clear_simulator(self):
         self._simulator.state.spikes = []
-        self._simulator.state.times = []
-        self._simulator.state.madc_samples = []
+        self._simulator.state.madc_recordings = {}
 
     # pylint: disable=unused-argument
     def _get_spiketimes(self, ids, clear=None):
@@ -312,9 +311,12 @@ class Recorder(pyNN.recording.Recorder):
             raise ValueError("Only implemented for membrane potential 'v' and"
                              + "technical parameters: '{exc,inh}_synin', "
                              + "'adaptation'.")
-        signals = np.array(self._simulator.state.madc_samples, dtype=object), \
-            np.array(self._simulator.state.times, dtype=object)
-        return signals
+        times = []
+        values = []
+        for madc_recording in self._simulator.state.madc_recordings.values():
+            times.append(madc_recording.times)
+            values.append(madc_recording.values)
+        return np.array(values, dtype=object), np.array(times, dtype=object)
 
     def _local_count(self, variable, filter_ids):
         counts = {}

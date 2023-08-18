@@ -1,7 +1,7 @@
 import time
 import itertools
 from copy import copy
-from typing import Optional, Final, List, Dict, Union, Tuple
+from typing import Optional, Final, List, Dict, Union, Tuple, NamedTuple, Any
 import numpy as np
 from pyNN.common import IDMixin, Population, Projection
 from pyNN.common.control import BaseState
@@ -15,6 +15,14 @@ from calix import calibrate
 
 
 name = "HX"  # for use in annotating output data
+
+
+class MADCRecording(NamedTuple):
+    '''
+    Times and values of a MADC recording.
+    '''
+    times: np.ndarray
+    values: np.ndarray
 
 
 class ID(int, IDMixin):
@@ -235,8 +243,7 @@ class State(BaseState):
         self.spikes: Dict[Tuple[
             grenade.network.PopulationDescriptor, int,
             halco.CompartmentOnLogicalNeuron], List[float]] = {}
-        self.times = []
-        self.madc_samples = []
+        self.madc_recordings = {}
 
         self.mpi_rank = 0        # disabled
         self.num_processes = 1   # number of MPI processes
@@ -335,20 +342,22 @@ class State(BaseState):
     def _get_v(self,
                network_graph: grenade.network.NetworkGraph,
                outputs: grenade.signal_flow.IODataMap
-               ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+               # Note: Any should be recording.MADCRecordingSite. We do not
+               # annotate the correct type due to cyclic imports.
+               ) -> Dict[Any, MADCRecording]:
         """
         Get MADC samples with times in ms.
         :param network_graph: Network graph to use for lookup of
                               MADC output vertex descriptor
         :param outputs: All outputs of a single execution to extract
                         samples from
-        :return: Times and sample values as numpy array
+        :return: Dictionary with a madc recording site as key and a
+            MADCRecording as value.
         """
         samples = grenade.network.extract_madc_samples(
             outputs, network_graph)[0]
 
-        times = []
-        values = []
+        data = {}
         for site in self.madc_recording_sites:
             local_times, population, neuron_on_population, \
                 compartment_on_neuron, _, local_values = samples
@@ -357,9 +366,9 @@ class State(BaseState):
             local_filter = (population == site.population) \
                 & (neuron_on_population == site.neuron_on_population) \
                 & (compartment_on_neuron == int(site.compartment_on_neuron))
-            times.append(local_times[local_filter])
-            values.append(local_values[local_filter])
-        return times, values
+            data[site] = MADCRecording(times=local_times[local_filter],
+                                       values=local_values[local_filter])
+        return data
 
     def _get_synaptic_observables(
             self,
@@ -817,9 +826,7 @@ class State(BaseState):
         self.spikes = grenade.network.extract_neuron_spikes(
             outputs, self.grenade_network_graph)[0]
 
-        # make two list for madc samples: times, madc_samples
-        self.times, self.madc_samples = self._get_v(
-            self.grenade_network_graph, outputs)
+        self.madc_recordings = self._get_v(self.grenade_network_graph, outputs)
 
         self.synaptic_observables = self._get_synaptic_observables(
             self.grenade_network_graph, outputs)
