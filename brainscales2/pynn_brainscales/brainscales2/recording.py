@@ -194,7 +194,7 @@ class Recorder(pyNN.recording.Recorder):
         variables_to_include = set(self.recorded.keys())
         if variables != 'all':
             variables_to_include = variables_to_include.intersection(set(variables))
-        for variable in variables_to_include:
+        for variable in sorted(variables_to_include):
             if variable == 'spikes':
                 t_stop = self._simulator.state.t * pq.ms  # must run on all MPI nodes
                 sids = sorted(self.filter_recorded('spikes', filter_ids))
