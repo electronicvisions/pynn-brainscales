@@ -238,7 +238,7 @@ class PopulationView(pyNN.common.PopulationView):
     @property
     def actual_hwparams(self):
         try:
-            return self.celltype.actual_hwparams[self.mask]
+            return np.array(self.celltype.actual_hwparams)[self.mask]
         except AttributeError:
             # pylint:disable=raise-missing-from
             raise AttributeError("actual_hwparams not available for celltype "
@@ -247,7 +247,7 @@ class PopulationView(pyNN.common.PopulationView):
     @property
     def calib_hwparams(self):
         try:
-            return self.celltype.calib_hwparams[self.mask]
+            return np.array(self.celltype.calib_hwparams)[self.mask]
         except AttributeError:
             # pylint:disable=raise-missing-from
             raise AttributeError("calib_hwparams not available for celltype "

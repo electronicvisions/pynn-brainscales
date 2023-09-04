@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import unittest
+import numpy as np
 import pynn_brainscales.brainscales2 as pynn
 
 
@@ -67,7 +68,7 @@ class TestCalibHXNeuronCuba(unittest.TestCase):
         _ = self.pop.calib_hwparams
         _ = self.pop.actual_hwparams
 
-    def test_popview(self):
+    def test_popview_slice(self):
         """
         Test correct assignment/masking in population views.
         """
@@ -75,6 +76,30 @@ class TestCalibHXNeuronCuba(unittest.TestCase):
         # modifying second entry in the population view should change the third
         # neuron in the parent population
         self.pop[1:3].actual_hwparams[1].leak.v_leak = 1022
+        self.assertEqual(self.pop.actual_hwparams[2].leak.v_leak, 1022)
+        self.assertNotEqual(self.pop.actual_hwparams[0].leak.v_leak, 1022)
+        self.assertNotEqual(self.pop.actual_hwparams[1].leak.v_leak, 1022)
+
+    def test_popview_list(self):
+        """
+        Test correct assignment/masking in population views.
+        """
+        pynn.preprocess()
+        # modifying second entry in the population view should change the third
+        # neuron in the parent population
+        self.pop[[1, 2]].actual_hwparams[1].leak.v_leak = 1022
+        self.assertEqual(self.pop.actual_hwparams[2].leak.v_leak, 1022)
+        self.assertNotEqual(self.pop.actual_hwparams[0].leak.v_leak, 1022)
+        self.assertNotEqual(self.pop.actual_hwparams[1].leak.v_leak, 1022)
+
+    def test_popview_array(self):
+        """
+        Test correct assignment/masking in population views.
+        """
+        pynn.preprocess()
+        # modifying second entry in the population view should change the third
+        # neuron in the parent population
+        self.pop[np.array([1, 2])].actual_hwparams[1].leak.v_leak = 1022
         self.assertEqual(self.pop.actual_hwparams[2].leak.v_leak, 1022)
         self.assertNotEqual(self.pop.actual_hwparams[0].leak.v_leak, 1022)
         self.assertNotEqual(self.pop.actual_hwparams[1].leak.v_leak, 1022)
