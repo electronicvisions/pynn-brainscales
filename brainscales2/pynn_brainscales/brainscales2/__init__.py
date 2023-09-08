@@ -252,7 +252,7 @@ def get_post_realtime_read() -> Dict[halco.Coordinate, hal.Container]:
     """
     if not simulator.state:
         raise RuntimeError("Post-realtime reads are only available with valid"
-                           " simulator.")
+                           " simulator after calling setup().")
     return simulator.state.post_realtime_read
 
 
@@ -264,7 +264,7 @@ def get_pre_realtime_read() -> Dict[halco.Coordinate, hal.Container]:
     """
     if not simulator.state:
         raise RuntimeError("Pre-realtime reads are only available with valid"
-                           " simulator.")
+                           " simulator after calling setup().")
     return simulator.state.pre_realtime_read
 
 
@@ -279,8 +279,9 @@ def get_post_realtime_read_ppu_symbols() -> Dict[
              values.
     """
     if not simulator.state:
-        raise RuntimeError("Post-realtime PPU symbol reads are only available "
-                           "with valid simulator.")
+        raise RuntimeError(
+            "Post-realtime PPU symbol reads are only available with valid "
+            "simulator after calling setup().")
     if not simulator.state.running:
         raise RuntimeError(
             "Read PPU symbols are only available after pynn.run().")
@@ -300,7 +301,8 @@ def get_backend_statistics() \
     """
     if not simulator.state:
         raise RuntimeError(
-            "Backend statistics are only available for active simulator.")
+            "Backend statistics are only available for active "
+            "simulator after calling setup().")
     if not simulator.state.grenade_network_graph:
         raise RuntimeError(
             "Backend statistics are only available after first mapping and"
@@ -321,7 +323,7 @@ def get_execution_time_info() -> grenade.signal_flow.ExecutionTimeInfo:
     if not simulator.state:
         raise RuntimeError(
             "Execution time information is only available for active "
-            "simulator."
+            "simulator after calling setup()."
         )
     if not simulator.state.running:
         raise RuntimeError(
