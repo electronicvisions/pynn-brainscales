@@ -39,7 +39,6 @@ def build(bld):
                                    excl='pynn_brainscales/brainscales2/examples/*.py'),
         relative_trick = True,
         use = ['dlens_vx_v3', 'pylogging', 'pygrenade_vx', 'calix_pylib'],
-        install_path = '${PREFIX}/lib',
         pylint_config = join(get_toplevel_path(), "code-format", "pylintrc"),
         pycodestyle_config = join(get_toplevel_path(), "code-format", "pycodestyle"),
         test_timeout = 60,
@@ -50,7 +49,6 @@ def build(bld):
         source = bld.path.ant_glob('pynn_brainscales/brainscales2/examples/*.py'),
         relative_trick = True,
         use = ['pynn_brainscales2'],
-        install_path = '${PREFIX}/lib',
         pylint_config = join(get_toplevel_path(), "code-format", "pylintrc"),
         pycodestyle_config = join(get_toplevel_path(), "code-format", "pycodestyle"),
     )
