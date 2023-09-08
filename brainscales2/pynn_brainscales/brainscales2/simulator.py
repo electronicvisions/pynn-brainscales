@@ -9,7 +9,6 @@ from pynn_brainscales.brainscales2.standardmodels.cells_base import \
     StandardCellType
 from dlens_vx_v3 import hal, halco, sta, lola, logger
 import pygrenade_vx as grenade
-from calix.spiking import SpikingCalibTarget, SpikingCalibOptions
 from calix.spiking.neuron import NeuronCalibTarget
 from calix import calibrate
 
@@ -268,6 +267,8 @@ class State(BaseState):
         self.log = logger.get("pyNN.brainscales2")
         self.injected_config = None
         self.injected_readout = None
+        self.injected_calib_target = None
+        self.injected_calib_options = None
         self.pre_realtime_tickets = None
         self.inside_realtime_begin_tickets = None
         self.inside_realtime_end_tickets = None
@@ -311,6 +312,8 @@ class State(BaseState):
         self.background_spike_source_placement = None
         self.injected_readout = None
         self.injected_config = None
+        self.injected_calib_target = None
+        self.injected_calib_options = None
         self.pre_realtime_tickets = None
         self.inside_realtime_begin_tickets = None
         self.inside_realtime_end_tickets = None
@@ -472,7 +475,8 @@ class State(BaseState):
                 self.log.WARN("Using automatically calibrating neurons with "
                               "initial_config. Initial configuration will be "
                               "overwritten")
-            calib_target = SpikingCalibTarget(neuron_target=neuron_target)
+            calib_target = copy(self.injected_calib_target)
+            calib_target.neuron_target = neuron_target
             # release JITGraphExecuter connection to establish a new one for
             # calibration (JITGraphExecuter conenctions can not be shared with
             # lower layers).
@@ -480,7 +484,7 @@ class State(BaseState):
                 self.conn_manager.__exit__()
             result = calibrate(
                 calib_target,
-                SpikingCalibOptions(),
+                self.injected_calib_options,
                 self.calib_cache_dir)
             if self.conn is not None and not self.conn_comes_from_outside:
                 self.conn = self.conn_manager.__enter__()

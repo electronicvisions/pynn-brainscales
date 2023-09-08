@@ -22,6 +22,7 @@ from pynn_brainscales.brainscales2 import helper
 from dlens_vx_v3 import lola, hal, halco, sta
 import pygrenade_vx as grenade
 import pylogging as logger
+from calix.spiking import SpikingCalibTarget, SpikingCalibOptions
 
 
 __all__ = ["list_standard_models", "setup", "end", "run", "run_until",
@@ -131,6 +132,12 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
         injected_readout: Optional user defined injected readout.
         calibration_cache: Directory where automated calibration is cached.
                            If none provided defaults to home cache.
+        injected_calib_target: Optional user defined injected calibration
+                               target, which may be partially overwritten by
+                               parameters set at populations and projections.
+        injected_calib_options: Optional user defined injected calibration
+                                options, which may be partially overwritten by
+                                parameters set at populations and projections.
     """
     time_begin = time.time()
 
@@ -173,6 +180,10 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
     simulator.state.prepare_static_config()
     simulator.state.calib_cache_dir = extra_params.pop('calibration_cache',
                                                        None)
+    simulator.state.injected_calib_target = \
+        extra_params.pop('injected_calib_target', SpikingCalibTarget())
+    simulator.state.injected_calib_options = \
+        extra_params.pop('injected_calib_options', SpikingCalibOptions())
 
     if extra_params:
         raise KeyError("unhandled extra_params in call to pynn.setup(...):"
