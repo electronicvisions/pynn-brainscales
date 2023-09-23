@@ -1,3 +1,6 @@
+"""
+Implementation of the PyNN API for the neuromorphic BrainScales2 system.
+"""
 from dataclasses import dataclass, field
 import time
 from typing import Dict, Union, Set
