@@ -70,6 +70,7 @@ class NeuronCellType(StandardCellType, plasticity_rules.PlasticityRuleHandle):
         float(lola.AtomicNeuron.Readout.Source.membrane),
         "plasticity_rule_enable_readout_source": False}
 
+    # pylint: disable-next=invalid-name
     units: Final[Dict[str, str]] = {
         "plasticity_rule_readout_source": "dimensionless",
         "plasticity_rule_enable_readout_source": "dimensionless"

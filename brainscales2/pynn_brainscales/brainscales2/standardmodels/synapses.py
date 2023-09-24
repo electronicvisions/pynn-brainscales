@@ -69,7 +69,7 @@ class StaticRecordingSynapse(
                 .OnlyRecordingPlasticityRuleGenerator(observables)
             return grenade_generator.generate().recording.observables
 
-        def _set_observables(self, value):
+        def _set_observables(self, new_observables):
             raise RuntimeError(
                 "Setting observables not possible directly, "
                 "use observables on synapse type instead.")
@@ -100,10 +100,11 @@ class StaticRecordingSynapse(
 
     def __init__(self, timer: plasticity_rules.Timer, weight: float,
                  observables: Set[str]):
+        # pylint: disable=super-init-not-called
         self._observables = observables
         plasticity_rules.PlasticityRuleHandle.__init__(
             self, self.RecordingRule(timer, self._observables))
-        synapses.StaticSynapse.__init__(self, weight=weight)
+        StaticSynapse.__init__(self, weight=weight)
         self.changed_since_last_run = True
 
     def _get_observables(self):
@@ -113,14 +114,14 @@ class StaticRecordingSynapse(
     def _set_observables(self, value: Set[str]):
         self.changed_since_last_run = True
         self._observables = value
-        super().plasticity_rule._recording_observables = self._observables
+        super().plasticity_rule._recording_observables = self._observables  # pylint: disable=protected-access
 
     observables = property(_get_observables, _set_observables)
 
     def _get_plasticity_rule(self):
         return super().plasticity_rule
 
-    def _set_plasticity_rule(self, value):
+    def _set_plasticity_rule(self, new_plasticity_rule):
         raise RuntimeError(
             "Plasticity rule assignment not possible for "
             "StaticRecordingSynapse.")

@@ -1,23 +1,21 @@
-import inspect
+# pylint: disable=too-many-lines
 import numbers
 import copy
-import numpy as np
 from typing import List, Dict, ClassVar, Final, Optional, Union, Callable, \
     Tuple
+import numpy as np
 
 from pyNN.parameters import ArrayParameter, ParameterSpace
 from pyNN.standardmodels import cells, build_translations
 from pyNN.common import Population
 from pynn_brainscales.brainscales2 import simulator, plasticity_rules
-from pynn_brainscales.brainscales2.recording import Recorder
 from pynn_brainscales.brainscales2.helper import get_values_of_atomic_neuron, \
     decompose_in_member_names
+from pynn_brainscales.brainscales2.standardmodels.cells_base import \
+    StandardCellType, NeuronCellType
 from dlens_vx_v3 import lola, hal, halco, sta
 import pygrenade_vx.network as grenade
 from quantities.quantity import Quantity
-
-from pynn_brainscales.brainscales2.standardmodels.cells_base import \
-    StandardCellType, NeuronCellType
 
 
 class HXNeuron(NeuronCellType):
@@ -48,7 +46,7 @@ class HXNeuron(NeuronCellType):
                                     "adaptation": "dimensionless",
                                     **NeuronCellType.units}
     # manual list of all parameters which should not be exposed
-    _not_configurable: Final[List[str]] = [
+    _NOT_CONFIGURABLE: Final[List[str]] = [
         "event_routing_analog_output",
         "event_routing_enable_digital",
         "leak_reset_i_bias_source_follower",
@@ -63,6 +61,7 @@ class HXNeuron(NeuronCellType):
     _user_provided_parameters: Optional[Dict[str, Union[int, bool]]]
 
     # HXNeuron consits of a single compartment with a single circuit
+    # pylint: disable-next=invalid-name
     logical_compartments: Final[halco.LogicalNeuronCompartments] = \
         halco.LogicalNeuronCompartments(
             {halco.CompartmentOnLogicalNeuron():
@@ -83,7 +82,7 @@ class HXNeuron(NeuronCellType):
         return {
             **NeuronCellType.default_parameters,
             **get_values_of_atomic_neuron(lola.AtomicNeuron(),
-                                          cls._not_configurable)}
+                                          cls._NOT_CONFIGURABLE)}
 
     @classmethod
     def _create_translation(cls) -> dict:
@@ -103,10 +102,10 @@ class HXNeuron(NeuronCellType):
         Builds setters for creation of Lola Neuron.
         """
 
-        cls._hw_entity_setters = dict()
+        cls._hw_entity_setters = {}
 
         for param in get_values_of_atomic_neuron(
-                lola.AtomicNeuron(), cls._not_configurable):
+                lola.AtomicNeuron(), cls._NOT_CONFIGURABLE):
             member, attr = decompose_in_member_names(param)
 
             def generate_setter(member, attr, param):
@@ -178,10 +177,10 @@ class HXNeuron(NeuronCellType):
             try:
                 atomic_neuron = simulator.state.initial_config.neuron_block.\
                     atomic_neurons[coord]
-            except KeyError:
-                raise KeyError(f"No coco entry for {coord}")
+            except KeyError as err:
+                raise KeyError(f"No coco entry for {coord}") from err
             param_per_neuron.append(get_values_of_atomic_neuron(
-                atomic_neuron, self._not_configurable))
+                atomic_neuron, self._NOT_CONFIGURABLE))
 
         # "fuse" entries of individual parameters to one large dict of arrays
         for k in param_per_neuron[0].keys():
@@ -406,6 +405,7 @@ class CalibHXNeuronCuba(NeuronCellType):
         **NeuronCellType.translations}
 
     # HXNeuron consists of a single compartment with a single circuit
+    # pylint: disable-next=invalid-name
     logical_compartments: Final[halco.LogicalNeuronCompartments] = \
         halco.LogicalNeuronCompartments(
             {halco.CompartmentOnLogicalNeuron():
@@ -446,17 +446,19 @@ class CalibHXNeuronCuba(NeuronCellType):
         **{key: translation["translated_name"]
            for key, translation in NeuronCellType.translations.items()}}
 
+    # pylint: disable=too-many-branches
     def add_calib_params(self, calib_params: Dict, cell_ids: List) -> Dict:
         self._calib_target = copy.deepcopy(self.parameter_space)
         paradict = calib_params.__dict__
         for parameters, cell_id in zip(self.parameter_space, cell_ids):
             for param in parameters:
-                coord = simulator.state.neuron_placement.id2first_circuit(cell_id)
+                coord = simulator.state.neuron_placement.id2first_circuit(
+                    cell_id)
                 myparam = self.param_trans[param]
                 if myparam not in paradict:
                     # no calib parameter
                     continue
-                elif param == "tau_syn_E":
+                if param == "tau_syn_E":
                     paradict[myparam][0][coord] = Quantity(
                         parameters[param], "us")
                 elif param == "tau_syn_I":
@@ -566,6 +568,7 @@ class CalibHXNeuronCoba(CalibHXNeuronCuba):
     Uses conductance-based synapses.
     """
 
+    # pylint: disable=too-many-locals
     def __init__(
             self,
             plasticity_rule: Optional[plasticity_rules.PlasticityRule] = None,
@@ -721,17 +724,19 @@ class CalibHXNeuronCoba(CalibHXNeuronCuba):
         **{key: translation["translated_name"]
            for key, translation in NeuronCellType.translations.items()}}
 
+    # pylint: disable=too-many-branches
     def add_calib_params(self, calib_params: Dict, cell_ids: List) -> Dict:
         self._calib_target = copy.deepcopy(self.parameter_space)
         paradict = calib_params.__dict__
         for parameters, cell_id in zip(self.parameter_space, cell_ids):
             for param in parameters:
-                coord = simulator.state.neuron_placement.id2first_circuit(cell_id)
+                coord = simulator.state.neuron_placement.id2first_circuit(
+                    cell_id)
                 myparam = self.param_trans[param]
                 if myparam not in paradict:
                     # no calib parameter
                     continue
-                elif param == "tau_syn_E":
+                if param == "tau_syn_E":
                     paradict[myparam][0][coord] = Quantity(
                         parameters[param], "us")
                 elif param == "tau_syn_I":
@@ -791,7 +796,7 @@ class SpikeSourcePoissonOnChip(StandardCellType):
     _simulator = simulator
     _padi_bus: Optional[halco.PADIBusOnPADIBusBlock] = None
 
-    background_source_clock_frequency: ClassVar[float]
+    background_source_clock_freq: ClassVar[float]
 
     # TODO: implement L2-based read-out
     recordable = []
@@ -805,9 +810,10 @@ class SpikeSourcePoissonOnChip(StandardCellType):
             builder: grenade.NetworkBuilder) \
             -> grenade.PopulationOnNetwork:
         # register hardware utilisation
-        if not population.celltype._padi_bus:
+        if not population.celltype._padi_bus:  # pylint: disable=protected-access
             simulator.state.background_spike_source_placement.register_id(
                 list(population.all_cells))
+            # pylint: disable-next=protected-access
             population.celltype._padi_bus = simulator.state \
                 .background_spike_source_placement.id2source(
                     list(population.all_cells))
@@ -818,18 +824,18 @@ class SpikeSourcePoissonOnChip(StandardCellType):
                       == population.celltype.parameter_space["seed"][0])
         hwrate = population.celltype.parameter_space["rate"][0] \
             * population.size
-        if hwrate > SpikeSourcePoissonOnChip.background_source_clock_frequency:
+        if hwrate > SpikeSourcePoissonOnChip.background_source_clock_freq:
             raise RuntimeError(
                 "The chosen Poisson rate can not be realized on"
                 " hardware. The product of rate and number of neurons is too"
                 " high in this population.")
         rate = hal.BackgroundSpikeSource.Rate(int(round(
             hal.BackgroundSpikeSource.Rate.max * hwrate
-            / SpikeSourcePoissonOnChip.background_source_clock_frequency)))
+            / SpikeSourcePoissonOnChip.background_source_clock_freq)))
         prob = (rate.value() + 1) / hal.BackgroundSpikeSource.Rate.size
         period = hal.BackgroundSpikeSource.Period(
             int(round(SpikeSourcePoissonOnChip
-                .background_source_clock_frequency / hwrate * prob) - 1))
+                .background_source_clock_freq / hwrate * prob) - 1))
         # create grenade population
         config = \
             grenade.BackgroundSourcePopulation.Config()
@@ -842,8 +848,8 @@ class SpikeSourcePoissonOnChip(StandardCellType):
         # targets
         gpopulation = grenade.BackgroundSourcePopulation(
             population.size,
-            {halco.HemisphereOnDLS(0): population.celltype._padi_bus,
-             halco.HemisphereOnDLS(1): population.celltype._padi_bus},
+            {halco.HemisphereOnDLS(0): population.celltype._padi_bus,  # pylint: disable=protected-access
+             halco.HemisphereOnDLS(1): population.celltype._padi_bus},  # pylint: disable=protected-access
             config
         )
         return builder.add(gpopulation)
@@ -855,14 +861,16 @@ class SpikeSourcePoissonOnChip(StandardCellType):
         pass
 
 
-SpikeSourcePoissonOnChip.background_source_clock_frequency = \
+# pylint: disable=no-member
+SpikeSourcePoissonOnChip.background_source_clock_freq = \
     sta.DigitalInit() \
-    .adplls[sta.DigitalInit().pll_clock_output_block.get_clock_output(
+    .adplls[sta.DigitalInit().pll_clock_output_block.get_clock_output(  # pylint: disable=unsubscriptable-object
         halco.PLLClockOutputOnDLS.phy_ref_clk).select_adpll] \
     .calculate_output_frequency(
         sta.DigitalInit().pll_clock_output_block.get_clock_output(
             halco.PLLClockOutputOnDLS.phy_ref_clk
         ).select_adpll_output) / 2.  # spl1_clk
+# pylint: enable=no-member
 
 
 class SpikeSourcePoisson(StandardCellType, cells.SpikeSourcePoisson):
@@ -875,7 +883,7 @@ class SpikeSourcePoisson(StandardCellType, cells.SpikeSourcePoisson):
         parameters = {"start": start,
                       "rate": rate,
                       "duration": duration}
-        super(cells.SpikeSourcePoisson, self).__init__(**parameters)
+        super().__init__(**parameters)
 
     translations = build_translations(
         ('start', 'start'),
