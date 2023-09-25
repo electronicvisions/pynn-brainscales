@@ -2,7 +2,8 @@ import inspect
 import numbers
 import copy
 import numpy as np
-from typing import List, Dict, ClassVar, Final, Optional, Union, Callable, Set
+from typing import List, Dict, ClassVar, Final, Optional, Union, Callable, \
+    Tuple
 
 from pyNN.parameters import ArrayParameter, ParameterSpace
 from pyNN.standardmodels import cells, build_translations
@@ -278,44 +279,73 @@ class CalibHXNeuronCuba(NeuronCellType):
     HX Neuron with automated calibration. Cell parameters correspond to
     parameters for Calix spiking calibration.
 
-    :param parameters: Mapping of parameters and corresponding values, i.e.
-                       dict. Either 1-dimensional or population size
-                       dimensions. Default values are overwritten for specified
-                       parameters.
-    Available parameters are:
-    v_rest: Resting potential. Value range [50, 160].
-    v_reset: Reset potential. Value range [50, 160].
-    v_thresh: Threshold potential. Value range [50, 220].
-    tau_m: Membrane time constant. Value range [0.5, 60]us.
-    tau_syn_E: Excitatory synaptic input time constant. Value range
-        [0.3, 30]us.
-    tau_syn_E: Inhibitory synaptic input time constant. Value range
-        [0.3, 30]us.
-    cm: Membrane capacitance. Value range [0, 63].
-    tau_refrac: Refractory time. Value range [.04, 32]us.
-    i_synin_gm_E: Excitatory synaptic input strength bias current. Scales the
-        strength of excitatory weights. Technical parameter which needs to be
-        same for all populations. Value range [30, 800].
-    i_synin_gm_I: Inhibitory synaptic input strength bias current. Scales the
-        strength of excitatory weights. Technical parameter which needs to be
-        same for all populations. Value range [30, 800].
-    synapse_dac_bias: Synapse DAC bias current. Technical parameter which needs
-        to be same for all populations Can be lowered in order to reduce the
-        amplitude of a spike at the input of the synaptic input OTA. This can
-        be useful to avoid saturation when using larger synaptic time
-        constants. Value range [30, 1022].
-
-    Attributes:
-        calib_target: Archive of cell parameters used for last calibration run.
-                      Only available after pynn.preprocess() or pynn.run()
-                      call.
-        calib_hwparams: Archive of resulting hardware parameters from last
-                        calibration run. Only available after pynn.preprocess()
-                        or pynn.run() call.
-        acutal_hwparams: Hardware parameters used for actual hardware
-                         execution, can be manually adjusted. Only available
-                         after pynn.preprocess() or pynn.run() call.
+    Uses current-based synapses.
     """
+    def __init__(
+            self,
+            plasticity_rule: Optional[plasticity_rules.PlasticityRule] = None,
+            *,
+            v_rest: Optional[Union[int, List, np.ndarray]] = None,
+            v_reset: Optional[Union[int, List, np.ndarray]] = None,
+            v_thresh: Optional[Union[int, List, np.ndarray]] = None,
+            tau_m: Optional[Union[int, List, np.ndarray]] = None,
+            tau_syn_E: Optional[Union[int, List, np.ndarray]] = None,
+            tau_syn_I: Optional[Union[int, List, np.ndarray]] = None,
+            cm: Optional[Union[int, List, np.ndarray]] = None,
+            tau_refrac: Optional[Union[int, List, np.ndarray]] = None,
+            i_synin_gm_E: Optional[Union[int, List, np.ndarray]] = None,
+            i_synin_gm_I: Optional[Union[int, List, np.ndarray]] = None,
+            synapse_dac_bias: Optional[Union[int, List, np.ndarray]] = None,
+            **parameters):
+        """
+        Set initial neuron parameters.
+
+        All parameters except for the plasticity rule have to be either
+        1-dimensional or population-size dimensional.
+
+        Additional keyword arguments are also saved in the parameter space of
+        the neuron but do not influence the calibration.
+
+        :param plasticity_rule: Plasticity rule which is evaluated periodically
+            during the experiment to change the parameters of the neuron.
+        :param v_rest: Resting potential. Value range [50, 160].
+        :param v_reset: Reset potential. Value range [50, 160].
+        :param v_thresh: Threshold potential. Value range [50, 220].
+        :param tau_m: Membrane time constant. Value range [0.5, 60]us.
+        :param tau_syn_E: Excitatory synaptic input time constant. Value range
+            [0.3, 30]us.
+        :param tau_syn_I: Inhibitory synaptic input time constant. Value range
+            [0.3, 30]us.
+        :param cm: Membrane capacitance. Value range [0, 63].
+        :param tau_refrac: Refractory time. Value range [.04, 32]us.
+        :param i_synin_gm_E: Excitatory synaptic input strength bias current.
+            Scales the strength of excitatory weights. Technical parameter
+            which needs to be same for all populations. Value range [30, 800].
+        :param i_synin_gm_I: Inhibitory synaptic input strength bias current.
+            Scales the strength of excitatory weights. Technical parameter
+            which needs to be same for all populations. Value range [30, 800].
+        :param synapse_dac_bias: Synapse DAC bias current. Technical parameter
+            which needs to be same for all populations Can be lowered in order
+            to reduce the amplitude of a spike at the input of the synaptic
+            input OTA. This can be useful to avoid saturation when using larger
+            synaptic time constants. Value range [30, 1022].
+        """
+        super().__init__(plasticity_rule=plasticity_rule,
+                         v_rest=v_rest,
+                         v_reset=v_reset,
+                         v_thresh=v_thresh,
+                         tau_m=tau_m,
+                         tau_syn_E=tau_syn_E,
+                         tau_syn_I=tau_syn_I,
+                         cm=cm,
+                         tau_refrac=tau_refrac,
+                         i_synin_gm_E=i_synin_gm_E,
+                         i_synin_gm_I=i_synin_gm_I,
+                         synapse_dac_bias=synapse_dac_bias,
+                         **parameters)
+        self._calib_target: Optional[ParameterSpace] = None
+        self._calib_hwparams: Optional[List[lola.AtomicNeuron]] = None
+        self._actual_hwparams: Optional[List[lola.AtomicNeuron]] = None
 
     # exc_synin, inh_synin and adaptation are technical voltages
     recordable: Final[List[str]] = ["spikes", "v", "exc_synin", "inh_synin",
@@ -374,10 +404,6 @@ class CalibHXNeuronCuba(NeuronCellType):
         ('inh_synin', 'inh_synin'),
         ('adaptation', 'adaptation')),
         **NeuronCellType.translations}
-
-    calib_target: ParameterSpace
-    calib_hwparams: List[lola.AtomicNeuron]
-    actual_hwparams: List[lola.AtomicNeuron]
 
     # HXNeuron consists of a single compartment with a single circuit
     logical_compartments: Final[halco.LogicalNeuronCompartments] = \
@@ -494,29 +520,42 @@ class CalibHXNeuronCuba(NeuronCellType):
         self._actual_hwparams = calib_result
 
     @property
-    def actual_hwparams(self):
+    def actual_hwparams(self) -> Optional[Tuple[lola.AtomicNeuron]]:
+        """
+        Hardware parameters used for actual hardware execution, can be
+        manually adjusted.
+
+        Only set after pynn.preprocess() or pynn.run() call.
+        """
         # cast to tuple prevents overwriting reference with new object
-        try:
-            return tuple(self._actual_hwparams)
-        except AttributeError:
+        if self._actual_hwparams is None:
             raise AttributeError("actual_hwparams only available after "
                                  "pynn.preprocess() or pynn.run() call.")
+        return tuple(self._actual_hwparams)
 
     @property
-    def calib_hwparams(self):
-        try:
-            return self._calib_hwparams
-        except AttributeError:
+    def calib_hwparams(self) -> Optional[List[lola.AtomicNeuron]]:
+        """
+        Archive of resulting hardware parameters from last calibration run.
+
+        Only set after pynn.preprocess() or pynn.run() call.
+        """
+        if self._calib_hwparams is None:
             raise AttributeError("calib_hwparams only available after "
                                  "pynn.preprocess() or pynn.run() call.")
+        return self._calib_hwparams
 
     @property
-    def calib_target(self):
-        try:
-            return self._calib_target
-        except AttributeError:
+    def calib_target(self) -> Optional[ParameterSpace]:
+        """
+        Archive of cell parameters used for last calibration run.
+
+        Only set after pynn.preprocess() or pynn.run() call.
+        """
+        if self._calib_target is None:
             raise AttributeError("calib_target only available after "
                                  "pynn.preprocess() or pynn.run() call.")
+        return self._calib_target
 
 
 class CalibHXNeuronCoba(CalibHXNeuronCuba):
@@ -524,56 +563,82 @@ class CalibHXNeuronCoba(CalibHXNeuronCuba):
     HX Neuron with automated calibration. Cell parameters correspond to
     parameters for Calix spiking calibration.
 
-    :param parameters: Mapping of parameters and corresponding values, e.g.
-                       dict. Either 1-dimensional or population size
-                       dimensions. Default values are overwritten for specified
-                       parameters.
-
-    Available parameters are:
-    v_rest: Resting potential. Value range [50, 160].
-    v_reset: Reset potential. Value range [50, 160].
-    v_thresh: Threshold potential. Value range [50, 220].
-    tau_m: Membrane time constant. Value range [0.5, 60]us.
-    tau_syn_E: Excitatory synaptic input time constant. Value range
-        [0.3, 30]us.
-    tau_syn_E: Inhibitory synaptic input time constant. Value range
-        [0.3, 30]us.
-    cm: Membrane capacitance. Value range [0, 63].
-    tau_refrac: Refractory time. Value range [.04, 32]us.
-    e_rev_E: Excitatory COBA synaptic input reversal potential. At this
-        potential, the synaptic input strength will be zero. Value range
-        [60, 160].
-    e_rev_I: Inhibitory COBA synaptic input reversal potential. At this
-        potential, the synaptic input strength will be zero. Value range
-        [60, 160].
-    i_synin_gm_E: Excitatory synaptic input strength bias current. Scales the
-        strength of excitatory weights. Technical parameter which needs to be
-        same for all populations. Value range [30, 800].
-    i_synin_gm_I: Inhibitory synaptic input strength bias current. Scales the
-        strength of excitatory weights. Technical parameter which needs to be
-        same for all populations. Value range [30, 800].
-    synapse_dac_bias: Synapse DAC bias current. Technical parameter which needs
-        to be same for all populations Can be lowered in order to reduce the
-        amplitude of a spike at the input of the synaptic input OTA. This can
-        be useful to avoid saturation when using larger synaptic time
-        constants. Value range [30, 1022].
-
-    Attributes:
-        calib_target: Archive of cell parameters used for last calibration run.
-                      Only available after pynn.preprocess() or pynn.run()
-                      call.
-        calib_hwparams: Archive of resulting hardware parameters from last
-                        calibration run. Only available after pynn.preprocess()
-                        or pynn.run() call.
-        acutal_hwparams: Hardware parameters used for actual hardware
-                         execution, can be manually adjusted. Only available
-                         after pynn.preprocess() or pynn.run() call.
+    Uses conductance-based synapses.
     """
 
-    # exc_synin, inh_synin and adaptation are technical voltages
-    recordable: Final[List[str]] = ["spikes", "v", "exc_synin", "inh_synin",
-                                    "adaptation"]
-    receptor_types: Final[List[str]] = ["excitatory", "inhibitory"]
+    def __init__(
+            self,
+            plasticity_rule: Optional[plasticity_rules.PlasticityRule] = None,
+            *,
+            v_rest: Optional[Union[int, List, np.ndarray]] = None,
+            v_reset: Optional[Union[int, List, np.ndarray]] = None,
+            v_thresh: Optional[Union[int, List, np.ndarray]] = None,
+            tau_m: Optional[Union[int, List, np.ndarray]] = None,
+            tau_syn_E: Optional[Union[int, List, np.ndarray]] = None,
+            tau_syn_I: Optional[Union[int, List, np.ndarray]] = None,
+            cm: Optional[Union[int, List, np.ndarray]] = None,
+            tau_refrac: Optional[Union[int, List, np.ndarray]] = None,
+            i_synin_gm_E: Optional[Union[int, List, np.ndarray]] = None,
+            i_synin_gm_I: Optional[Union[int, List, np.ndarray]] = None,
+            e_rev_E: Optional[Union[int, List, np.ndarray]] = None,
+            e_rev_I: Optional[Union[int, List, np.ndarray]] = None,
+            synapse_dac_bias: Optional[Union[int, List, np.ndarray]] = None,
+            **parameters):
+        """
+        Set initial neuron parameters.
+
+        All parameters except for the plasticity rule have to be either
+        1-dimensional or population-size dimensional.
+
+        Additional key-word arguments are also saved in the parameter space of
+        the neuron but do not influence the calibration.
+
+        :param plasticity_rule: Plasticity rule which is evaluated periodically
+            during the experiment to change the parameters of the neuron.
+        :param v_rest: Resting potential. Value range [50, 160].
+        :param v_reset: Reset potential. Value range [50, 160].
+        :param v_thresh: Threshold potential. Value range [50, 220].
+        :param tau_m: Membrane time constant. Value range [0.5, 60]us.
+        :param tau_syn_E: Excitatory synaptic input time constant. Value range
+            [0.3, 30]us.
+        :param tau_syn_I: Inhibitory synaptic input time constant. Value range
+            [0.3, 30]us.
+        :param cm: Membrane capacitance. Value range [0, 63].
+        :param tau_refrac: Refractory time. Value range [.04, 32]us.
+        :param i_synin_gm_E: Excitatory synaptic input strength bias current.
+            Scales the strength of excitatory weights. Technical parameter
+            which needs to be same for all populations. Value range [30, 800].
+        :param i_synin_gm_I: Inhibitory synaptic input strength bias current.
+            Scales the strength of excitatory weights. Technical parameter
+            which needs to be same for all populations. Value range [30, 800].
+        :param e_rev_E: Excitatory COBA synaptic input reversal potential. At
+            this potential, the synaptic input strength will be zero. Value
+            range [60, 160].
+        :param e_rev_I: Inhibitory COBA synaptic input reversal potential. At
+            this potential, the synaptic input strength will be zero. Value
+            range [60, 160].
+        :param synapse_dac_bias: Synapse DAC bias current. Technical parameter
+            which needs to be same for all populations Can be lowered in order
+            to reduce the amplitude of a spike at the input of the synaptic
+            input OTA. This can be useful to avoid saturation when using larger
+            synaptic time constants. Value range [30, 1022].
+        """
+        super().__init__(plasticity_rule=plasticity_rule,
+                         v_rest=v_rest,
+                         v_reset=v_reset,
+                         v_thresh=v_thresh,
+                         tau_m=tau_m,
+                         tau_syn_E=tau_syn_E,
+                         tau_syn_I=tau_syn_I,
+                         cm=cm,
+                         tau_refrac=tau_refrac,
+                         i_synin_gm_E=i_synin_gm_E,
+                         i_synin_gm_I=i_synin_gm_I,
+                         e_rev_E=e_rev_E,
+                         e_rev_I=e_rev_I,
+                         synapse_dac_bias=synapse_dac_bias,
+                         **parameters)
+
     conductance_based: Final[bool] = True
 
     default_parameters = {

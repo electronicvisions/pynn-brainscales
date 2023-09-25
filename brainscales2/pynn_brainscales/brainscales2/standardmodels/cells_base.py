@@ -15,7 +15,12 @@ class StandardCellType(ABC, UpstreamStandardCellType):
     """
 
     def __init__(self, **parameters):
-        UpstreamStandardCellType.__init__(self, **parameters)
+        # only forward non None values (parameter spaces can not handle None
+        # values)
+        UpstreamStandardCellType.__init__(
+            self,
+            **{name: value for name, value in parameters.items()
+               if value is not None})
 
     @staticmethod
     @abstractmethod
