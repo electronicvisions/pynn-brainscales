@@ -5,8 +5,6 @@ from typing import Optional, Final, List, Dict, Union, Tuple, NamedTuple, Any
 import numpy as np
 from pyNN.common import IDMixin, Population, Projection
 from pyNN.common.control import BaseState
-from pynn_brainscales.brainscales2.standardmodels.cells_base import \
-    StandardCellType
 from dlens_vx_v3 import hal, halco, sta, lola, logger
 import pygrenade_vx as grenade
 from calix.spiking.neuron import NeuronCalibTarget
@@ -464,7 +462,6 @@ class State(BaseState):
         # gather calibration information
         execute_calib = False
         for population in changed:
-            assert isinstance(population.celltype, StandardCellType)
             if hasattr(population.celltype, 'add_calib_params'):
                 population.celltype.add_calib_params(
                     neuron_target, population.all_cells)
