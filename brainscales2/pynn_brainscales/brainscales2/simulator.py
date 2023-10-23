@@ -1,12 +1,15 @@
 import time
 import itertools
 from copy import copy
-from typing import Optional, Final, List, Dict, Union, Tuple, NamedTuple, Any
+from typing import Optional, Final, List, Dict, Union, NamedTuple, Any
 import numpy as np
 from pyNN.common import IDMixin, Population, Projection
 from pyNN.common.control import BaseState
 from dlens_vx_v3 import hal, halco, sta, lola, logger
 import pygrenade_vx as grenade
+
+from pynn_brainscales.brainscales2.recording_data import Recording
+
 from calix.spiking.neuron import NeuronCalibTarget
 from calix import calibrate
 
@@ -237,10 +240,6 @@ class State(BaseState):
 
         # BSS hardware can only record IrregularlySampledSignal
         self.record_sample_times = True
-        self.spikes: Dict[Tuple[
-            grenade.network.PopulationOnNetwork, int,
-            halco.CompartmentOnLogicalNeuron], List[float]] = {}
-        self.madc_recordings = {}
 
         self.mpi_rank = 0        # disabled
         self.num_processes = 1   # number of MPI processes
@@ -253,7 +252,7 @@ class State(BaseState):
         self.background_spike_source_placement = None
         self.populations: List[Population] = []
         self.recorders = set([])
-        self.madc_recording_sites = {}
+        self.recording = Recording()
         self.projections: List[Projection] = []
         self.plasticity_rules: List["PlasticityRule"] = []
         self.synaptic_observables: List[Dict[str, object]] = []
@@ -297,7 +296,7 @@ class State(BaseState):
     def clear(self):
         self.recorders = set([])
         self.populations = []
-        self.madc_recording_sites = {}
+        self.recording = Recording()
         self.projections = []
         self.plasticity_rules = []
         self.synaptic_observables = []
@@ -361,7 +360,7 @@ class State(BaseState):
             outputs, network_graph)[0]
 
         data = {}
-        for site in self.madc_recording_sites:
+        for site in self.recording.config.madc:
             local_times, population, neuron_on_population, \
                 compartment_on_neuron, _, local_values = samples
             # converting compartment_on_neuron to an integer increases the
@@ -520,24 +519,8 @@ class State(BaseState):
                 self.populations, proj, network_builder)
         for plasticity_rule in self.plasticity_rules:
             plasticity_rule.add_to_network_graph(network_builder)
-        # generate MADC recording
-        if len(self.madc_recording_sites) > 0:
-            assert len(self.madc_recording_sites) <= 2
-            madc_recording_neurons = []
-            for rec_site, source in self.madc_recording_sites.items():
-                neuron = grenade.network.MADCRecording.Neuron()
-                neuron.coordinate.population = grenade.network\
-                    .PopulationOnNetwork(rec_site.population)
-                neuron.source = source
-                neuron.coordinate.neuron_on_population \
-                    = rec_site.neuron_on_population
-                neuron.coordinate.compartment_on_neuron \
-                    = rec_site.compartment_on_neuron
-                neuron.coordinate.atomic_neuron_on_compartment = 0
-                madc_recording_neurons.append(neuron)
-            madc_recording = grenade.network.MADCRecording(
-                madc_recording_neurons)
-            network_builder.add(madc_recording)
+
+        self.recording.config.add_to_network_graph(network_builder)
 
         network = network_builder.done()
 
@@ -828,10 +811,11 @@ class State(BaseState):
                        f"{(time.time() - time_after_preparations):.3f}s")
         time_after_hw_run = time.time()
 
-        self.spikes = grenade.network.extract_neuron_spikes(
+        self.recording.data.spikes = grenade.network.extract_neuron_spikes(
             outputs, self.grenade_network_graph)[0]
 
-        self.madc_recordings = self._get_v(self.grenade_network_graph, outputs)
+        self.recording.data.madc = self._get_v(self.grenade_network_graph,
+                                               outputs)
 
         self.synaptic_observables = self._get_synaptic_observables(
             self.grenade_network_graph, outputs)

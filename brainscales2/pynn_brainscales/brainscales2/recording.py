@@ -1,5 +1,5 @@
 from itertools import product, compress
-from typing import NamedTuple, Sequence, Set, List, Optional
+from typing import Sequence, Set, List, Optional
 from datetime import datetime
 from warnings import warn
 import numpy as np
@@ -9,73 +9,18 @@ import pyNN.recording
 import pyNN.errors
 
 from pynn_brainscales.brainscales2 import simulator
-from dlens_vx_v3 import hal, halco
-
-
-class RecordingSite(NamedTuple):
-    cell_id: int  # Type pynn.simulator.ID (cyclic import)
-    comp_id: halco.CompartmentOnLogicalNeuron
-
-
-class MADCRecordingSite(NamedTuple):
-    population: int
-    neuron_on_population: int
-    compartment_on_neuron: halco.CompartmentOnLogicalNeuron
+from pynn_brainscales.brainscales2.recording_data import RecordingSite, \
+    RecordingConfig, GrenadeRecId
+from dlens_vx_v3 import halco
 
 
 class Recorder(pyNN.recording.Recorder):
 
     _simulator = simulator
-    _var_name_to_readout_source = \
-        {"v": hal.NeuronConfig.ReadoutSource.membrane,
-         "exc_synin": hal.NeuronConfig.ReadoutSource.exc_synin,
-         "inh_synin": hal.NeuronConfig.ReadoutSource.inh_synin,
-         "adaptation": hal.NeuronConfig.ReadoutSource.adaptation}
-    madc_variables = list(_var_name_to_readout_source)
 
     def __init__(self, population, file=None):
         super().__init__(population, file=file)
         self.changed_since_last_run = True
-
-    # pylint: disable=too-many-branches
-    def _configure_madc(self, variables: Set[str],
-                        recording_sites: Set[RecordingSite]):
-        if len(variables) == 0 or len(recording_sites) == 0:
-            return
-        if len(variables) > 1:
-            raise ValueError("Can only set 1 analog record type per neuron.")
-        if len(recording_sites) > 2:
-            raise ValueError("Can only record at most two neurons/locations "
-                             "via MADC.")
-
-        variable = next(iter(variables))
-        assert variable in Recorder.madc_variables
-        readout_source = self._var_name_to_readout_source[variable]
-
-        for recording_site in recording_sites:
-            neuron_on_population = int(np.where(
-                self.population.all_cells
-                == int(recording_site.cell_id))[0][0])
-
-            new_rec_site = MADCRecordingSite(
-                population=self._simulator.state.populations.index(
-                    self.population),
-                neuron_on_population=neuron_on_population,
-                compartment_on_neuron=recording_site.comp_id)
-
-            # check if MADC recording already enabled for this site.
-            all_rec_sites = self._simulator.state.madc_recording_sites
-            if new_rec_site in all_rec_sites:
-                if all_rec_sites[new_rec_site] == readout_source:
-                    # recording already set.
-                    return
-                raise ValueError("Only one source can be recorded per neuron.")
-
-            # MADC recording not enabled for this site.
-            if len(all_rec_sites) >= 2:
-                raise ValueError(
-                    "Can only record at most two neurons/locations via MADC")
-            all_rec_sites[new_rec_site] = readout_source
 
     def _get_recording_sites(self, neuron_ids: List[int],
                              locations: Optional[Sequence[str]] = None
@@ -105,10 +50,14 @@ class Recorder(pyNN.recording.Recorder):
             raise NotImplementedError("Sampling interval not implemented.")
         variable_list = pyNN.recording.normalize_variables_arg(variables)
 
-        madc_variables = set(variable_list).intersection(self.madc_variables)
         ids = {id for id in ids if id.local}
         recording_sites = self._get_recording_sites(ids, locations)
-        self._configure_madc(madc_variables, recording_sites)
+        grenade_ids = {self._rec_site_to_grenade_index(rec_site) for rec_site
+                       in recording_sites}
+        self._simulator.state.recording.config.add_madc_recording(
+            set(variable_list).intersection(
+                RecordingConfig.analog_observable_names),
+            grenade_ids)
 
         self._simulator.state.log.debug(f'Recorder.record(<{len(ids)} cells>)')
 
@@ -135,41 +84,32 @@ class Recorder(pyNN.recording.Recorder):
     def _reset(self):
         self.changed_since_last_run = True
 
-        pop_idx = self._simulator.state.populations.index(self.population)
-        # only MADC record setting needs to be reset for BSS back end. As it's
-        # a global state we check if a record parameters is MADC based
         for variable in self.recorded:
-            if variable not in Recorder.madc_variables:
-                continue
             for rec_site in self.recorded[variable]:
-                global_rec_site = MADCRecordingSite(
-                    pop_idx, self.population.id_to_index(rec_site.cell_id),
-                    rec_site.comp_id)
-                self._simulator.state.madc_recording_sites.pop(global_rec_site)
-                try:
-                    self._simulator.state.madc_recordings.pop(rec_site)
-                except KeyError:
-                    # samples might already be deleted (for examples when
-                    # `get_data(clear=True)` is called.)
-                    pass
+                grenade_id = self._rec_site_to_grenade_index(rec_site)
+                self._simulator.state.recording.remove(grenade_id)
 
     def _clear_simulator(self):
-        self._simulator.state.spikes = []
-        self._simulator.state.madc_recordings = {}
+        self._simulator.state.recording.data.remove()
 
     # pylint: disable=unused-argument
     def _get_spiketimes(self, ids, clear=None):
         """Returns a dict containing the recording site and its spiketimes."""
         all_spiketimes = {}
         for rec_site in ids:
-            index_on_pop = np.where(
-                self.population.all_cells == int(rec_site.cell_id))[0]
-            assert len(index_on_pop) == 1
-            neuron_idx = (simulator.state.populations.index(self.population),
-                          index_on_pop[0], int(rec_site.comp_id))
-            if neuron_idx in simulator.state.spikes:
-                all_spiketimes[rec_site] = simulator.state.spikes[neuron_idx]
+            neuron_idx = self._rec_site_to_grenade_index(rec_site)
+            if neuron_idx in self._simulator.state.recording.data.spikes:
+                all_spiketimes[rec_site] = self._simulator.state.recording.\
+                    data.spikes[neuron_idx]
         return all_spiketimes
+
+    def _rec_site_to_grenade_index(self, rec_site: RecordingSite
+                                   ) -> GrenadeRecId:
+        index_on_pop = np.where(
+            self.population.all_cells == int(rec_site.cell_id))[0]
+        assert len(index_on_pop) == 1
+        return GrenadeRecId(simulator.state.populations.index(self.population),
+                            index_on_pop[0], int(rec_site.comp_id))
 
     def _get_location_label(self, comp_id: halco.CompartmentOnLogicalNeuron
                             ) -> str:
@@ -316,29 +256,29 @@ class Recorder(pyNN.recording.Recorder):
         return segment
 
     def _get_all_signals(self, variable, ids, clear=None):
-        pop_idx = self._simulator.state.populations.index(self.population)
         del clear  # not implemented
 
         times = []
         values = []
         for id in ids:
-            rec_site = MADCRecordingSite(
-                pop_idx, self.population.id_to_index(id.cell_id), id.comp_id)
-            if rec_site not in self._simulator.state.madc_recording_sites:
+            grenade_id = self._rec_site_to_grenade_index(id)
+            if grenade_id not in self._simulator.state.recording.config.madc:
                 raise RuntimeError("No samples were recorded for population "
                                    f"'{self.population.label}' at recording "
                                    f"{id}.")
-            recorded_var = self._simulator.state.madc_recording_sites[rec_site]
-            if recorded_var != self._var_name_to_readout_source.get(variable):
+            recorded_var = self._simulator.state.recording.config.\
+                analog_observables[grenade_id]
+            if recorded_var != RecordingConfig.str_to_source_map.get(variable):
                 raise RuntimeError(f"'{recorded_var}' was recorded but "
                                    f"'{variable}' was requested "
                                    f"(population: {self.population.label}, "
                                    f"recording_site: {id}).")
-            if rec_site not in self._simulator.state.madc_recordings:
+            if grenade_id not in self._simulator.state.recording.data.madc:
                 # no samples have been recorded yet
                 continue
 
-            madc_recording = self._simulator.state.madc_recordings[rec_site]
+            madc_recording = self._simulator.state.recording.data.\
+                madc[grenade_id]
             times.append(madc_recording.times)
             values.append(madc_recording.values)
 
