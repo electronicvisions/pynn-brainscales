@@ -1,5 +1,5 @@
 from itertools import product, compress
-from typing import Sequence, Set, List, Optional
+from typing import Sequence, Set, List, Optional, Tuple
 from datetime import datetime
 from warnings import warn
 import numpy as np
@@ -59,6 +59,13 @@ class Recorder(pyNN.recording.Recorder):
                 set(variable_list).intersection(
                     RecordingConfig.analog_observable_names),
                 grenade_ids)
+        elif 'pad' in device:
+            pad, buffered = self._device_name_to_pad_config(device)
+            self._simulator.state.recording.config.add_pad_readout(
+                set(variable_list).intersection(
+                    RecordingConfig.analog_observable_names),
+                grenade_ids,
+                pad=pad, buffered=buffered)
         else:
             raise ValueError(f'Device "{device}" is not supported')
 
@@ -70,6 +77,30 @@ class Recorder(pyNN.recording.Recorder):
                                                  self.population.celltype)
             # save all recording sites in a set
             self.recorded[variable] |= recording_sites
+
+    @staticmethod
+    def _device_name_to_pad_config(device: str) -> Tuple[str, bool]:
+        '''
+        Extract pad and buffering mode from device name.
+
+        The device name is of the form 'pad_[0|1][|_unbuffered|_buffered]'.
+        Raise ValueError if device name does not fit format. Otherwise,
+        extract pad as well as buffering mode from device name.
+        :param device: Device to record.
+        :returns: Pad, buffering enabled.
+        '''
+        parts = device.split("_")
+        correct_start = parts[0] == 'pad'
+        correct_pad_number = len(parts) > 1 and parts[1] in ['0', '1']
+        correct_buffering = len(parts) < 3 or parts[2] in ['buffered',
+                                                           'unbuffered']
+        if len(parts) > 3 or not (correct_start and correct_pad_number
+                                  and correct_buffering):
+            raise ValueError(f'Device "{device}" is not supported')
+        pad = int(parts[1])
+        unbuffered = 'unbuffered' in device
+
+        return pad, not unbuffered
 
     # Overwrite base function since `self.recorded` saves sets of
     # RecordingSite. `filter_ids` filters for cell_ids therefore, we have to

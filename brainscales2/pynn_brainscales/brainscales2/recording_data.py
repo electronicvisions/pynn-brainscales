@@ -24,6 +24,11 @@ class MADCData(NamedTuple):
     values: np.ndarray
 
 
+class PadConfig(NamedTuple):
+    rec_site: GrenadeRecId
+    buffered: bool
+
+
 class Recording:
     """
     Save recording information as well as recorded data.
@@ -84,6 +89,7 @@ class RecordingConfig:
         self.analog_observables: Dict[GrenadeRecId,
                                       hal.NeuronConfig.ReadoutSource] = {}
         self.madc: List[GrenadeRecId] = []
+        self.pads: Dict[halco.PadOnDLS, PadConfig] = {}
 
     def add_madc_recording(self, variables: Set[str],
                            recording_sites: Set[GrenadeRecId]):
@@ -116,30 +122,88 @@ class RecordingConfig:
             self.madc.append(recording_site)
             self.analog_observables[recording_site] = readout_source
 
+    def add_pad_readout(self, variables: Set[str],
+                        recording_sites: Set[GrenadeRecId],
+                        pad: int,
+                        buffered: bool = True):
+        if len(variables) == 0 or len(recording_sites) == 0:
+            return
+        if len(variables) > 1:
+            raise ValueError("Can only set 1 analog readout type per neuron.")
+        if len(recording_sites) > 1:
+            raise ValueError("Can only read out a single neuron per pad.")
+        if pad not in [0, 1]:
+            raise ValueError("Only pad 0 and 1 are available.")
+
+        variable = next(iter(variables))
+        if variable not in self.analog_observable_names:
+            raise RuntimeError(f"Can not readout variable '{variable}' at "
+                               "the pad.")
+        readout_source = self.str_to_source_map[variable]
+
+        # check if other variable is already recorded at given recording sites.
+        recording_site = next(iter(recording_sites))
+        if recording_site in self.analog_observables and \
+                self.analog_observables[recording_site] != readout_source:
+            raise ValueError("Only one source can be recorded per neuron.")
+
+        pad_coord = halco.PadOnDLS(pad)
+        if pad_coord in self.pads and \
+                self.pads[pad_coord] != PadConfig(recording_site, buffered):
+            raise ValueError("Can only record one neuron and one mode "
+                             "(buffered or unbuffered) per pad.")
+        self.pads[pad_coord] = PadConfig(recording_site, buffered)
+        self.analog_observables[recording_site] = readout_source
+
     def remove(self, recording_site: GrenadeRecId):
         if recording_site in self.analog_observables:
             self.analog_observables.pop(recording_site)
         if recording_site in self.madc:
             self.madc.remove(recording_site)
 
+        pads_to_remove = []
+        for pad_coord, pad in self.pads.items():
+            if pad[0] == recording_site:
+                pads_to_remove.append(pad_coord)
+        for pad_coord in pads_to_remove:
+            del self.pads[pad_coord]
+
     def add_to_network_graph(self,
                              network_builder: grenade.network.NetworkBuilder
                              ) -> None:
-        if len(self.madc) == 0:
-            return
-        madc_recording_neurons = []
-        for rec_site in self.madc:
-            source = self.analog_observables[rec_site]
-            neuron = grenade.network.MADCRecording.Neuron()
-            neuron.coordinate.population = grenade.network\
-                .PopulationOnNetwork(rec_site.population)
-            neuron.source = source
-            neuron.coordinate.neuron_on_population \
-                = rec_site.neuron_on_population
-            neuron.coordinate.compartment_on_neuron \
-                = rec_site.compartment_on_neuron
-            neuron.coordinate.atomic_neuron_on_compartment = 0
-            madc_recording_neurons.append(neuron)
-        madc_recording = grenade.network.MADCRecording(
-            madc_recording_neurons)
-        network_builder.add(madc_recording)
+        if len(self.madc) > 0:
+            madc_recording_neurons = []
+            for rec_site in self.madc:
+                source = self.analog_observables[rec_site]
+                neuron = grenade.network.MADCRecording.Neuron()
+                neuron.coordinate.population = grenade.network\
+                    .PopulationOnNetwork(rec_site.population)
+                neuron.source = source
+                neuron.coordinate.neuron_on_population \
+                    = rec_site.neuron_on_population
+                neuron.coordinate.compartment_on_neuron \
+                    = rec_site.compartment_on_neuron
+                neuron.coordinate.atomic_neuron_on_compartment = 0
+                madc_recording_neurons.append(neuron)
+            madc_recording = grenade.network.MADCRecording(
+                madc_recording_neurons)
+            network_builder.add(madc_recording)
+
+        if len(self.pads) > 0:
+            recordings = {}
+            for pad_coord, config in self.pads.items():
+                source = self.analog_observables[config.rec_site]
+
+                neuron = grenade.network.MADCRecording.Neuron()
+                neuron.coordinate.population = grenade.network\
+                    .PopulationOnNetwork(config.rec_site.population)
+                neuron.source = source
+                neuron.coordinate.neuron_on_population \
+                    = config.rec_site.neuron_on_population
+                neuron.coordinate.compartment_on_neuron \
+                    = config.rec_site.compartment_on_neuron
+                neuron.coordinate.atomic_neuron_on_compartment = 0
+
+                recordings[pad_coord] = grenade.network.PadRecording.Source(
+                    neuron, config.buffered)
+            network_builder.add(grenade.network.PadRecording(recordings))

@@ -211,6 +211,22 @@ class TestAPopulation(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.hxpop1.record('v', device='non_exiting_device')
 
+    def test_pad_readout(self):
+        '''
+        Test that pad recording can be configured.
+        '''
+        devices = ['pad_0', 'pad_0_buffered', 'pad_0_unbuffered',
+                   'pad_1', 'pad_1_buffered', 'pad_1_unbuffered']
+        for device in devices:
+            for value in ["v", "exc_synin", "inh_synin", "adaptation"]:
+                self.hxpop1.record(value, device=device)
+                self.hxpop1.record(None)
+
+        with self.assertRaises(ValueError):
+            self.hxpop1.record('v', device='pad_2')
+        with self.assertRaises(ValueError):
+            self.hxpop1.record('v', device='pad_0_un_buffered')
+
 
 class TestLolaNeuronConstruction(unittest.TestCase):
 
