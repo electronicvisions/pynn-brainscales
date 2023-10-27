@@ -14,7 +14,6 @@ class StaticSynapse(synapses.StaticSynapse):
         ('delay', 'delay')
     )
 
-    # pylint: disable=no-self-use
     def _get_minimum_delay(self):
         return simulator.state.min_delay
 

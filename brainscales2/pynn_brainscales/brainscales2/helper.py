@@ -165,4 +165,4 @@ def decompose_in_member_names(composed_name: str) -> Tuple[str, str]:
 # all members of the lola.AtomicNeuron
 ATOMIC_NEURON_MEMBERS = \
     [name for name, _ in inspect.getmembers(lola.AtomicNeuron())
-     if(not(name.startswith("_")) and name.islower())]
+     if (not name.startswith("_") and name.islower())]

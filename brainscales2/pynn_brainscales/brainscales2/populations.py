@@ -111,7 +111,7 @@ class Population(pyNN.common.Population):
         else:
             super().__setattr__(name, value)
 
-    # pylint: disable=unused-argument, no-self-use
+    # pylint: disable=unused-argument
     def _set_initial_value_array(self, variable, value):
         return
 

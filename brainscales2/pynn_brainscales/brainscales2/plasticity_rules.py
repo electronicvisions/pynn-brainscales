@@ -130,7 +130,6 @@ class PlasticityRule:
         self._populations.remove(old_population)
         self.changed_since_last_run = True
 
-    # pylint: disable=no-self-use
     def generate_kernel(self) -> str:
         """
         Generate plasticity rule kernel to be compiled into PPU program.

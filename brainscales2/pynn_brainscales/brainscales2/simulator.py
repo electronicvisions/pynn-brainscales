@@ -485,7 +485,7 @@ class State(BaseState):
                 self.injected_calib_options,
                 self.calib_cache_dir)
             if self.conn is not None and not self.conn_comes_from_outside:
-                self.conn = self.conn_manager.__enter__()
+                self.conn = self.conn_manager.__enter__()  # pylint: disable=unnecessary-dunder-call
             dumper = sta.PlaybackProgramBuilderDumper()
             result.apply(dumper)
             self.grenade_chip_config = sta.convert_to_chip(
@@ -805,7 +805,7 @@ class State(BaseState):
            self.conn_manager is None:
             self.conn_manager = grenade.execution.ManagedJITGraphExecutor()
             assert self.conn is None
-            self.conn = self.conn_manager.__enter__()
+            self.conn = self.conn_manager.__enter__()  # pylint: disable=unnecessary-dunder-call
 
         time_after_preparations = time.time()
         self.log.DEBUG("run(): Preparations finished in "
