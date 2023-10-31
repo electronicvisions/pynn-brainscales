@@ -199,6 +199,18 @@ class TestAPopulation(unittest.TestCase):
             self.mcpop1.record('v', locations=['non_existent_label'])
         self.mcpop1.record(None)
 
+        # test device argument
+        for value in ["v", "exc_synin", "inh_synin", "adaptation"]:
+            self.hxpop1.record(value, device="madc")
+            self.hxpop1.record(None)
+        self.hxpop1.record(["spikes", "v"], device='madc')
+        self.hxpop1.record(None)
+        self.mcpop1.record('v', device='madc')
+        self.mcpop1.record(None)
+
+        with self.assertRaises(ValueError):
+            self.hxpop1.record('v', device='non_exiting_device')
+
 
 class TestLolaNeuronConstruction(unittest.TestCase):
 

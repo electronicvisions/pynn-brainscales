@@ -9,10 +9,10 @@ from pynn_brainscales.brainscales2.recording import Recorder
 class Assembly(pyNN.common.Assembly):
     _simulator = simulator
 
-    # Note: Forward `location` argument. Rest of implementation identical to
-    # upstream PyNN.
-    def record(self, variables, to_file=None, sampling_interval=None,
-               locations=None):
+    # Note: Forward `location` and `device` arguments. Rest of implementation
+    # identical to upstream PyNN.
+    def record(self, variables, to_file=None, sampling_interval=None, *,
+               locations=None, device="madc"):
         """
         Record the specified variable or variables for all cells in the
         Assembly.
@@ -26,9 +26,11 @@ class Assembly(pyNN.common.Assembly):
         is called.
 
         `locations` defines where the variables should be recorded.
+        `device` defines the device to use.
         """
         for pop in self.populations:
-            pop.record(variables, to_file, sampling_interval, locations)
+            pop.record(variables, to_file, sampling_interval,
+                       locations=locations, device=device)
 
 
 # pylint:disable=abstract-method
@@ -166,10 +168,10 @@ class Population(pyNN.common.Population):
             raise AttributeError("calib_target not available for celltype "
                                  f"{type(self.celltype)}")
 
-    # Note: Forward `location` argument. Rest of implementation identical to
-    # upstream PyNN.
-    def record(self, variables, to_file=None, sampling_interval=None,
-               locations=None):
+    # Note: Forward `location` and `device` arguments. Rest of implementation
+    # identical to upstream PyNN.
+    def record(self, variables, to_file=None, sampling_interval=None, *,
+               locations=None, device="madc"):
         """
         Record the specified variable or variables for all cells in the
         Population or view.
@@ -186,6 +188,7 @@ class Population(pyNN.common.Population):
         multiple of the simulation timestep.
 
         `locations` defines where the variables should be recorded.
+        `device` defines the device to use.
         """
         if variables is None:  # reset the list of things to record
             # note that if record(None) is called on a view of a population
@@ -198,11 +201,13 @@ class Population(pyNN.common.Population):
             if self._record_filter is None:
                 self.recorder.record(variables, self.all_cells,
                                      sampling_interval,
-                                     locations)
+                                     locations=locations,
+                                     device=device)
             else:
                 self.recorder.record(variables, self._record_filter,
                                      sampling_interval,
-                                     locations)
+                                     locations=locations,
+                                     device=device)
         if isinstance(to_file, str):
             self.recorder.file = to_file
             self._simulator.state.write_on_end.append((self, variables,

@@ -39,8 +39,8 @@ class Recorder(pyNN.recording.Recorder):
         return {RecordingSite(n_id, c_id) for n_id, c_id in
                 product(neuron_ids, comp_ids)}
 
-    def record(self, variables, ids, sampling_interval=None,
-               locations=None):
+    def record(self, variables, ids, sampling_interval=None, *,
+               locations=None, device="madc"):
         self.changed_since_last_run = True
         # MADC based recording is only possible for one neuron on a chip
         # it is therefore checked for population size one and no multi
@@ -54,10 +54,13 @@ class Recorder(pyNN.recording.Recorder):
         recording_sites = self._get_recording_sites(ids, locations)
         grenade_ids = {self._rec_site_to_grenade_index(rec_site) for rec_site
                        in recording_sites}
-        self._simulator.state.recording.config.add_madc_recording(
-            set(variable_list).intersection(
-                RecordingConfig.analog_observable_names),
-            grenade_ids)
+        if device == "madc":
+            self._simulator.state.recording.config.add_madc_recording(
+                set(variable_list).intersection(
+                    RecordingConfig.analog_observable_names),
+                grenade_ids)
+        else:
+            raise ValueError(f'Device "{device}" is not supported')
 
         self._simulator.state.log.debug(f'Recorder.record(<{len(ids)} cells>)')
 
