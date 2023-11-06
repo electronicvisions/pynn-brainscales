@@ -131,10 +131,10 @@ class Recorder(pyNN.recording.Recorder):
         """Returns a dict containing the recording site and its spiketimes."""
         all_spiketimes = {}
         for rec_site in ids:
-            neuron_idx = self._rec_site_to_grenade_index(rec_site)
-            if neuron_idx in self._simulator.state.recording.data.spikes:
+            grenade_id = self._rec_site_to_grenade_index(rec_site)
+            if grenade_id in self._simulator.state.recording.data.spikes:
                 all_spiketimes[rec_site] = self._simulator.state.recording.\
-                    data.spikes[neuron_idx]
+                    data.spikes[grenade_id]
         return all_spiketimes
 
     def _rec_site_to_grenade_index(self, rec_site: RecordingSite
