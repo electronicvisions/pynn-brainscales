@@ -295,11 +295,11 @@ class Recorder(pyNN.recording.Recorder):
         times = []
         values = []
         for id in ids:
-            grenade_id = self._rec_site_to_grenade_index(id)
-            if grenade_id not in self._simulator.state.recording.config.madc:
+            if id not in self.recorded.get(variable, set()):
                 raise RuntimeError("No samples were recorded for population "
                                    f"'{self.population.label}' at recording "
                                    f"{id}.")
+            grenade_id = self._rec_site_to_grenade_index(id)
             recorded_var = self._simulator.state.recording.config.\
                 analog_observables[grenade_id]
             if recorded_var != RecordingConfig.str_to_source_map.get(variable):
