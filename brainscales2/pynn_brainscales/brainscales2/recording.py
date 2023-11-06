@@ -10,7 +10,7 @@ import pyNN.errors
 
 from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.recording_data import RecordingSite, \
-    RecordingConfig, GrenadeRecId
+    RecordingConfig, GrenadeRecId, RecordingType
 from dlens_vx_v3 import halco
 
 
@@ -121,13 +121,21 @@ class Recorder(pyNN.recording.Recorder):
         for variable in self.recorded:
             for rec_site in self.recorded[variable]:
                 grenade_id = self._rec_site_to_grenade_index(rec_site)
-                self._simulator.state.recording.remove(grenade_id)
+                # this removes the recording site from the configuration as
+                # well as previously recorded data since the data can no longer
+                # be retrieved.
+                self._simulator.state.recording.remove(
+                    recording_site=grenade_id)
 
     def _clear_simulator(self):
-        self._simulator.state.recording.data.remove()
+        # here we only remove the recorded data but keep the configuration
+        for variable in self.recorded:
+            for rec_site in self.recorded[variable]:
+                grenade_id = self._rec_site_to_grenade_index(rec_site)
+                self._simulator.state.recording.data.remove(
+                    recording_site=grenade_id)
 
-    # pylint: disable=unused-argument
-    def _get_spiketimes(self, ids, clear=None):
+    def _get_spiketimes(self, ids, clear=False):
         """Returns a dict containing the recording site and its spiketimes."""
         all_spiketimes = {}
         for rec_site in ids:
@@ -135,6 +143,10 @@ class Recorder(pyNN.recording.Recorder):
             if grenade_id in self._simulator.state.recording.data.spikes:
                 all_spiketimes[rec_site] = self._simulator.state.recording.\
                     data.spikes[grenade_id]
+            if clear:
+                self._simulator.state.recording.data.remove(
+                    recording_site=grenade_id,
+                    recording_type=RecordingType.SPIKES)
         return all_spiketimes
 
     def _rec_site_to_grenade_index(self, rec_site: RecordingSite
@@ -289,9 +301,7 @@ class Recorder(pyNN.recording.Recorder):
                         signal.segment = segment
         return segment
 
-    def _get_all_signals(self, variable, ids, clear=None):
-        del clear  # not implemented
-
+    def _get_all_signals(self, variable, ids, clear=False):
         times = []
         values = []
         for id in ids:
@@ -315,6 +325,10 @@ class Recorder(pyNN.recording.Recorder):
                 madc[grenade_id]
             times.append(madc_recording.times)
             values.append(madc_recording.values)
+            if clear:
+                self._simulator.state.recording.data.remove(
+                    recording_site=grenade_id,
+                    recording_type=RecordingType.MADC)
 
         return np.array(values, dtype=object), np.array(times, dtype=object)
 

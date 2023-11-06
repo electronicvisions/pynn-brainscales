@@ -1,8 +1,15 @@
+from enum import Enum, auto
 from typing import NamedTuple, Set, List, Dict, Optional
 import numpy as np
 
 import pygrenade_vx as grenade
 from dlens_vx_v3 import hal, halco
+
+
+class RecordingType(Enum):
+    MADC = auto()
+    PAD = auto()
+    SPIKES = auto()
 
 
 class RecordingSite(NamedTuple):
@@ -54,17 +61,27 @@ class RecordingData:
         self.madc: Dict[GrenadeRecId, MADCData] = {}
         self.spikes: Dict[GrenadeRecId, List[float]] = {}
 
-    def remove(self, recording_site: Optional[GrenadeRecId] = None):
-        for data_type in ['madc', 'spikes']:
+    def __getitem__(self, key: RecordingType):
+        return self.__getattribute__(key.name.lower())
+
+    def __setitem__(self, key: RecordingType, value: Dict):
+        self.__setattr__(key.name.lower(), value)
+
+    def remove(self, recording_site: Optional[GrenadeRecId] = None,
+               recording_type: Optional[RecordingType] = None):
+        recording_types = [RecordingType.MADC, RecordingType.SPIKES]
+        if recording_type is not None:
+            recording_types = [recording_type]
+        for data_type in recording_types:
             if recording_site is None:
-                setattr(self, data_type, {})
-            else:
-                try:
-                    getattr(self, data_type).pop(recording_site)
-                except KeyError:
-                    # samples might already be deleted (for example when
-                    # `get_data(clear=True)` is called.)
-                    pass
+                self[data_type] = {}
+                continue
+            try:
+                self[data_type].pop(recording_site)
+            except KeyError:
+                # samples might already be deleted (for example when
+                # `get_data(clear=True)` is called.)
+                pass
 
 
 class RecordingConfig:

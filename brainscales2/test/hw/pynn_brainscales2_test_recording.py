@@ -226,6 +226,8 @@ class TestMembraneRecording(unittest.TestCase):
         self.assertEqual(
             len(pop_c.get_data().segments[-1].irregularlysampledsignals), 0)
 
+        pynn.reset()
+
         pop_a.record(None)
         pop_c.record(["v"])
 
@@ -242,6 +244,77 @@ class TestMembraneRecording(unittest.TestCase):
             len(pop_b.get_data().segments[-1].irregularlysampledsignals), 1)
         self.assertEqual(
             len(pop_c.get_data().segments[-1].irregularlysampledsignals), 1)
+
+
+class TestClearBehaviour(unittest.TestCase):
+    """
+    Test clear behaviour.
+
+    Test proper behaviour of the clear parameter of get_data.
+    """
+    n_spikes = 10
+    runtime = 10  # ms
+
+    def setUp(self) -> None:
+        '''
+        Perform experiment an record spikes
+        '''
+        pynn.setup(enable_neuron_bypass=True)
+
+        pop_0 = pynn.Population(1, pynn.cells.HXNeuron())
+        pop_1 = pynn.Population(1, pynn.cells.HXNeuron())
+        pop_0.record('spikes')
+        pop_1.record('spikes')
+
+        # Inject spikes
+        spikes = np.linspace(0.1, 0.9 * self.runtime, self.n_spikes)
+        input_pop = pynn.Population(1, pynn.cells.SpikeSourceArray(
+            spike_times=spikes))
+        pynn.Projection(input_pop, pop_0, pynn.AllToAllConnector(),
+                        synapse_type=StaticSynapse(weight=63))
+        pynn.Projection(input_pop, pop_1, pynn.AllToAllConnector(),
+                        synapse_type=StaticSynapse(weight=63))
+        pynn.run(self.runtime)
+
+        self.pop_0 = pop_0
+        self.pop_1 = pop_1
+
+    def tearDown(self) -> None:
+        pynn.end()
+
+    def test_no_clear(self):
+        """
+        Test without clear.
+
+        All data should still be available.
+        """
+
+        spikes_0 = self.pop_0.get_data().segments[0].spiketrains[0]
+        spikes_1 = self.pop_1.get_data().segments[0].spiketrains[0]
+        self.assertEqual(len(spikes_0), self.n_spikes)
+        self.assertEqual(len(spikes_1), self.n_spikes)
+
+        spikes_0 = self.pop_0.get_data().segments[0].spiketrains[0]
+        spikes_1 = self.pop_1.get_data().segments[0].spiketrains[0]
+        self.assertEqual(len(spikes_0), self.n_spikes)
+        self.assertEqual(len(spikes_1), self.n_spikes)
+
+    def test_only_clear_one_population(self):
+        """
+        Only clear recording from one population.
+
+        This should not affect the data of the other population.
+        be available.
+        """
+        spikes_0 = self.pop_0.get_data(clear=True).segments[0].spiketrains[0]
+        spikes_1 = self.pop_1.get_data().segments[0].spiketrains[0]
+        self.assertEqual(len(spikes_0), self.n_spikes)
+        self.assertEqual(len(spikes_1), self.n_spikes)
+
+        spikes_0 = self.pop_0.get_data().segments[0].spiketrains[0]
+        spikes_1 = self.pop_1.get_data().segments[0].spiketrains[0]
+        self.assertEqual(len(spikes_0), 0)
+        self.assertEqual(len(spikes_1), self.n_spikes)
 
 
 if __name__ == "__main__":
