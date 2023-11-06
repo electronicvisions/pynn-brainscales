@@ -232,6 +232,7 @@ class TestMembraneRecording(unittest.TestCase):
         # test that samples of `pop_a` are not assigned to `pop_c`
         self.assertEqual(
             len(pop_c.get_data().segments[-1].irregularlysampledsignals), 0)
+        pynn.reset()
 
         pynn.run(0.1)
 

@@ -11,6 +11,14 @@ class TestEmpty(unittest.TestCase):
         pynn.run(0.2)
         pynn.end()
 
+    def test_several_runs(self):
+        pynn.setup()
+        pynn.run(0.2)
+
+        with self.assertRaises(RuntimeError):
+            pynn.run(0.2)
+        pynn.end()
+
 
 if __name__ == "__main__":
     unittest.main()

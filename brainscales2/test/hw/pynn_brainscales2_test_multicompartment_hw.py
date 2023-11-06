@@ -93,6 +93,7 @@ class TestRecordingAndProjections(unittest.TestCase):
             data = pop.get_data(clear=True).segments[-1]\
                 .irregularlysampledsignals[-1]
             psp_heights.append(self.get_psp_heights(data, len(labels)))
+            pynn.reset()
 
         self.assertTrue(
             np.all(np.argmax(psp_heights, axis=1) == np.arange(len(labels))))

@@ -779,6 +779,14 @@ class State(BaseState):
                           + "no hardware run performed.")
         else:
             self.t += runtime
+
+        if self.running and runtime is not None:
+            raise RuntimeError(
+                "Call `pynn.reset()` before calling `pynn.run()` again. "
+                "BrainScales-2 emulates the behavior of neurons and synapses "
+                "in continuous time. Stacking several `pynn.run` commands "
+                "without calling `pynn.reset()` between runs is therefore not "
+                "supported.")
         self.running = self.running or runtime is not None
 
         self.preprocess()
