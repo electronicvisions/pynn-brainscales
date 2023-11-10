@@ -823,8 +823,11 @@ class State(BaseState):
                        f"{(time_after_preparations - time_begin):.3f}s")
 
         outputs = grenade.network.run(
-            self.conn, self.grenade_chip_config, self.grenade_network_graph,
-            inputs, self._generate_playback_hooks())
+            self.conn, {grenade.common.ExecutionInstanceID():
+                        self.grenade_chip_config},
+            self.grenade_network_graph, inputs,
+            {grenade.common.ExecutionInstanceID():
+             self._generate_playback_hooks()})
 
         self.log.DEBUG("run(): Execution finished in "
                        f"{(time.time() - time_after_preparations):.3f}s")
