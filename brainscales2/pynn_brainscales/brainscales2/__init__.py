@@ -300,7 +300,8 @@ def get_post_realtime_read_ppu_symbols() -> Dict[
             "simulator after calling setup().")
     if not simulator.state.running:
         raise RuntimeError(
-            "Read PPU symbols are only available after pynn.run().")
+            "Read PPU symbols are only available after emulation on hardware. "
+            "Call pynn.run(...).")
     return simulator.state.ppu_symbols_read
 
 
@@ -341,7 +342,10 @@ def get_execution_time_info() -> grenade.signal_flow.ExecutionTimeInfo:
             "Execution time information is only available for active "
             "simulator after calling setup()."
         )
-    if not simulator.state.running:
+    if simulator.state.execution_time_info is None:
         raise RuntimeError(
-            "Execution time information is only available after pynn.run().")
+            "Execution time information is only available after the hardware "
+            "configuration has been determined. Call pynn.run(...) (you can "
+            "pass `None` as an argument if want to determine the hardware "
+            "configuration without an emulation on hardware.")
     return simulator.state.execution_time_info

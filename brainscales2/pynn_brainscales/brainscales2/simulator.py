@@ -779,7 +779,7 @@ class State(BaseState):
                           + "no hardware run performed.")
         else:
             self.t += runtime
-        self.running = True
+        self.running = self.running or runtime is not None
 
         self.preprocess()
 
