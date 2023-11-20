@@ -205,9 +205,9 @@ class TestMembraneRecording(unittest.TestCase):
         data = pop.get_data().segments[-1].irregularlysampledsignals
         self.assertFalse(np.all(data[0].magnitude == data[1].magnitude))
 
-    def test_reseting(self):
+    def test_resetting(self):
         """
-        Test that reseting of recording works correctly.
+        Test that resetting of recording works correctly.
         """
 
         pop_a = pynn.Population(1, pynn.cells.HXNeuron())
