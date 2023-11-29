@@ -1,9 +1,12 @@
+from typing import Optional, Union, List
+
 import numpy as np
 import pyNN.common
 from pyNN.parameters import ParameterSpace, simplify
 from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.plasticity_rules import PlasticityRuleHandle
 from pynn_brainscales.brainscales2.recording import Recorder
+from neo.io import NixIO
 
 
 class Assembly(pyNN.common.Assembly):
@@ -170,26 +173,43 @@ class Population(pyNN.common.Population):
 
     # Note: Forward `location` and `device` arguments. Rest of implementation
     # identical to upstream PyNN.
-    def record(self, variables, to_file=None, sampling_interval=None, *,
-               locations=None, device="madc"):
+    def record(self,
+               variables: Union[str, List[str]],
+               to_file: Optional[Union[str, NixIO]] = None,
+               sampling_interval: Optional[float] = None,
+               *,
+               locations: Optional[List[str]] = None,
+               device: str = "madc") -> None:
+
         """
         Record the specified variable or variables for all cells in the
         Population or view.
 
-        `variables` may be either a single variable name or a list of variable
-        names. For a given celltype class, `celltype.recordable` contains a
-        list of variables that can be recorded for that celltype.
+        :param variables: may be either a single variable name or a list of
+                variable names. For a given celltype class,
+                `celltype.recordable` contains a list of variables that can be
+                recorded for that celltype. To reset recording of
+                PopulationView or Population call `record` with "None" as
+                argument.
 
-        If specified, `to_file` should be either a filename or a Neo IO
-        instance and `write_data()` will be automatically called when `end()`
-        is called.
+        :param to_file: If specified, variables are written
+                to file when `pynn.end()` is called. For more details see
+                :py:function::pynn.population.write_data or pyNN-Doc
+                <https://neuralensemble.org/docs/PyNN/data_handling.html>
 
-        `sampling_interval` should be a value in milliseconds, and an integer
-        multiple of the simulation timestep.
+        :param sampling_interval: Feature not yet implemented.
 
-        `locations` defines where the variables should be recorded.
-        `device` defines the device to use.
+        :param locations: Defines where the variables should be recorded. Used
+                with multi-compartment neurons where location is defined by
+                `label`.
+
+        :param device: Configures device which is used to record recordables.
+                Default is set to "madc". Use as device
+                "pad_[0/1]_[unbuffered/buffered]" to connect recordables of
+                neurons to pads. Each of the 2 pads can be connected to one
+                neuron. For limitations see documentation.
         """
+
         if variables is None:  # reset the list of things to record
             # note that if record(None) is called on a view of a population
             # recording will be reset for the entire population, not just the
