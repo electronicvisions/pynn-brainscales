@@ -1,6 +1,6 @@
 import time
 import itertools
-from copy import copy
+from copy import copy, deepcopy
 from typing import Optional, Final, List, Dict, Union, NamedTuple, Any
 import numpy as np
 from pyNN.common import IDMixin, Population, Projection
@@ -245,6 +245,7 @@ class State(BaseState):
         self.num_processes = 1   # number of MPI processes
         self.running = False
         self.t = 0
+        self.runtimes = []
         self.t_start = 0
         self.min_delay = 0
         self.max_delay = 0
@@ -252,12 +253,12 @@ class State(BaseState):
         self.background_spike_source_placement = None
         self.populations: List[Population] = []
         self.recorders = set([])
-        self.recording = Recording()
+        self.recordings = []
         self.projections: List[Projection] = []
         self.plasticity_rules: List["PlasticityRule"] = []
-        self.synaptic_observables: List[Dict[str, object]] = []
-        self.neuronal_observables: List[Dict[str, object]] = []
-        self.array_observables: List[Dict[str, object]] = []
+        self.synaptic_observables: List[List[Dict[str, object]]] = []
+        self.neuronal_observables: List[List[Dict[str, object]]] = []
+        self.array_observables: List[List[Dict[str, object]]] = []
         self.id_counter = 0
         self.current_sources = []
         self.segment_counter = -1
@@ -290,6 +291,10 @@ class State(BaseState):
         self.initial_config = None
         self.execution_time_info = None
         self.calib_cache_dir = None
+        self.configs = []
+        self.network_graphs = []
+        self.inputs = []
+        self.realtime_snippet_count = 0
 
     def run_until(self, tstop):
         self.run(tstop - self.t)
@@ -297,7 +302,7 @@ class State(BaseState):
     def clear(self):
         self.recorders = set([])
         self.populations = []
-        self.recording = Recording()
+        self.recordings = []
         self.projections = []
         self.plasticity_rules = []
         self.synaptic_observables = []
@@ -333,6 +338,9 @@ class State(BaseState):
         self.initial_config = None
         self.execution_time_info = None
         self.calib_cache_dir = None
+        self.configs = []
+        self.network_graphs = []
+        self.inputs = []
 
         self.reset()
 
@@ -340,12 +348,23 @@ class State(BaseState):
         """Reset the state of the current network to time t = 0."""
         self.running = False
         self.t = 0
+        self.runtimes = []
         self.t_start = 0
         self.segment_counter += 1
+        self.configs = []
+        self.inputs = []
+        self.network_graphs = []
+        self.recordings = [self.recordings[-1]] if self.recordings else []
+        self.synaptic_observables = []
+        self.array_observables = []
+        self.neuronal_observables = []
+        self.realtime_snippet_count = 0
+
 
     def _get_v(self,
                network_graph: grenade.network.NetworkGraph,
-               outputs: grenade.signal_flow.IODataMap
+               outputs: grenade.signal_flow.IODataMap,
+               recording: Recording
                # Note: Any should be recording.MADCRecordingSite. We do not
                # annotate the correct type due to cyclic imports.
                ) -> Dict[Any, MADCRecording]:
@@ -360,9 +379,8 @@ class State(BaseState):
         """
         samples = grenade.network.extract_madc_samples(
             outputs, network_graph)[0]
-
         data = {}
-        for site in self.recording.config.madc:
+        for site in recording.config.madc:
             local_times, population, neuron_on_population, \
                 compartment_on_neuron, _, local_values = samples
             # converting compartment_on_neuron to an integer increases the
@@ -509,6 +527,7 @@ class State(BaseState):
                 iter(self.plasticity_rules)))
         if not changed_since_last_run:
             if self.grenade_network_graph is not None:
+                self.recordings.append(deepcopy(self.recordings[-1]))
                 return
 
         # generate network
@@ -522,7 +541,11 @@ class State(BaseState):
         for plasticity_rule in self.plasticity_rules:
             plasticity_rule.add_to_network_graph(network_builder)
 
-        self.recording.config.add_to_network_graph(network_builder)
+        if len(self.recordings) <= 0:
+            self.recordings.append(Recording())
+        recording = self.recordings[-1]
+        recording.config.add_to_network_graph(network_builder)
+        self.recordings.append(deepcopy(recording))
 
         network = network_builder.done()
 
@@ -771,6 +794,43 @@ class State(BaseState):
         self._configure_recorders_populations()
         self._reset_changed_since_last_run()
 
+    def add(self, runtime: float):
+        """
+        Adds currently specified configuration, network_graph and inputs to
+        list, which is processed serially in run()
+        """
+        time_begin = time.time()
+
+        self.t += runtime
+        self.runtimes.append(runtime)
+
+        self.realtime_snippet_count += 1
+
+        self.preprocess()
+
+        # generate external spike trains
+        inputs = self._generate_inputs(self.grenade_network_graph)
+        runtime_in_clocks = int(
+            self.t * int(hal.Timer.Value.fpga_clock_cycles_per_us) * 1000)
+        if runtime_in_clocks > hal.Timer.Value.max:
+            max_runtime = hal.Timer.Value.max /\
+                1000 / int(hal.Timer.Value.fpga_clock_cycles_per_us)
+            raise ValueError(f"Total runtime of {self.t} to long. "
+                             f"Maximum supported runtime {max_runtime}")
+
+        inputs.runtime = [{grenade.common.ExecutionInstanceID():
+                           runtime_in_clocks}]
+
+        self.configs.append(deepcopy({grenade.common.ExecutionInstanceID(): self.\
+                grenade_chip_config}))
+        self.network_graphs.append(deepcopy(self.grenade_network_graph))
+        self.inputs.append(inputs)
+
+        time_after_add = time.time()
+        self.log.DEBUG("add(): Added " + str(self.realtime_snippet_count) +
+                ". program snippet in " +
+                f"{(time_after_add - time_begin):.3f}s")
+
     def run(self, runtime: Optional[float]):
         """
         Performs a hardware run for `runtime` milliseconds.
@@ -780,8 +840,6 @@ class State(BaseState):
         if runtime is None:
             self.log.INFO("User requested 'None' runtime: "
                           + "no hardware run performed.")
-        else:
-            self.t += runtime
 
         if self.running and runtime is not None:
             raise RuntimeError(
@@ -792,25 +850,12 @@ class State(BaseState):
                 "supported.")
         self.running = self.running or runtime is not None
 
-        self.preprocess()
-
         if runtime is None:
             self.log.DEBUG(
                 f"run(): Completed in {(time.time() - time_begin):.3f}s")
             return
 
-        # generate external spike trains
-        inputs = self._generate_inputs(self.grenade_network_graph)
-        runtime_in_clocks = int(
-            runtime * int(hal.Timer.Value.fpga_clock_cycles_per_us) * 1000)
-        if runtime_in_clocks > hal.Timer.Value.max:
-            max_runtime = hal.Timer.Value.max /\
-                1000 / int(hal.Timer.Value.fpga_clock_cycles_per_us)
-            raise ValueError(f"Runtime of {runtime} to long. "
-                             f"Maximum supported runtime {max_runtime}")
-
-        inputs.runtime = [{grenade.common.ExecutionInstanceID():
-                           runtime_in_clocks}]
+        self.add(runtime)
 
         if not self.conn_comes_from_outside and \
            self.conn_manager is None:
@@ -823,39 +868,38 @@ class State(BaseState):
                        f"{(time_after_preparations - time_begin):.3f}s")
 
         outputs = grenade.network.run(
-            self.conn, {grenade.common.ExecutionInstanceID():
-                        self.grenade_chip_config},
-            self.grenade_network_graph, inputs,
-            {grenade.common.ExecutionInstanceID():
-             self._generate_playback_hooks()})
+            self.conn, self.configs, self.network_graphs,
+            self.inputs, {grenade.common.ExecutionInstanceID():
+                     self._generate_playback_hooks()})
 
         self.log.DEBUG("run(): Execution finished in "
                        f"{(time.time() - time_after_preparations):.3f}s")
         time_after_hw_run = time.time()
 
-        self.recording.data.spikes = grenade.network.extract_neuron_spikes(
-            outputs, self.grenade_network_graph)[0]
+        for i in range(self.realtime_snippet_count):
+            self.recordings[i].data.spikes = grenade.network.\
+                extract_neuron_spikes(outputs[i], self.network_graphs[i])[0]
 
-        self.recording.data.madc = self._get_v(self.grenade_network_graph,
-                                               outputs)
+            self.recordings[i].data.madc = self._get_v(
+                    self.network_graphs[i], outputs[i], self.recordings[i])
 
-        self.synaptic_observables = self._get_synaptic_observables(
-            self.grenade_network_graph, outputs)
-        self.array_observables = self._get_array_observables(
-            self.grenade_network_graph, outputs)
+            self.synaptic_observables.append(self._get_synaptic_observables(
+                self.network_graphs[i], outputs[i]))
+            self.array_observables.append(self._get_array_observables(
+                self.network_graphs[i], outputs[i]))
 
-        self.neuronal_observables = self._get_neuronal_observables(
-            self.grenade_network_graph, outputs)
+            self.neuronal_observables.append(self._get_neuronal_observables(
+                self.network_graphs[i], outputs[i]))
 
         self.pre_realtime_read = self._get_pre_realtime_read()
         self.post_realtime_read = self._get_post_realtime_read()
-        if outputs.read_ppu_symbols and outputs.read_ppu_symbols[0]:
-            self.ppu_symbols_read = outputs.read_ppu_symbols[0][
+        if outputs[0].read_ppu_symbols and outputs[0].read_ppu_symbols[0]:
+            self.ppu_symbols_read = outputs[0].read_ppu_symbols[0][
                 grenade.common.ExecutionInstanceID()]
         else:
             self.ppu_symbols_read = {}
 
-        self.execution_time_info = outputs.execution_time_info
+        self.execution_time_info = outputs[0].execution_time_info
         assert self.execution_time_info is not None
 
         self.log.DEBUG("run(): Postprocessing finished in "

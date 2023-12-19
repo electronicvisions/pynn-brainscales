@@ -28,7 +28,7 @@ import pylogging as logger
 from calix.spiking import SpikingCalibTarget, SpikingCalibOptions
 
 
-__all__ = ["list_standard_models", "setup", "end", "run", "run_until",
+__all__ = ["list_standard_models", "setup", "end", "run", "add", "run_until",
            "run_for", "reset", "initialize", "get_current_time", "create",
            "connect", "set", "record", "logger", "preprocess"]
 
@@ -226,6 +226,10 @@ _, run_until = common.build_run(simulator)
 
 def run(*args, **kwargs):
     return simulator.state.run(*args, **kwargs)
+
+
+def add(*args, **kwargs):
+    return simulator.state.add(*args, **kwargs)
 
 
 run_for = run
