@@ -101,6 +101,90 @@ class TestSpikeRecording(unittest.TestCase):
         self.assertLess(len(input_set_2 - output_set_2) / len(input_set_2),
                         0.02)
 
+    def test_reconfigure_spike_recording(self):
+        """
+        Test, if the returned spiketrains are structured in a list with one
+        spiketrain per realtime snippet and if the different spiketrains
+        with their individual spike rates each are returned in the same order,
+        as configured.
+        """
+        runtime = 10  # ms, runtime of each realtime snippet / config
+        pop = pynn.Population(1, pynn.cells.HXNeuron())
+
+        # initial config (spike recording on, 1000 spikes)
+        n_spikes = 1000
+        pop.record('spikes')
+
+        # Inject spikes
+        spikes_1 = np.linspace(0, runtime, n_spikes)
+        input_pop = pynn.Population(1, pynn.cells.SpikeSourceArray(
+            spike_times=spikes_1))
+        pynn.Projection(input_pop, pop, pynn.AllToAllConnector(),
+                        synapse_type=StaticSynapse(weight=63))
+        pynn.add(runtime)
+
+        # second config (spike recording off, 2000 spikes)
+        n_spikes = 2000
+        pop.record(None)
+
+        # Inject spikes
+        spikes_2 = np.linspace(0, runtime, n_spikes)
+        input_pop.set(spike_times=spikes_2)
+        pynn.add(runtime)
+
+        # third config (spike recording on, 3000 spikes)
+        n_spikes = 3000
+        pop.record('spikes')
+
+        # Inject spikes
+        spikes_3 = np.linspace(0, runtime, n_spikes)
+        input_pop.set(spike_times=spikes_3)
+        pynn.add(runtime)
+
+        # fourth config (spike recording off, 4000 spikes)
+        n_spikes = 4000
+        pop.record(None)
+
+        # Inject spikes
+        spikes_4 = np.linspace(0, runtime, n_spikes)
+        input_pop.set(spike_times=spikes_4)
+        pynn.add(runtime)
+
+        # fifth config (spike recording off, 5000 spikes)
+        n_spikes = 5000
+
+        # Inject spikes
+        spikes_5 = np.linspace(0, runtime, n_spikes)
+        input_pop.set(spike_times=spikes_5)
+        pynn.add(runtime)
+
+        # sixth config (spike recording on, 6000 spikes)
+        n_spikes = 6000
+        pop.record('spikes')
+
+        # Inject spikes
+        spikes_6 = np.linspace(0, runtime, n_spikes)
+        input_pop.set(spike_times=spikes_6)
+
+        #execute hardware run
+        pynn.run(runtime)
+
+        spiketrains = pop.get_data().segments[0].spiketrains
+
+        # Check now the according attributes of the spiketrains to confirm the
+        # correct order.
+        # Check the length of the spiketrains to match the above set values,
+        # if recorded, but 0 otherwise
+        self.assertLess(0.95*len(spikes_1), len(spiketrains[0]))
+        self.assertLessEqual(len(spiketrains[0]), len(spikes_1))
+        self.assertEqual(len(spiketrains[1]), 0)
+        self.assertLess(0.95*len(spikes_3), len(spiketrains[2]))
+        self.assertLessEqual(len(spiketrains[2]), len(spikes_3))
+        self.assertEqual(len(spiketrains[3]), 0)
+        self.assertEqual(len(spiketrains[4]), 0)
+        self.assertLess(0.95*len(spikes_6), len(spiketrains[5]))
+        self.assertLessEqual(len(spiketrains[5]), len(spikes_6))
+
 
 class TestMembraneRecording(unittest.TestCase):
     """
@@ -244,6 +328,34 @@ class TestMembraneRecording(unittest.TestCase):
             len(pop_b.get_data().segments[-1].irregularlysampledsignals), 1)
         self.assertEqual(
             len(pop_c.get_data().segments[-1].irregularlysampledsignals), 1)
+
+    def test_reconfigure_analog_recording(self):
+        """
+        Test whether there are recorded voltage levels for and only for the
+        according realtime snippets, where madc recording was enabled
+        """
+
+        runtime = 10 #runtime per realtime snippet in ms
+
+        pop = pynn.Population(1, pynn.cells.HXNeuron())
+
+        pop.record('v')
+        pynn.add(runtime)
+        pynn.add(runtime)
+
+        pop.record(None)
+        pynn.add(runtime)
+
+        pop.record('v')
+
+        pynn.run(runtime)
+
+        samples = pop.get_data('v').segments[0].irregularlysampledsignals
+
+        self.assertTrue(len(samples) == 3)
+        self.assertTrue(samples[0].size > 0)
+        self.assertTrue(samples[1].size > 0)
+        self.assertTrue(samples[2].size > 0)
 
 
 class TestClearBehaviour(unittest.TestCase):
