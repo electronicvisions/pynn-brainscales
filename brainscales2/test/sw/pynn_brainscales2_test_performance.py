@@ -36,7 +36,7 @@ class TestPerformance(unittest.TestCase):
         log.INFO(f"network construction {time.time() - begin}s")
 
         begin = time.time()
-        pynn.add(1) #does not perform hardware run. just preprocessing
+        pynn.add(1)  # does not perform hardware run. just preprocessing
         log.INFO(f"first run {time.time() - begin}s")
 
         begin = time.time()

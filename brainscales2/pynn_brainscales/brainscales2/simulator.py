@@ -360,7 +360,6 @@ class State(BaseState):
         self.neuronal_observables = []
         self.realtime_snippet_count = 0
 
-
     def _get_v(self,
                network_graph: grenade.network.NetworkGraph,
                outputs: grenade.signal_flow.IODataMap,
@@ -821,15 +820,15 @@ class State(BaseState):
         inputs.runtime = [{grenade.common.ExecutionInstanceID():
                            runtime_in_clocks}]
 
-        self.configs.append(deepcopy({grenade.common.ExecutionInstanceID(): self.\
-                grenade_chip_config}))
+        self.configs.append(deepcopy({grenade.common.
+                            ExecutionInstanceID(): self.grenade_chip_config}))
         self.network_graphs.append(deepcopy(self.grenade_network_graph))
         self.inputs.append(inputs)
 
         time_after_add = time.time()
-        self.log.DEBUG("add(): Added " + str(self.realtime_snippet_count) +
-                ". program snippet in " +
-                f"{(time_after_add - time_begin):.3f}s")
+        self.log.DEBUG(f"add(): Added {self.realtime_snippet_count}"
+                       ". program snippet in "
+                       f"{(time_after_add - time_begin):.3f}s")
 
     def run(self, runtime: Optional[float]):
         """
@@ -870,7 +869,7 @@ class State(BaseState):
         outputs = grenade.network.run(
             self.conn, self.configs, self.network_graphs,
             self.inputs, {grenade.common.ExecutionInstanceID():
-                     self._generate_playback_hooks()})
+                          self._generate_playback_hooks()})
 
         self.log.DEBUG("run(): Execution finished in "
                        f"{(time.time() - time_after_preparations):.3f}s")
@@ -881,7 +880,7 @@ class State(BaseState):
                 extract_neuron_spikes(outputs[i], self.network_graphs[i])[0]
 
             self.recordings[i].data.madc = self._get_v(
-                    self.network_graphs[i], outputs[i], self.recordings[i])
+                self.network_graphs[i], outputs[i], self.recordings[i])
 
             self.synaptic_observables.append(self._get_synaptic_observables(
                 self.network_graphs[i], outputs[i]))
