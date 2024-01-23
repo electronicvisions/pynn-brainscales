@@ -10,7 +10,7 @@ import pyNN.errors
 
 from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.recording_data import RecordingSite, \
-    RecordingConfig, GrenadeRecId, RecordingType, Recording
+    RecordingConfig, GrenadeRecId, RecordingType
 from dlens_vx_v3 import halco
 
 
@@ -54,8 +54,6 @@ class Recorder(pyNN.recording.Recorder):
         recording_sites = self._get_recording_sites(ids, locations)
         grenade_ids = {self._rec_site_to_grenade_index(rec_site) for rec_site
                        in recording_sites}
-        if len(self._simulator.state.recordings) <= 0:
-            self._simulator.state.recordings.append(Recording())
 
         if device == "madc":
             self._simulator.state.recordings[-1].config.add_madc_recording(

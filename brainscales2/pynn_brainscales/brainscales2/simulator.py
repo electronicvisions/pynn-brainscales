@@ -253,7 +253,7 @@ class State(BaseState):
         self.background_spike_source_placement = None
         self.populations: List[Population] = []
         self.recorders = set([])
-        self.recordings = []
+        self.recordings = [Recording()]
         self.projections: List[Projection] = []
         self.plasticity_rules: List["PlasticityRule"] = []
         self.synaptic_observables: List[List[Dict[str, object]]] = []
@@ -302,7 +302,6 @@ class State(BaseState):
     def clear(self):
         self.recorders = set([])
         self.populations = []
-        self.recordings = []
         self.projections = []
         self.plasticity_rules = []
         self.synaptic_observables = []
@@ -526,7 +525,6 @@ class State(BaseState):
                 iter(self.plasticity_rules)))
         if not changed_since_last_run:
             if self.grenade_network_graph is not None:
-                self.recordings.append(deepcopy(self.recordings[-1]))
                 return
 
         # generate network
@@ -540,11 +538,7 @@ class State(BaseState):
         for plasticity_rule in self.plasticity_rules:
             plasticity_rule.add_to_network_graph(network_builder)
 
-        if len(self.recordings) <= 0:
-            self.recordings.append(Recording())
-        recording = self.recordings[-1]
-        recording.config.add_to_network_graph(network_builder)
-        self.recordings.append(deepcopy(recording))
+        self.recordings[-1].config.add_to_network_graph(network_builder)
 
         network = network_builder.done()
 
@@ -824,6 +818,7 @@ class State(BaseState):
                             ExecutionInstanceID(): self.grenade_chip_config}))
         self.network_graphs.append(deepcopy(self.grenade_network_graph))
         self.inputs.append(inputs)
+        self.recordings.append(deepcopy(self.recordings[-1]))
 
         time_after_add = time.time()
         self.log.DEBUG(f"add(): Added {self.realtime_snippet_count}"
@@ -850,6 +845,7 @@ class State(BaseState):
         self.running = self.running or runtime is not None
 
         if runtime is None:
+            self.preprocess()
             self.log.DEBUG(
                 f"run(): Completed in {(time.time() - time_begin):.3f}s")
             return
