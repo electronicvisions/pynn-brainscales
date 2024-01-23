@@ -875,13 +875,14 @@ class SpikeSourcePoissonOnChip(StandardCellType):
 
 # pylint: disable=no-member
 SpikeSourcePoissonOnChip.background_source_clock_freq = \
-    sta.DigitalInit() \
-    .adplls[sta.DigitalInit().pll_clock_output_block.get_clock_output(  # pylint: disable=unsubscriptable-object
-        halco.PLLClockOutputOnDLS.phy_ref_clk).select_adpll] \
+    sta.DigitalInit().chip \
+    .adplls[sta.DigitalInit().chip.pll_clock_output_block
+            .get_clock_output(  # pylint: disable=unsubscriptable-object
+                halco.PLLClockOutputOnDLS.phy_ref_clk).select_adpll] \
     .calculate_output_frequency(
-        sta.DigitalInit().pll_clock_output_block.get_clock_output(
-            halco.PLLClockOutputOnDLS.phy_ref_clk
-        ).select_adpll_output) / 2.  # spl1_clk
+        sta.DigitalInit().chip.pll_clock_output_block \
+        .get_clock_output(halco.PLLClockOutputOnDLS.phy_ref_clk) \
+        .select_adpll_output) / 2.  # spl1_clk
 # pylint: enable=no-member
 
 
