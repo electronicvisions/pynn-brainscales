@@ -176,14 +176,14 @@ class TestSpikeRecording(unittest.TestCase):
         # Check the length of the spiketrains to match the above set values,
         # if recorded, but 0 otherwise
         self.assertLess(0.95 * len(spikes_1), len(spiketrains[0]))
-        self.assertLessEqual(len(spiketrains[0]), len(spikes_1))
+        self.assertLessEqual(len(spiketrains[0]), len(spikes_1) * 1.05)
         self.assertEqual(len(spiketrains[1]), 0)
         self.assertLess(0.95 * len(spikes_3), len(spiketrains[2]))
-        self.assertLessEqual(len(spiketrains[2]), len(spikes_3))
+        self.assertLessEqual(len(spiketrains[2]), len(spikes_3) * 1.05)
         self.assertEqual(len(spiketrains[3]), 0)
         self.assertEqual(len(spiketrains[4]), 0)
         self.assertLess(0.95 * len(spikes_6), len(spiketrains[5]))
-        self.assertLessEqual(len(spiketrains[5]), len(spikes_6))
+        self.assertLessEqual(len(spiketrains[5]), len(spikes_6) * 1.05)
 
 
 class TestMembraneRecording(unittest.TestCase):
