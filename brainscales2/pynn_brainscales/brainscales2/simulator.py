@@ -596,7 +596,7 @@ class State(BaseState):
                 population, input_generator)
         return input_generator.done()
 
-    def _generate_playback_hooks(self):
+    def _generate_hooks(self):
         assert self.injection_pre_static_config is not None
         assert self.injection_pre_realtime is not None
         assert self.injection_inside_realtime_begin is not None
@@ -625,7 +625,7 @@ class State(BaseState):
         post_realtime.copy_back(
             self.injection_post_realtime)
         self._prepare_post_realtime_read(post_realtime)
-        return grenade.signal_flow.ExecutionInstancePlaybackHooks(
+        return grenade.signal_flow.ExecutionInstanceHooks(
             pre_static_config, pre_realtime,
             inside_realtime_begin, inside_realtime,
             inside_realtime_end, post_realtime,
@@ -855,7 +855,7 @@ class State(BaseState):
         outputs = grenade.network.run(
             self.conn, self.configs, self.network_graphs,
             self.inputs, {grenade.common.ExecutionInstanceID():
-                          self._generate_playback_hooks()})
+                          self._generate_hooks()})
 
         self.log.DEBUG("run(): Execution finished in "
                        f"{(time.time() - time_after_preparations):.3f}s")
