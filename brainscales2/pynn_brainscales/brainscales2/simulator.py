@@ -362,7 +362,7 @@ class State(BaseState):
 
     def _get_v(self,
                network_graph: grenade.network.NetworkGraph,
-               outputs: grenade.signal_flow.IODataMap,
+               outputs: grenade.signal_flow.OutputData,
                recording: Recording
                # Note: Any should be recording.MADCRecordingSite. We do not
                # annotate the correct type due to cyclic imports.
@@ -377,7 +377,8 @@ class State(BaseState):
             MADCRecording as value.
         """
         samples = grenade.network.extract_madc_samples(
-            outputs, network_graph)[0]
+            outputs, network_graph)
+        samples = samples[0] if samples else []
         data = {}
         for site in recording.config.madc:
             local_times, population, neuron_on_population, \
@@ -394,7 +395,7 @@ class State(BaseState):
     def _get_synaptic_observables(
             self,
             network_graph: grenade.network.NetworkGraph,
-            outputs: grenade.signal_flow.IODataMap
+            outputs: grenade.signal_flow.OutputData
     ) -> List[Dict[str, np.ndarray]]:
         """
         Get synaptic observables.
@@ -418,7 +419,7 @@ class State(BaseState):
     def _get_neuronal_observables(
             self,
             network_graph: grenade.network.NetworkGraph,
-            outputs: grenade.signal_flow.IODataMap) -> Dict[str, np.ndarray]:
+            outputs: grenade.signal_flow.OutputData) -> Dict[str, np.ndarray]:
         """
         Get neuronal observables.
         :param network_graph: Network graph to use for lookup of
@@ -441,7 +442,7 @@ class State(BaseState):
     def _get_array_observables(
             self,
             network_graph: grenade.network.NetworkGraph,
-            outputs: grenade.signal_flow.IODataMap) \
+            outputs: grenade.signal_flow.OutputData) \
             -> List[Dict[str, np.ndarray]]:
         """
         Get general array observables.
@@ -578,7 +579,7 @@ class State(BaseState):
 
     def _generate_inputs(
             self, network_graph: grenade.network.NetworkGraph) \
-            -> grenade.signal_flow.IODataMap:
+            -> grenade.signal_flow.InputData:
         """
         Generate external input events from the routed network graph
         representation.
@@ -587,7 +588,7 @@ class State(BaseState):
                 network_graph.graph_translation.execution_instances[
                 grenade.common.ExecutionInstanceID()].event_input_vertex\
                 is None:
-            return grenade.signal_flow.IODataMap()
+            return grenade.signal_flow.InputData()
         input_generator = grenade.network.InputGenerator(
             network_graph)
         for population in self.populations:
@@ -861,8 +862,9 @@ class State(BaseState):
         time_after_hw_run = time.time()
 
         for i in range(self.realtime_snippet_count):
-            self.recordings[i].data.spikes = grenade.network.\
-                extract_neuron_spikes(outputs[i], self.network_graphs[i])[0]
+            spikes = grenade.network.\
+                extract_neuron_spikes(outputs[i], self.network_graphs[i])
+            self.recordings[i].data.spikes = spikes[0] if spikes else []
 
             self.recordings[i].data.madc = self._get_v(
                 self.network_graphs[i], outputs[i], self.recordings[i])

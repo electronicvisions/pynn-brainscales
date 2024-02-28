@@ -178,7 +178,7 @@ class PlasticityRule:
     def get_data(
             self,
             network_graph: grenade.NetworkGraph,
-            outputs: grenade_signal_flow.IODataMap) \
+            outputs: grenade_signal_flow.OutputData) \
             -> grenade.PlasticityRule.RecordingData:
         """
         Get synaptic and neuron observables of plasticity rule.
