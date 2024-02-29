@@ -853,7 +853,7 @@ class State(BaseState):
                        f"{(time_after_preparations - time_begin):.3f}s")
 
         outputs = grenade.network.run(
-            self.conn, self.configs, self.network_graphs,
+            self.conn, self.network_graphs, self.configs,
             self.inputs, {grenade.common.ExecutionInstanceID():
                           self._generate_hooks()})
 
