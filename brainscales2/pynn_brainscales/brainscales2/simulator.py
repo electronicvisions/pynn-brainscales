@@ -353,7 +353,7 @@ class State(BaseState):
         self.configs = []
         self.inputs = []
         self.network_graphs = []
-        self.recordings = [self.recordings[-1]] if self.recordings else []
+        self.recordings = [self.recordings[-1]]
         self.synaptic_observables = []
         self.array_observables = []
         self.neuronal_observables = []
