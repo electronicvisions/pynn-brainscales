@@ -330,7 +330,7 @@ class TestExecution(unittest.TestCase):
 
         pynn.setup()
         pynn.Population(1, McNeuron())
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
         pynn.end()
 
         # multiple circuits
@@ -339,7 +339,7 @@ class TestExecution(unittest.TestCase):
 
         pynn.setup()
         pynn.Population(1, McNeuron())
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
         pynn.end()
 
     @staticmethod
@@ -354,7 +354,7 @@ class TestExecution(unittest.TestCase):
 
         pynn.setup()
         pynn.Population(1, McNeuron())
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
         pynn.end()
 
 

@@ -19,7 +19,7 @@ class TestBackendStatistics(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             pynn.get_backend_statistics()
 
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
         string = str(pynn.get_backend_statistics())
         self.assertTrue("NetworkGraphStatistics" in string)
 

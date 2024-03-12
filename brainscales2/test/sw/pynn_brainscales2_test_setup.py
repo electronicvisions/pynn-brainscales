@@ -46,48 +46,48 @@ class TestpyNNSetup(unittest.TestCase):
     def test_injected_config():
         pynn.setup(injected_config=pynn.InjectedConfiguration(
             pre_non_realtime={halco.AtomicNeuronOnDLS(): lola.AtomicNeuron()}))
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
         pynn.end()
 
         pynn.setup(injected_config=pynn.InjectedConfiguration(
             pre_realtime={halco.AtomicNeuronOnDLS(): lola.AtomicNeuron()}))
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
         pynn.end()
 
         pynn.setup(injected_config=pynn.InjectedConfiguration(
             post_realtime={halco.AtomicNeuronOnDLS(): lola.AtomicNeuron()}))
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
         pynn.end()
 
         pynn.setup(injected_config=pynn.InjectedConfiguration(
             pre_non_realtime={halco.AtomicNeuronOnDLS(): lola.AtomicNeuron()},
             pre_realtime={halco.AtomicNeuronOnDLS(): lola.AtomicNeuron()},
             post_realtime={halco.AtomicNeuronOnDLS(): lola.AtomicNeuron()}))
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
         pynn.end()
 
     @staticmethod
     def test_injected_builder():
         pynn.setup(injected_config=pynn.InjectedConfiguration(
             pre_non_realtime=sta.PlaybackProgramBuilder()))
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
         pynn.end()
 
         pynn.setup(injected_config=pynn.InjectedConfiguration(
             pre_realtime=sta.PlaybackProgramBuilder()))
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
         pynn.end()
 
         pynn.setup(injected_config=pynn.InjectedConfiguration(
             post_realtime=sta.PlaybackProgramBuilder()))
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
         pynn.end()
 
         pynn.setup(injected_config=pynn.InjectedConfiguration(
             pre_non_realtime=sta.PlaybackProgramBuilder(),
             pre_realtime=sta.PlaybackProgramBuilder(),
             post_realtime=sta.PlaybackProgramBuilder()))
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
         pynn.end()
 
     def test_initial_config(self):
@@ -105,7 +105,7 @@ class TestpyNNSetup(unittest.TestCase):
             numpy.array_equal(pop.get("leak_i_bias"), [666, 420]))
         self.assertEqual(pynn.simulator.state.grenade_chip_config.neuron_block
                          .backends[backend_c].clock_scale_fast, 2)
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
         pynn.end()
 
 

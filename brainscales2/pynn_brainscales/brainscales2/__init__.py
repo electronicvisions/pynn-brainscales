@@ -3,7 +3,9 @@ Implementation of the PyNN API for the neuromorphic BrainScales2 system.
 """
 from dataclasses import dataclass, field
 import time
-from typing import Dict, Union, Set
+from warnings import warn
+from enum import Enum, auto
+from typing import Dict, Union, Set, Optional
 from pyNN import common, space, errors
 from pyNN.recording import get_io
 from pyNN.common.control import DEFAULT_MAX_DELAY, DEFAULT_MIN_DELAY
@@ -28,7 +30,7 @@ import pylogging as logger
 from calix.spiking import SpikingCalibTarget, SpikingCalibOptions
 
 
-__all__ = ["list_standard_models", "setup", "end", "run", "add", "run_until",
+__all__ = ["list_standard_models", "setup", "end", "run", "run_until",
            "run_for", "reset", "initialize", "get_current_time", "create",
            "connect", "set", "record", "logger", "preprocess"]
 
@@ -103,6 +105,24 @@ class InjectedReadout():
     inside_realtime_end: Set[halco.Coordinate] = field(default_factory=set)
     post_realtime: Set[halco.Coordinate] = field(default_factory=set)
     ppu_symbols: Set[str] = field(default_factory=set)
+
+
+class RunCommand(Enum):
+    """Command specifying the type of run to be performed in pynn.run()
+
+    :param prepare: Command that only induces all preparatory steps for the
+                        hardware backend, e.g. place&route of network graph or
+                        execution of calibration.
+    :param append: Command that induces the scheduling of an experiment snippet
+                        for the system in the currently defined state for a
+                        certain runtime.
+    :param execute: Command that induces a hardware run. Executes the already
+                        scheduled experiment and optionally append one last
+                        experiment snippet.
+    """
+    PREPARE = auto()
+    APPEND = auto()
+    EXECUTE = auto()
 
 
 # TODO: handle the delays (cf. feature #3657)
@@ -224,12 +244,52 @@ def end():
 _, run_until = common.build_run(simulator)
 
 
-def run(*args, **kwargs):
-    return simulator.state.run(*args, **kwargs)
+def run(runtime: Optional[float],
+        command: RunCommand = RunCommand.EXECUTE):
+    """
+    Take different actions according to the value passed for command:
 
+    For command=pyNN.RunCommand.PREPARE:
+    Execute all steps needed for the hardware back-end.
+    Includes place&route of network graph or execution of calibration.
+    Can be called manually to obtain calibration results for e.g.
+    CalibHXNeuron and make adjustments if needed.
+    If not called manually is automatically called on
+    command=pyNN.RunCommand.APPEND.
 
-def add(*args, **kwargs):
-    return simulator.state.add(*args, **kwargs)
+    For command=pyNN.RunCommand.APPEND:
+    Make a snapshot of the current network configuration and cache it
+    together with the according runtime, for which the system shall evolve
+    in this configuration.
+    Append snippet (=certain network description valid for certain
+    duration) to currently scheduled experiment.
+
+    For command=pyNN.RunCommand.EXECUTE:
+    Execute the experiment that was already scheduled by using
+    command=pyNN.RunCommand.APPEND.
+    Can also append a last snippet to the experiment right before
+    executing the experiment, if a value is passed for runtime.
+    """
+    if command == RunCommand.PREPARE:
+        simulator.state.preprocess()
+    elif command == RunCommand.APPEND:
+        if runtime is None:
+            raise ValueError("""Appending a configuration that is executed for
+                    no time is forbidden.""")
+        simulator.state.add(runtime)
+    elif command == RunCommand.EXECUTE:
+        if runtime is not None:
+            simulator.state.add(runtime)
+        elif not simulator.state.runtimes:
+            raise ValueError("""No experiment scheduled for execution yet
+                    \nTo schedule an execution of the currently
+                    defined network configuration use
+                    pyNN.RunCommand.APPEND\nTo only perform map and
+                    route operations on the current network
+                    configuration use pyNN.RunCommand.PREPARE""")
+        simulator.state.run()
+    else:
+        raise ValueError("Passed command is invalid.")
 
 
 run_for = run
@@ -237,12 +297,11 @@ run_for = run
 
 def preprocess():
     """
-    Execute all steps needed for the hardware back-end.
-    Includes place&route of network graph or execution calibration.
-    Can be called manually to obtain calibration results for e.g.
-    CalibHXNeuron and make adjustments if needed.
-    If not called manually is automatically called on run().
+    Does the same as pyNN.run(pyNN.RunCommand.PREPARE).
+    Exists only due to backwards-compatibility reasons.
     """
+    warn('Please use pyNN.run(None, pyNN.RunCommand.PREPARE)',
+         DeprecationWarning, stacklevel=2)
     simulator.state.preprocess()
 
 

@@ -113,7 +113,7 @@ class TestSpikeSources(unittest.TestCase):
         self.pops.append(pynn.Population(2, pynn.cells.HXNeuron()))
 
     def tearDown(self):
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
         pynn.end()
 
     # FIXME connector related tests need to be separated due to issue #3874

@@ -36,7 +36,7 @@ class TestPlasticityRule(unittest.TestCase):
         expectation = grenade.ProjectionOnNetwork()
         self.assertEqual(handle, expectation)
 
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
 
     def test_population_no_readout(self):
         timer = pynn.Timer(start=5, period=10, num_periods=1)
@@ -59,7 +59,7 @@ class TestPlasticityRule(unittest.TestCase):
             {halco.CompartmentOnLogicalNeuron(): [None]}]
         self.assertEqual(handle, expectation)
 
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
 
     def test_population_readout(self):
         timer = pynn.Timer(start=5, period=10, num_periods=1)
@@ -109,7 +109,7 @@ class TestPlasticityRule(unittest.TestCase):
              pop.get("plasticity_rule_readout_source", simplify=False)],
             expectation)
 
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
 
     def test_population_projection(self):
         timer = pynn.Timer(start=5, period=10, num_periods=1)
@@ -139,7 +139,7 @@ class TestPlasticityRule(unittest.TestCase):
             proj.synapse_type,
             pynn.plasticity_rules.PlasticityRuleHandle))
 
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
 
 
 if __name__ == '__main__':

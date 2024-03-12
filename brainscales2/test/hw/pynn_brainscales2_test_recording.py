@@ -121,7 +121,7 @@ class TestSpikeRecording(unittest.TestCase):
             spike_times=spikes_1))
         pynn.Projection(input_pop, pop, pynn.AllToAllConnector(),
                         synapse_type=StaticSynapse(weight=63))
-        pynn.add(runtime)
+        pynn.run(runtime, pynn.RunCommand.APPEND)
 
         # second config (spike recording off, 2000 spikes)
         n_spikes = 2000
@@ -130,7 +130,7 @@ class TestSpikeRecording(unittest.TestCase):
         # Inject spikes
         spikes_2 = np.linspace(0, runtime, n_spikes)
         input_pop.set(spike_times=spikes_2)
-        pynn.add(runtime)
+        pynn.run(runtime, pynn.RunCommand.APPEND)
 
         # third config (spike recording on, 3000 spikes)
         n_spikes = 3000
@@ -139,7 +139,7 @@ class TestSpikeRecording(unittest.TestCase):
         # Inject spikes
         spikes_3 = np.linspace(0, runtime, n_spikes)
         input_pop.set(spike_times=spikes_3)
-        pynn.add(runtime)
+        pynn.run(runtime, pynn.RunCommand.APPEND)
 
         # fourth config (spike recording off, 4000 spikes)
         n_spikes = 4000
@@ -148,7 +148,7 @@ class TestSpikeRecording(unittest.TestCase):
         # Inject spikes
         spikes_4 = np.linspace(0, runtime, n_spikes)
         input_pop.set(spike_times=spikes_4)
-        pynn.add(runtime)
+        pynn.run(runtime, pynn.RunCommand.APPEND)
 
         # fifth config (spike recording off, 5000 spikes)
         n_spikes = 5000
@@ -156,7 +156,7 @@ class TestSpikeRecording(unittest.TestCase):
         # Inject spikes
         spikes_5 = np.linspace(0, runtime, n_spikes)
         input_pop.set(spike_times=spikes_5)
-        pynn.add(runtime)
+        pynn.run(runtime, pynn.RunCommand.APPEND)
 
         # sixth config (spike recording on, 6000 spikes)
         n_spikes = 6000
@@ -167,7 +167,7 @@ class TestSpikeRecording(unittest.TestCase):
         input_pop.set(spike_times=spikes_6)
 
         # execute hardware run
-        pynn.run(runtime)
+        pynn.run(runtime, pynn.RunCommand.EXECUTE)
 
         spiketrains = pop.get_data().segments[0].spiketrains
 
@@ -340,11 +340,11 @@ class TestMembraneRecording(unittest.TestCase):
         pop = pynn.Population(1, pynn.cells.HXNeuron())
 
         pop.record('v')
-        pynn.add(runtime)
-        pynn.add(runtime)
+        pynn.run(runtime, pynn.RunCommand.APPEND)
+        pynn.run(runtime, pynn.RunCommand.APPEND)
 
         pop.record(None)
-        pynn.add(runtime)
+        pynn.run(runtime, pynn.RunCommand.APPEND)
 
         pop.record('v')
 

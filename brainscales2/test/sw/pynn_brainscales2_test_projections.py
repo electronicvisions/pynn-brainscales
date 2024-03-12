@@ -39,7 +39,7 @@ class TestProjection(unittest.TestCase):
     def test_identical_connection(self):
         pynn.Projection(self.pop1, self.pop2, pynn.AllToAllConnector())
         pynn.Projection(self.pop1, self.pop2, pynn.AllToAllConnector())
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
 
     def test_delay(self):
         proj = pynn.Projection(self.pop1, self.pop2, pynn.AllToAllConnector())
@@ -48,12 +48,12 @@ class TestProjection(unittest.TestCase):
         self.assertEqual(proj.get("delay", format="array"), [0])
         with self.assertRaises(ValueError):
             proj.set(delay=1)
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
 
     def test_weight(self):
         proj = pynn.Projection(self.pop1, self.pop1, pynn.AllToAllConnector())
         self.assertEqual(proj.get("weight", format="array"), 0)
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
         pynn.simulator.state.projections = []
         synapse = pynn.standardmodels.synapses.StaticSynapse(weight=32)
         proj = pynn.Projection(self.pop1, self.pop2, pynn.AllToAllConnector(),
@@ -78,7 +78,7 @@ class TestProjection(unittest.TestCase):
         connection_list = [(0, 0, 32), (0, 1, 32), (1, 0, 32),
                            (1, 1, 32), (2, 0, 32), (2, 1, 32)]
         self.assertEqual(proj.get("weight", format="list"), connection_list)
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
 
     def test_weight_sign(self):
         synapse_exc = pynn.standardmodels.synapses.StaticSynapse(weight=32)
@@ -106,14 +106,14 @@ class TestProjection(unittest.TestCase):
         with self.assertRaises(pynn.errors.ConnectionError):
             proj_inh.set(weight=32)
 
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
 
     def test_set_one_to_one(self):
         proj = pynn.Projection(self.pop3, self.pop3, pynn.OneToOneConnector())
         proj.set(weight=32)
         connection_list = [(0, 0, 32), (1, 1, 32)]
         self.assertEqual(proj.get("weight", format="list"), connection_list)
-        pynn.run(None)
+        pynn.run(None, pynn.RunCommand.PREPARE)
         pynn.simulator.state.projections = []
 
     def test_projection_view(self):

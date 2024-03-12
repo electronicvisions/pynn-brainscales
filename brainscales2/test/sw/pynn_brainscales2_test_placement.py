@@ -70,7 +70,7 @@ class TestDefaultPlacement(unittest.TestCase):
             with self.subTest(n_neurons=n_neurons):
                 pynn.setup()
                 pynn.Population(n_neurons, pynn.cells.HXNeuron())
-                pynn.run(None)
+                pynn.run(None, pynn.RunCommand.PREPARE)
                 pynn.end()
 
 

@@ -36,7 +36,7 @@ class TestPerformance(unittest.TestCase):
         log.INFO(f"network construction {time.time() - begin}s")
 
         begin = time.time()
-        pynn.add(1)  # does not perform hardware run. just preprocessing
+        pynn.run(1, pynn.RunCommand.APPEND)  # does not perform hardware run
         log.INFO(f"first run {time.time() - begin}s")
 
         begin = time.time()
@@ -45,7 +45,7 @@ class TestPerformance(unittest.TestCase):
 
         for i in range(10):
             begin = time.time()
-            pynn.add(1)
+            pynn.run(1, pynn.RunCommand.APPEND)
             log.INFO(f"run {i} after modification {time.time() - begin}s")
 
     @classmethod
@@ -63,7 +63,7 @@ class TestPerformance(unittest.TestCase):
         log.INFO(f"network construction {time.time() - begin}s")
 
         begin = time.time()
-        pynn.add(1)
+        pynn.run(1, pynn.RunCommand.APPEND)
         log.INFO(f"first run {time.time() - begin}s")
 
         begin = time.time()
@@ -72,7 +72,7 @@ class TestPerformance(unittest.TestCase):
 
         for i in range(10):
             begin = time.time()
-            pynn.add(1)
+            pynn.run(1, pynn.RunCommand.APPEND)
             log.INFO(f"run {i} after modification {time.time() - begin}s")
 
 

@@ -297,7 +297,8 @@ class State(BaseState):
         self.realtime_snippet_count = 0
 
     def run_until(self, tstop):
-        self.run(tstop - self.t)
+        self.add(tstop - self.t)
+        self.run()
 
     def clear(self):
         self.recorders = set([])
@@ -825,32 +826,20 @@ class State(BaseState):
                        ". program snippet in "
                        f"{(time_after_add - time_begin):.3f}s")
 
-    def run(self, runtime: Optional[float]):
+    def run(self):
         """
-        Performs a hardware run for `runtime` milliseconds.
-        If runtime is `None`, we only perform preparatory steps.
+        Performs a hardware run of the currently scheduled experiment.
         """
         time_begin = time.time()
-        if runtime is None:
-            self.log.INFO("User requested 'None' runtime: "
-                          + "no hardware run performed.")
 
-        if self.running and runtime is not None:
+        if self.running:
             raise RuntimeError(
                 "Call `pynn.reset()` before calling `pynn.run()` again. "
                 "BrainScales-2 emulates the behavior of neurons and synapses "
                 "in continuous time. Stacking several `pynn.run` commands "
                 "without calling `pynn.reset()` between runs is therefore not "
                 "supported.")
-        self.running = self.running or runtime is not None
-
-        if runtime is None:
-            self.preprocess()
-            self.log.DEBUG(
-                f"run(): Completed in {(time.time() - time_begin):.3f}s")
-            return
-
-        self.add(runtime)
+        self.running = True
 
         if not self.conn_comes_from_outside and \
            self.conn_manager is None:
