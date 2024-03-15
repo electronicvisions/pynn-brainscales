@@ -93,7 +93,8 @@ class HXNeuron(NeuronCellType):
 
         return build_translations(*translation)
 
-    def can_record(self, variable: str) -> bool:
+    def can_record(self, variable: str, location=None) -> bool:
+        del location  # for BSS-2 observables do not depend on the location
         return variable in self.recordable
 
     @classmethod
@@ -422,7 +423,8 @@ class CalibHXNeuronCuba(NeuronCellType):
                                builder: grenade.InputGenerator):
         pass
 
-    def can_record(self, variable: str) -> bool:
+    def can_record(self, variable: str, location=None) -> bool:
+        del location  # for BSS-2 observables do not depend on the location
         return variable in self.recordable
 
     # map between pynn and hardware parameter names. Cannot utilize pyNN
@@ -801,7 +803,8 @@ class SpikeSourcePoissonOnChip(StandardCellType):
     # TODO: implement L2-based read-out
     recordable = []
 
-    def can_record(self, variable: str) -> bool:
+    def can_record(self, variable: str, location=None) -> bool:
+        del location  # for BSS-2 observables do not depend on the location
         return variable in self.recordable
 
     @staticmethod
@@ -901,7 +904,8 @@ class SpikeSourcePoisson(StandardCellType, cells.SpikeSourcePoisson):
     # TODO: implement L2-based read-out injected spikes
     recordable = []
 
-    def can_record(self, variable: str) -> bool:
+    def can_record(self, variable: str, location=None) -> bool:
+        del location  # for BSS-2 observables do not depend on the location
         return variable in self.recordable
 
     def get_spike_times(self) -> List[np.ndarray]:
@@ -987,7 +991,8 @@ class SpikeSourceArray(StandardCellType, cells.SpikeSourceArray):
     # TODO: implement L2-based read-out for injected spikes
     recordable = []
 
-    def can_record(self, variable: str) -> bool:
+    def can_record(self, variable: str, location=None) -> bool:
+        del location  # for BSS-2 observables do not depend on the location
         return variable in self.recordable
 
     @staticmethod
