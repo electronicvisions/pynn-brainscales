@@ -8,10 +8,20 @@ import quantities as pq
 import pyNN.recording
 import pyNN.errors
 
+from pyNN.recording import gather_blocks, filter_by_variables, \
+    remove_duplicate_spiketrains
+
 from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.recording_data import RecordingSite, \
     RecordingConfig, GrenadeRecId, RecordingType
 from dlens_vx_v3 import halco
+
+
+def normalize_variables_arg(variables):
+    """If variables is a single string, encapsulate it in a list."""
+    if isinstance(variables, str) and variables != 'all':
+        return [variables]
+    return variables
 
 
 class Recorder(pyNN.recording.Recorder):
@@ -48,7 +58,7 @@ class Recorder(pyNN.recording.Recorder):
         # state
         if sampling_interval:
             raise NotImplementedError("Sampling interval not implemented.")
-        variable_list = pyNN.recording.normalize_variables_arg(variables)
+        variable_list = normalize_variables_arg(variables)
 
         ids = {id for id in ids if id.local}
         recording_sites = self._get_recording_sites(ids, locations)
@@ -351,3 +361,38 @@ class Recorder(pyNN.recording.Recorder):
         else:
             raise ValueError("Only implemented for spikes")
         return counts
+
+    # TODO: align handling of varibales to PyNN 0.12
+    # this function was copied from PyNN 0.10.1 and the agruments were
+    # adjusted for PyNN 0.12
+    # pylint: disable=too-many-arguments
+    def get(self, variables, gather=False, filter_ids=None, clear=False,
+            annotations=None, locations=None):
+        """Return the recorded data as a Neo `Block`."""
+        del locations  # we do not yet support PyNN 0.12
+        variables = normalize_variables_arg(variables)
+        data = neo.Block()
+        data.segments = [filter_by_variables(segment, variables)
+                         for segment in self.cache]
+        if self._simulator.state.running:
+            # reset() has not been called, so current segment is not in cache
+            data.segments.append(self._get_current_segment(
+                filter_ids=filter_ids, variables=variables, clear=clear))
+        for segment in data.segments:
+            segment.block = data
+        data.name = self.population.label
+        data.description = self.population.describe()
+        data.rec_datetime = data.segments[0].rec_datetime
+        data.annotate(**self.metadata)
+        if annotations:
+            data.annotate(**annotations)
+        if gather and self._simulator.state.num_processes > 1:
+            data = gather_blocks(data)
+            if (
+                hasattr(self.population.celltype, "always_local")
+                and self.population.celltype.always_local
+            ):
+                data = remove_duplicate_spiketrains(data)
+        if clear:
+            self.clear()
+        return data

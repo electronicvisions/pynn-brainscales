@@ -233,6 +233,11 @@ class Population(pyNN.common.Population):
             self._simulator.state.write_on_end.append((self, variables,
                                                       self.recorder.file))
 
+    # TODO: align handling of varibales to PyNN 0.12
+    # this function was just copied from PyNN 0.10.1
+    def find_units(self, variable):
+        return self.celltype.units[variable]
+
 
 # pylint:disable=abstract-method
 class PopulationView(pyNN.common.PopulationView):
