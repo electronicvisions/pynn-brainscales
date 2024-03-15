@@ -146,10 +146,11 @@ class Projection(pyNN.common.Projection):
         raise NotImplementedError
 
     def _convergent_connect(self, presynaptic_indices, postsynaptic_index,
-                            **connection_parameters):
+                            location_selector=None, **connection_parameters):
         """
         Connect a neuron to one or more other neurons with a static connection.
         """
+        del location_selector  # we handle "location_selector" in __init__
         assert len(presynaptic_indices) > 0 and \
             len(presynaptic_indices) <= len(self.pre.all_cells)
         for pre_ind in presynaptic_indices:
