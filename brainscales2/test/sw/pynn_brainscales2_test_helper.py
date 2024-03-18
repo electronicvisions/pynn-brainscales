@@ -3,6 +3,7 @@
 import os
 import unittest
 from unittest import mock
+from pathlib import Path
 import pynn_brainscales.brainscales2 as pynn
 
 
@@ -20,6 +21,9 @@ class TestHelper(unittest.TestCase):
         chip = pynn.helper.chip_from_nightly()
         self.assertTrue(chip is not None)
 
+    @unittest.skipUnless(Path("/wang").exists(),
+                         "Mock file is only available on Electronic "
+                         "Vision(s) cluster")
     def test_chip_from_file(self):
         path = "/wang/data/calibration/hicann-dls-sr-hx/zeromock/" \
             "stable/latest/spiking_cocolist.pbin"
