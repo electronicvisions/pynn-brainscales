@@ -252,7 +252,12 @@ class PopulationView(pyNN.common.PopulationView):
             if isinstance(value, np.ndarray):
                 value = value[self.mask]
             parameter_space[name] = value
-        return ParameterSpace(parameter_space, shape=(self.size,))
+        # need to add schema such that lazyarrays in the parameter space get
+        # a `dtype` assigned and can be evaluated later
+        schema = {key: value for key, value in
+                  self.celltype.get_schema().items() if key in names}
+        return ParameterSpace(parameter_space, schema=schema,
+                              shape=(self.size,))
 
     def _set_parameters(self, parameter_space):
         """parameter_space should contain native parameters"""
