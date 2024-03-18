@@ -12,10 +12,10 @@ from neo.io import NixIO
 class Assembly(pyNN.common.Assembly):
     _simulator = simulator
 
-    # Note: Forward `location` and `device` arguments. Rest of implementation
-    # identical to upstream PyNN.
-    def record(self, variables, to_file=None, sampling_interval=None, *,
-               locations=None, device="madc"):
+    # Note: Forward `device` argument. Rest of implementation identical to
+    # upstream PyNN.
+    def record(self, variables, to_file=None, sampling_interval=None,
+               locations=None, *, device="madc"):
         """
         Record the specified variable or variables for all cells in the
         Assembly.
@@ -177,14 +177,14 @@ class Population(pyNN.common.Population):
             raise AttributeError("calib_target not available for celltype "
                                  f"{type(self.celltype)}")
 
-    # Note: Forward `location` and `device` arguments. Rest of implementation
-    # identical to upstream PyNN.
+    # Note: Forward `device` argument. Rest of implementation identical to
+    # upstream PyNN.
     def record(self,
                variables: Union[str, List[str]],
                to_file: Optional[Union[str, NixIO]] = None,
                sampling_interval: Optional[float] = None,
-               *,
                locations: Optional[List[str]] = None,
+               *,
                device: str = "madc") -> None:
 
         """

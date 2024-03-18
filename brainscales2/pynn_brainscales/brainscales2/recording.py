@@ -49,8 +49,8 @@ class Recorder(pyNN.recording.Recorder):
         return {RecordingSite(n_id, c_id) for n_id, c_id in
                 product(neuron_ids, comp_ids)}
 
-    def record(self, variables, ids, sampling_interval=None, *,
-               locations=None, device="madc"):
+    def record(self, variables, ids, sampling_interval=None,
+               locations=None, *, device="madc"):
         self.changed_since_last_run = True
         # MADC based recording is only possible for one neuron on a chip
         # it is therefore checked for population size one and no multi
