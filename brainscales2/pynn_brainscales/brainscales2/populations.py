@@ -95,7 +95,13 @@ class Population(pyNN.common.Population):
         self.changed_since_last_run = True
         parameter_space.evaluate(simplify=False)
         for name, value in parameter_space.items():
-            self.celltype.parameter_space[name] = value
+            # Since pyNN 0.12.0 a LazyArray is generated when we assign
+            # a new value with parameterspace[name] = value. As a result
+            # the parmeter space is no longer consistently "evaluated"
+            # (since a lazy array is saved) -> assign value directly to
+            # private member
+            # TODO: Discuss if upstream PyNN implementation is correct/wanted.
+            self.celltype.parameter_space._parameters[name] = value  # pylint: disable=protected-access
 
     def __setattr__(self, name, value):
         # Handle (de-)registering of population in plasticity rule.
