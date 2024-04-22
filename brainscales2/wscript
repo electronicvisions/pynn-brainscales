@@ -32,7 +32,7 @@ def configure(cfg):
 
 
 def build(bld):
-    bld.env.DLSvx_HARDWARE_AVAILABLE = "SLURM_HWDB_YAML" in os.environ
+    bld.env.BBS_HARDWARE_AVAILABLE = "SLURM_HWDB_YAML" in os.environ
     bld(name = 'pynn_brainscales2',
         features = 'use py pylint pycodestyle',
         source = bld.path.ant_glob('pynn_brainscales/**/*.py',
@@ -71,7 +71,7 @@ def build(bld):
         use = ['pynn_brainscales2'],
         install_path = '${PREFIX}/bin',
         chmod=Utils.O755,
-        skip_run = not bld.env.DLSvx_HARDWARE_AVAILABLE
+        skip_run = not bld.env.BBS_HARDWARE_AVAILABLE
     )
 
     bld(name = 'pynn_brainscales2_hwtest_pylint',
