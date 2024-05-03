@@ -807,7 +807,9 @@ class State(BaseState):
         inputs = self._generate_inputs(self.grenade_network_graph)
         runtime_in_clocks = int(
             runtime * int(hal.Timer.Value.fpga_clock_cycles_per_us) * 1000)
-        if runtime_in_clocks > hal.Timer.Value.max:
+        total_runtime_in_clocks = int(
+            self.t * int(hal.Timer.Value.fpga_clock_cycles_per_us) * 1000)
+        if total_runtime_in_clocks > hal.Timer.Value.max:
             max_runtime = hal.Timer.Value.max /\
                 1000 / int(hal.Timer.Value.fpga_clock_cycles_per_us)
             raise ValueError(f"Total runtime of {self.t} to long. "
