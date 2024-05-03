@@ -117,19 +117,20 @@ class TestSpikeRecording(unittest.TestCase):
 
         # Inject spikes
         spikes_1 = np.linspace(0, runtime, n_spikes)
+        # also prepare spikes of second snippet right away
+        n_spikes = 2000
+        spikes_2 = np.linspace(runtime, 2 * runtime, n_spikes)
         input_pop = pynn.Population(1, pynn.cells.SpikeSourceArray(
-            spike_times=spikes_1))
+            spike_times=np.concatenate([spikes_1, spikes_2])))
         pynn.Projection(input_pop, pop, pynn.AllToAllConnector(),
                         synapse_type=StaticSynapse(weight=63))
         pynn.run(runtime, pynn.RunCommand.APPEND)
 
         # second config (spike recording off, 2000 spikes)
-        n_spikes = 2000
+        # (according spikerate already set above)
         pop.record(None)
 
         # Inject spikes
-        spikes_2 = np.linspace(0, runtime, n_spikes)
-        input_pop.set(spike_times=spikes_2)
         pynn.run(runtime, pynn.RunCommand.APPEND)
 
         # third config (spike recording on, 3000 spikes)
@@ -137,8 +138,9 @@ class TestSpikeRecording(unittest.TestCase):
         pop.record('spikes')
 
         # Inject spikes
-        spikes_3 = np.linspace(0, runtime, n_spikes)
-        input_pop.set(spike_times=spikes_3)
+        spikes_3 = np.linspace(2 * runtime, 3 * runtime, n_spikes)
+        input_pop.set(spike_times=np.concatenate([spikes_1, spikes_2, spikes_3,
+                                                  spikes_1 + 3 * runtime]))
         pynn.run(runtime, pynn.RunCommand.APPEND)
 
         # fourth config (spike recording off, 4000 spikes)
@@ -146,7 +148,7 @@ class TestSpikeRecording(unittest.TestCase):
         pop.record(None)
 
         # Inject spikes
-        spikes_4 = np.linspace(0, runtime, n_spikes)
+        spikes_4 = np.linspace(3 * runtime, 4 * runtime, n_spikes)
         input_pop.set(spike_times=spikes_4)
         pynn.run(runtime, pynn.RunCommand.APPEND)
 
@@ -154,7 +156,7 @@ class TestSpikeRecording(unittest.TestCase):
         n_spikes = 5000
 
         # Inject spikes
-        spikes_5 = np.linspace(0, runtime, n_spikes)
+        spikes_5 = np.linspace(4 * runtime, 5 * runtime, n_spikes)
         input_pop.set(spike_times=spikes_5)
         pynn.run(runtime, pynn.RunCommand.APPEND)
 
@@ -163,7 +165,7 @@ class TestSpikeRecording(unittest.TestCase):
         pop.record('spikes')
 
         # Inject spikes
-        spikes_6 = np.linspace(0, runtime, n_spikes)
+        spikes_6 = np.linspace(5 * runtime, 6 * runtime, n_spikes)
         input_pop.set(spike_times=spikes_6)
 
         # execute hardware run
@@ -175,6 +177,8 @@ class TestSpikeRecording(unittest.TestCase):
         # correct order.
         # Check the length of the spiketrains to match the above set values,
         # if recorded, but 0 otherwise
+        # Also check, that the set spiketrains of input_pop are cropped
+        # accordingly to the realtime snippet bonds
         self.assertLess(0.95 * len(spikes_1), len(spiketrains[0]))
         self.assertLessEqual(len(spiketrains[0]), len(spikes_1) * 1.05)
         self.assertEqual(len(spiketrains[1]), 0)

@@ -39,7 +39,8 @@ class StandardCellType(ABC, UpstreamStandardCellType):
     @abstractmethod
     def add_to_input_generator(
             population: Population,
-            builder: grenade.InputGenerator):
+            builder: grenade.InputGenerator,
+            snippet_begin_time, snippet_end_time):
         """
         Add external events to input generator.
         :param population: Population to add featuring this cell's celltype.

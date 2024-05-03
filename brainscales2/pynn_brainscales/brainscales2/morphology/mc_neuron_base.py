@@ -179,7 +179,8 @@ class McNeuronBase(StandardCellType, ABC):
     @staticmethod
     def add_to_input_generator(
             population: Population,
-            builder: grenade.InputGenerator):
+            builder: grenade.InputGenerator,
+            snippet_begin_time, snippet_end_time):
         pass
 
     @classmethod

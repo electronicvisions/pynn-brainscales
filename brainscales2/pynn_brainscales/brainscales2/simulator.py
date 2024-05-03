@@ -578,7 +578,8 @@ class State(BaseState):
             plasticity_rule.changed_since_last_run = False
 
     def _generate_inputs(
-            self, network_graph: grenade.network.NetworkGraph) \
+            self, network_graph: grenade.network.NetworkGraph,
+            snippet_begin_time, snippet_end_time) \
             -> grenade.signal_flow.InputData:
         """
         Generate external input events from the routed network graph
@@ -593,7 +594,8 @@ class State(BaseState):
             network_graph)
         for population in self.populations:
             population.celltype.add_to_input_generator(
-                population, input_generator)
+                population, input_generator,
+                snippet_begin_time, snippet_end_time)
         return input_generator.done()
 
     def _generate_hooks(self):
@@ -796,6 +798,7 @@ class State(BaseState):
         """
         time_begin = time.time()
 
+        snippet_begin_time = deepcopy(self.t)
         self.t += runtime
         self.runtimes.append(runtime)
 
@@ -804,7 +807,8 @@ class State(BaseState):
         self.preprocess()
 
         # generate external spike trains
-        inputs = self._generate_inputs(self.grenade_network_graph)
+        inputs = self._generate_inputs(self.grenade_network_graph,
+                                       snippet_begin_time, self.t)
         runtime_in_clocks = int(
             runtime * int(hal.Timer.Value.fpga_clock_cycles_per_us) * 1000)
         total_runtime_in_clocks = int(

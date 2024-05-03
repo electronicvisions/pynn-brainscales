@@ -239,7 +239,8 @@ class HXNeuron(NeuronCellType):
     @staticmethod
     def add_to_input_generator(
             population: Population,
-            builder: grenade.InputGenerator):
+            builder: grenade.InputGenerator,
+            snippet_begin_time, snippet_end_time):
         pass
 
     # TODO circular import -> can not import ID for type hint of conn_indices
@@ -420,7 +421,8 @@ class CalibHXNeuronCuba(NeuronCellType):
 
     @staticmethod
     def add_to_input_generator(population: Population,
-                               builder: grenade.InputGenerator):
+                               builder: grenade.InputGenerator,
+                               snippet_begin_time, snippet_end_time):
         pass
 
     def can_record(self, variable: str, location=None) -> bool:
@@ -860,7 +862,8 @@ class SpikeSourcePoissonOnChip(StandardCellType):
     @staticmethod
     def add_to_input_generator(
             population: Population,
-            builder: grenade.InputGenerator):
+            builder: grenade.InputGenerator,
+            snippet_begin_time, snippet_end_time):
         pass
 
 
@@ -966,14 +969,23 @@ class SpikeSourcePoisson(StandardCellType, cells.SpikeSourcePoisson):
     @staticmethod
     def add_to_input_generator(
             population: Population,
-            builder: grenade.InputGenerator):
+            builder: grenade.InputGenerator,
+            snippet_begin_time, snippet_end_time):
 
         spiketimes = population.celltype.get_spike_times()
-        spiketimes = [np.sort(spiketimes_neuron) for spiketimes_neuron
-                      in spiketimes]
+        filtered_spiketimes = []
+        for spiketimes_neuron in spiketimes:
+            filtered_spiketimes_neuron = spiketimes_neuron[
+                np.logical_and(
+                    snippet_begin_time <= spiketimes_neuron,
+                    spiketimes_neuron < snippet_end_time)] \
+                - snippet_begin_time
+
+            filtered_spiketimes.append(np.sort(filtered_spiketimes_neuron))
+
         descriptor = grenade.PopulationOnNetwork(
             simulator.state.populations.index(population))
-        builder.add(spiketimes, descriptor)
+        builder.add(filtered_spiketimes, descriptor)
 
 
 class SpikeSourceArray(StandardCellType, cells.SpikeSourceArray):
@@ -1008,9 +1020,18 @@ class SpikeSourceArray(StandardCellType, cells.SpikeSourceArray):
     @staticmethod
     def add_to_input_generator(
             population: Population,
-            builder: grenade.InputGenerator):
+            builder: grenade.InputGenerator,
+            snippet_begin_time, snippet_end_time):
         spiketimes = population.celltype.parameter_space["spike_times"]
-        spiketimes = [s.value for s in spiketimes]
+        filtered_spiketimes = []
+        for spiketimes_neuron in spiketimes:
+            filtered_spiketimes_neuron = spiketimes_neuron.value[
+                np.logical_and(
+                    snippet_begin_time <= spiketimes_neuron.value,
+                    spiketimes_neuron.value < snippet_end_time)] \
+                - snippet_begin_time
+            filtered_spiketimes.append(filtered_spiketimes_neuron)
+
         descriptor = grenade.PopulationOnNetwork(
             simulator.state.populations.index(population))
-        builder.add(spiketimes, descriptor)
+        builder.add(filtered_spiketimes, descriptor)
