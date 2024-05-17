@@ -33,6 +33,7 @@ class TestPoissonInput(unittest.TestCase):
         pop2.record(["spikes"])
         src = pynn.Population(
             2, pynn.cells.SpikeSourcePoisson(**self.bg_props))
+        src.record(["spikes"])
         # The second Poisson neuron is not connected to any target population
         # and just exists to test that Populations with more than one neuron
         # are created correctly.
@@ -46,6 +47,7 @@ class TestPoissonInput(unittest.TestCase):
 
         self.spiketrain1 = pop1.get_data("spikes").segments[0].spiketrains[0]
         self.spiketrain2 = pop2.get_data("spikes").segments[0].spiketrains[0]
+        self.spiketrain_src = src.get_data("spikes").segments[0].spiketrains[0]
         pynn.reset()
 
         self.rate3 = 10e3
@@ -74,6 +76,9 @@ class TestPoissonInput(unittest.TestCase):
         measured_length1 = len(self.spiketrain1)
         self.assertLessEqual(abs(measured_length1 - expected_length1), dev1)
 
+        measured_length_src = len(self.spiketrain_src)
+        self.assertLessEqual(abs(measured_length_src - expected_length1), dev1)
+
         expected_length3 = self.bg_props["duration"] / 1000 * self.rate3
         dev3 = 5 * np.sqrt(expected_length3)
         measured_length3 = len(self.spiketrain3)
@@ -90,7 +95,12 @@ class TestPoissonInput(unittest.TestCase):
         # number.
         spiketrain1_set = set(np.round(self.spiketrain1.magnitude + 1e-9, 2))
         spiketrain2_set = set(np.round(self.spiketrain2.magnitude + 1e-9, 2))
+        spiketrain_src_set = set(np.round(
+            self.spiketrain_src.magnitude + 1e-9, 2))
         self.assertLess(abs(len(spiketrain1_set - spiketrain2_set))
+                        / len(spiketrain1_set),
+                        0.02)
+        self.assertLess(abs(len(spiketrain1_set - spiketrain_src_set))
                         / len(spiketrain1_set),
                         0.02)
 

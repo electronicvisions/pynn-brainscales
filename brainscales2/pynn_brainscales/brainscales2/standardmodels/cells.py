@@ -802,8 +802,7 @@ class SpikeSourcePoissonOnChip(StandardCellType):
 
     background_source_clock_freq: ClassVar[float]
 
-    # TODO: implement L2-based read-out
-    recordable = []
+    recordable: Final[List[str]] = ['spikes']
 
     def can_record(self, variable: str, location=None) -> bool:
         del location  # for BSS-2 observables do not depend on the location
@@ -841,6 +840,12 @@ class SpikeSourcePoissonOnChip(StandardCellType):
         period = hal.BackgroundSpikeSource.Period(
             int(round(SpikeSourcePoissonOnChip
                 .background_source_clock_freq / hwrate * prob) - 1))
+        pop_cells_int = np.asarray(population.all_cells, dtype=int)
+        enable_record_spikes = np.zeros((len(pop_cells_int)), dtype=bool)
+        if "spikes" in population.recorder.recorded:
+            recording_ids = [neuron_comp[0] for neuron_comp in
+                             population.recorder.recorded["spikes"]]
+            enable_record_spikes = np.isin(pop_cells_int, recording_ids)
         # create grenade population
         config = \
             grenade.BackgroundSourcePopulation.Config()
@@ -852,7 +857,8 @@ class SpikeSourcePoissonOnChip(StandardCellType):
         # we need both hemispheres because of possibly arbitrary connection
         # targets
         gpopulation = grenade.BackgroundSourcePopulation(
-            population.size,
+            [grenade.BackgroundSourcePopulation.Neuron(enable_record_spikes[i])
+             for i in range(len(pop_cells_int))],
             {halco.HemisphereOnDLS(0): population.celltype._padi_bus,  # pylint: disable=protected-access
              halco.HemisphereOnDLS(1): population.celltype._padi_bus},  # pylint: disable=protected-access
             config
@@ -904,8 +910,7 @@ class SpikeSourcePoisson(StandardCellType, cells.SpikeSourcePoisson):
     _spike_times: Optional[List[np.ndarray]] = None
     _used_parameters: Optional[Dict[str, np.ndarray]] = None
 
-    # TODO: implement L2-based read-out injected spikes
-    recordable = []
+    recordable: Final[List[str]] = ['spikes']
 
     def can_record(self, variable: str, location=None) -> bool:
         del location  # for BSS-2 observables do not depend on the location
@@ -961,8 +966,15 @@ class SpikeSourcePoisson(StandardCellType, cells.SpikeSourcePoisson):
                              builder: grenade.NetworkBuilder) \
             -> grenade.PopulationOnNetwork:
         # create grenade population
-        gpopulation = grenade.ExternalSourcePopulation(
-            population.size)
+        pop_cells_int = np.asarray(population.all_cells, dtype=int)
+        enable_record_spikes = np.zeros((len(pop_cells_int)), dtype=bool)
+        if "spikes" in population.recorder.recorded:
+            recording_ids = [neuron_comp[0] for neuron_comp in
+                             population.recorder.recorded["spikes"]]
+            enable_record_spikes = np.isin(pop_cells_int, recording_ids)
+        gpopulation = grenade.ExternalSourcePopulation([
+            grenade.ExternalSourcePopulation.Neuron(enable_record_spikes[i])
+            for i in range(len(pop_cells_int))])
         # add to builder
         return builder.add(gpopulation)
 
@@ -1000,8 +1012,7 @@ class SpikeSourceArray(StandardCellType, cells.SpikeSourceArray):
         ('spike_times', 'spike_times'),
     )
 
-    # TODO: implement L2-based read-out for injected spikes
-    recordable = []
+    recordable: Final[List[str]] = ['spikes']
 
     def can_record(self, variable: str, location=None) -> bool:
         del location  # for BSS-2 observables do not depend on the location
@@ -1012,8 +1023,15 @@ class SpikeSourceArray(StandardCellType, cells.SpikeSourceArray):
                              builder: grenade.NetworkBuilder) \
             -> grenade.PopulationOnNetwork:
         # create grenade population
-        gpopulation = grenade.ExternalSourcePopulation(
-            population.size)
+        pop_cells_int = np.asarray(population.all_cells, dtype=int)
+        enable_record_spikes = np.zeros((len(pop_cells_int)), dtype=bool)
+        if "spikes" in population.recorder.recorded:
+            recording_ids = [neuron_comp[0] for neuron_comp in
+                             population.recorder.recorded["spikes"]]
+            enable_record_spikes = np.isin(pop_cells_int, recording_ids)
+        gpopulation = grenade.ExternalSourcePopulation([
+            grenade.ExternalSourcePopulation.Neuron(enable_record_spikes[i])
+            for i in range(len(pop_cells_int))])
         # add to builder
         return builder.add(gpopulation)
 
