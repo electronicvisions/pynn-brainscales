@@ -290,6 +290,7 @@ class State(BaseState):
         self.injection_post_realtime = None
         self.initial_config = None
         self.execution_time_info = None
+        self.execution_health_info = None
         self.calib_cache_dir = None
         self.configs = []
         self.network_graphs = []
@@ -337,6 +338,7 @@ class State(BaseState):
         self.injection_post_realtime = None
         self.initial_config = None
         self.execution_time_info = None
+        self.execution_health_info = None
         self.calib_cache_dir = None
         self.configs = []
         self.network_graphs = []
@@ -896,6 +898,12 @@ class State(BaseState):
 
         self.execution_time_info = outputs[0].execution_time_info
         assert self.execution_time_info is not None
+        # We return the first entry, since they are all equal since
+        # they are measured for the full runtime and not the individual
+        # snippets. Grenade should introduce a global field instead of
+        # having only fields for the individual snippet results.
+        self.execution_health_info = outputs[0].execution_health_info
+        assert self.execution_health_info is not None
 
         self.log.DEBUG("run(): Postprocessing finished in "
                        f"{(time.time() - time_after_hw_run):.3f}s")

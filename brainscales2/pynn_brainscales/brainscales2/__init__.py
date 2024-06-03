@@ -412,3 +412,27 @@ def get_execution_time_info() -> grenade.signal_flow.ExecutionTimeInfo:
             "pass `None` as an argument if want to determine the hardware "
             "configuration without an emulation on hardware.")
     return simulator.state.execution_time_info
+
+
+def get_execution_health_info() -> grenade.signal_flow.ExecutionHealthInfo:
+    """
+    Get health information of last execution.
+
+    :raises RuntimeError: If the simulator is not active, i.e. pynn.setup()
+                          was not called.
+    :raises RuntimeError: If no info is available, i.e. pynn.run() was not
+                          called.
+    :return: Health info object.
+    """
+    if not simulator.state:
+        raise RuntimeError(
+            "Execution health information is only available for active "
+            "simulator after calling setup()."
+        )
+    if simulator.state.execution_time_info is None:
+        raise RuntimeError(
+            "Execution health information is only available after the "
+            "hardware configuration has been determined. Call pynn.run(...) "
+            "(you can pass `None` as an argument if want to determine the "
+            "hardware configuration without an emulation on hardware.")
+    return simulator.state.execution_health_info
