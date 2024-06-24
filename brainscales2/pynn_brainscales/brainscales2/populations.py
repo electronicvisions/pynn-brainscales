@@ -146,8 +146,16 @@ class Population(pyNN.common.Population):
         if observable not in self.celltype.plasticity_rule.observables:
             raise RuntimeError(
                 "Celltype doesn't have requested observable.")
-        return self._simulator.state.neuronal_observables[0][
-            self._simulator.state.populations.index(self)][observable]
+
+        observable_data = []
+        for neuronal_observables in self._simulator.state.neuronal_observables:
+            if observable in neuronal_observables[
+                    self._simulator.state.populations.index(self)]:
+                observable_data.append(neuronal_observables[
+                    self._simulator.state.populations.
+                    index(self)][observable])
+
+        return observable_data
 
     # Accessors for automatic calibration neuron types
     @property

@@ -258,8 +258,16 @@ class Projection(pyNN.common.Projection):
         if observable not in self.synapse_type.plasticity_rule.observables:
             raise RuntimeError(
                 "Synapse type doesn't have requested observable.")
-        return self._simulator.state.synaptic_observables[0][
-            self._simulator.state.projections.index(self)][observable]
+
+        observable_data = []
+        for synaptic_observables in self._simulator.state.synaptic_observables:
+            if observable in synaptic_observables[
+                    self._simulator.state.projections.index(self)]:
+                observable_data.append(synaptic_observables[
+                    self._simulator.state.projections.
+                    index(self)][observable])
+
+        return observable_data
 
 
 class Connection(pyNN.common.Connection):

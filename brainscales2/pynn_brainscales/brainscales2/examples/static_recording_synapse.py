@@ -24,7 +24,7 @@ def main():
 
     pynn.run(10)
 
-    weights = projection.get_data("weights")
+    weights = projection.get_data("weights")[0]
 
     pynn.end()
 

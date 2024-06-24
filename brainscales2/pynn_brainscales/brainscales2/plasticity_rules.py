@@ -222,8 +222,15 @@ class PlasticityRule:
                 "For observables per synapse, use the `get_data` function "
                 "of the respective projection.")
 
-        return self._simulator.state.array_observables[0][
-            self._simulator.state.plasticity_rules.index(self)][observable][0]
+        observable_data = []
+        for array_observables in self._simulator.state.array_observables:
+            if observable in array_observables[
+                    self._simulator.state.plasticity_rules.index(self)]:
+                observable_data.append(array_observables[
+                    self._simulator.state.plasticity_rules.
+                    index(self)][observable][0])
+
+        return observable_data
 
 
 class PlasticityRuleHandle:
