@@ -38,6 +38,7 @@ class PlasticityRule(pynn.PlasticityRule):
         #include "grenade/vx/ppu/neuron_view_handle.h"
         #include "grenade/vx/ppu/synapse_array_view_handle.h"
         #include "libnux/vx/location.h"
+        #include <array>
         using namespace grenade::vx::ppu;
         using namespace libnux::vx;
         extern volatile PPUOnDLS ppu;
@@ -53,10 +54,8 @@ class PlasticityRule(pynn.PlasticityRule):
             for (size_t i = 0; i < 256; ++i) {
                 zeros[i] = 0;
             }
-            for (size_t i = 0; i < synapses[0].rows.size; ++i) {
-                if (synapses[0].rows.test(i)) {
-                    synapses[0].set_weights(zeros, i);
-                }
+            for (size_t i = 0; i < synapses[0].rows.size(); ++i) {
+                synapses[0].set_weights(zeros, i);
             }
         }
         """)

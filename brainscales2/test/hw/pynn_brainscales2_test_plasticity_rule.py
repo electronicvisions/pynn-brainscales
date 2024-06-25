@@ -29,6 +29,7 @@ class TestPlasticityRule(unittest.TestCase):
                 return textwrap.dedent("""
                 #include "grenade/vx/ppu/neuron_view_handle.h"
                 #include "grenade/vx/ppu/synapse_array_view_handle.h"
+                #include <array>
                 using namespace grenade::vx::ppu;
                 volatile uint32_t test;
 
