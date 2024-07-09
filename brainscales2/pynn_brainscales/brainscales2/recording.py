@@ -200,8 +200,8 @@ class Recorder(pyNN.recording.Recorder):
                     data = self._get_spiketimes(sids, j, clear=clear)
 
                     if isinstance(data, dict):
-                        for id in sids:
-                            times = pq.Quantity(data.get(id, []), pq.ms)
+                        for id, spikes in data.items():
+                            times = pq.Quantity(spikes, pq.ms)
                             times += t_start
                             if times.size > 0 and times.max() > t_stop:
                                 warn("Recorded at least one spike after t_stop")

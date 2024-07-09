@@ -104,9 +104,9 @@ class TestSpikeRecording(unittest.TestCase):
     def test_switch_spike_recording(self):
         """
         Test, if the returned spiketrains are structured in a list with one
-        spiketrain per realtime snippet and if the different spiketrains
-        with their individual spike rates each are returned in the same order,
-        as configured.
+        spiketrain per realtime snippet (if recorded) and if the different
+        spiketrains with their individual spike rates each are returned in
+        the same order, as configured.
         """
         runtime = 10  # ms, runtime of each realtime snippet / config
         pop = pynn.Population(1, pynn.cells.HXNeuron())
@@ -173,21 +173,20 @@ class TestSpikeRecording(unittest.TestCase):
 
         spiketrains = pop.get_data().segments[0].spiketrains
 
+        # Expect spiketrains only for snippets, in which spike recording was
+        # enabled
+        self.assertEqual(len(spiketrains), 3)
         # Check now the according attributes of the spiketrains to confirm the
         # correct order.
-        # Check the length of the spiketrains to match the above set values,
-        # if recorded, but 0 otherwise
+        # Check the length of the spiketrains to match the above set values.
         # Also check, that the set spiketrains of input_pop are cropped
         # accordingly to the realtime snippet bonds
         self.assertLess(0.95 * len(spikes_1), len(spiketrains[0]))
         self.assertLessEqual(len(spiketrains[0]), len(spikes_1) * 1.05)
-        self.assertEqual(len(spiketrains[1]), 0)
-        self.assertLess(0.95 * len(spikes_3), len(spiketrains[2]))
-        self.assertLessEqual(len(spiketrains[2]), len(spikes_3) * 1.05)
-        self.assertEqual(len(spiketrains[3]), 0)
-        self.assertEqual(len(spiketrains[4]), 0)
-        self.assertLess(0.95 * len(spikes_6), len(spiketrains[5]))
-        self.assertLessEqual(len(spiketrains[5]), len(spikes_6) * 1.05)
+        self.assertLess(0.95 * len(spikes_3), len(spiketrains[1]))
+        self.assertLessEqual(len(spiketrains[1]), len(spikes_3) * 1.05)
+        self.assertLess(0.95 * len(spikes_6), len(spiketrains[2]))
+        self.assertLessEqual(len(spiketrains[2]), len(spikes_6) * 1.05)
 
 
 class TestMembraneRecording(unittest.TestCase):
@@ -427,9 +426,9 @@ class TestClearBehaviour(unittest.TestCase):
         self.assertEqual(len(spikes_0), self.n_spikes)
         self.assertEqual(len(spikes_1), self.n_spikes)
 
-        spikes_0 = self.pop_0.get_data().segments[0].spiketrains[0]
+        spiketrains_0 = self.pop_0.get_data().segments[0].spiketrains
         spikes_1 = self.pop_1.get_data().segments[0].spiketrains[0]
-        self.assertEqual(len(spikes_0), 0)
+        self.assertEqual(len(spiketrains_0), 0)
         self.assertEqual(len(spikes_1), self.n_spikes)
 
 
