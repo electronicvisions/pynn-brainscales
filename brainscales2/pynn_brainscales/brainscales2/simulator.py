@@ -870,7 +870,7 @@ class State(BaseState):
         for i in range(self.realtime_snippet_count):
             spikes = grenade.network.\
                 extract_neuron_spikes(outputs[i], self.network_graphs[i])
-            self.recordings[i].data.spikes = spikes[0] if spikes else []
+            self.recordings[i].data.spikes = spikes[0] if spikes else {}
 
             self.recordings[i].data.madc = self._get_v(
                 self.network_graphs[i], outputs[i], self.recordings[i])
