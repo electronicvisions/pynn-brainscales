@@ -146,18 +146,17 @@ class Recorder(pyNN.recording.Recorder):
                     recording.data.remove(
                         recording_site=grenade_id)
 
-    def _get_spiketimes(self, ids, i, clear=False):
+    def _get_spiketimes(self, ids, snippet_idx, clear=False):
         """Returns a dict containing the recording site and its spiketimes."""
         all_spiketimes = {}
+        recording = self._simulator.state.recordings[snippet_idx]
         for rec_site in ids:
             grenade_id = self._rec_site_to_grenade_index(rec_site)
-            if grenade_id in self._simulator.state.recordings[i].data.spikes:
-                all_spiketimes[rec_site] = self._simulator.state.\
-                    recordings[i].data.spikes[grenade_id]
+            if grenade_id in recording.data.spikes:
+                all_spiketimes[rec_site] = recording.data.spikes[grenade_id]
             if clear:
-                self._simulator.state.recordings[i].data.remove(
-                    recording_site=grenade_id,
-                    recording_type=RecordingType.SPIKES)
+                recording.data.remove(recording_site=grenade_id,
+                                      recording_type=RecordingType.SPIKES)
         return all_spiketimes
 
     def _rec_site_to_grenade_index(self, rec_site: RecordingSite
@@ -191,13 +190,13 @@ class Recorder(pyNN.recording.Recorder):
         variables_to_include = set(self.recorded.keys())
         if variables != 'all':
             variables_to_include = variables_to_include.intersection(set(variables))
-        for j in range(len(self._simulator.state.recordings) - 1):
-            t_start = sum(self._simulator.state.runtimes[0:j]) * pq.ms
-            t_stop = t_start + self._simulator.state.runtimes[j] * pq.ms  # must run on all MPI nodes
+        for snippet_idx in range(len(self._simulator.state.recordings) - 1):
+            t_start = sum(self._simulator.state.runtimes[0:snippet_idx]) * pq.ms
+            t_stop = t_start + self._simulator.state.runtimes[snippet_idx] * pq.ms  # must run on all MPI nodes
             for variable in sorted(variables_to_include):
                 if variable == 'spikes':
                     sids = sorted(self.filter_recorded('spikes', filter_ids))
-                    data = self._get_spiketimes(sids, j, clear=clear)
+                    data = self._get_spiketimes(sids, snippet_idx, clear=clear)
 
                     if isinstance(data, dict):
                         for id, spikes in data.items():
@@ -244,7 +243,7 @@ class Recorder(pyNN.recording.Recorder):
                         segment.spiketrains.segment = segment
                 else:
                     ids = sorted(self.filter_recorded(variable, filter_ids))
-                    signal_array, times_array = self._get_all_signals(variable, ids, j, clear=clear)
+                    signal_array, times_array = self._get_all_signals(variable, ids, snippet_idx, clear=clear)
                     times_array += t_start
                     mpi_node = self._simulator.state.mpi_rank  # for debugging
                     if signal_array.size > 0:
@@ -316,40 +315,37 @@ class Recorder(pyNN.recording.Recorder):
                             signal.segment = segment
         return segment
 
-    def _get_all_signals(self, variable, ids, i, clear=False):
+    def _get_all_signals(self, variable, ids, snippet_idx, clear=False):
         times = []
         values = []
+        recording = self._simulator.state.recordings[snippet_idx]
         for id in ids:
             if id not in self.recorded.get(variable, set()):
                 raise RuntimeError("No samples were recorded for population "
                                    f"'{self.population.label}' at recording "
                                    f"{id}.")
             grenade_id = self._rec_site_to_grenade_index(id)
-            if grenade_id not in self._simulator.state.recordings[i].config.\
-                    analog_observables:
+            if grenade_id not in recording.config.analog_observables:
                 values.append([])
                 times.append([])
                 continue
 
-            recorded_var = self._simulator.state.recordings[i].config.\
-                analog_observables[grenade_id]
+            recorded_var = recording.config.analog_observables[grenade_id]
             if recorded_var != RecordingConfig.str_to_source_map.get(variable):
                 raise RuntimeError(f"'{recorded_var}' was recorded but "
                                    f"'{variable}' was requested "
                                    f"(population: {self.population.label}, "
                                    f"recording_site: {id}).")
-            if grenade_id not in self._simulator.state.recordings[i].data.madc:
+            if grenade_id not in recording.data.madc:
                 # no samples have been recorded yet
                 continue
 
-            madc_recording = self._simulator.state.recordings[i].data.\
-                madc[grenade_id]
+            madc_recording = recording.data.madc[grenade_id]
             times.append(madc_recording.times)
             values.append(madc_recording.values)
             if clear:
-                self._simulator.state.recordings[i].data.remove(
-                    recording_site=grenade_id,
-                    recording_type=RecordingType.MADC)
+                recording.data.remove(recording_site=grenade_id,
+                                      recording_type=RecordingType.MADC)
 
         return np.array(values, dtype=object), np.array(times, dtype=object)
 
