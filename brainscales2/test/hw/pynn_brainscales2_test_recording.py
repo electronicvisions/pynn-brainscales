@@ -18,6 +18,21 @@ class TestSpikeRecording(unittest.TestCase):
     def tearDown(self):
         pynn.end()
 
+    def test_empty_recording(self):
+        """
+        Test that an empty spike train is returned if no spikes are
+        recorded.
+        """
+        runtime = 0.5  # ms
+
+        pop = pynn.Population(1, pynn.cells.HXNeuron())
+        pop.record(['spikes'])
+        pynn.run(runtime)
+        spiketrains = pop.get_data().segments[0].spiketrains
+
+        self.assertEqual(len(spiketrains), 1)
+        self.assertEqual(len(spiketrains[0]), 0)
+
     def test_number_of_spike_trains(self):
         """
         Here we test that only spikes are recorded for the neurons we set in
