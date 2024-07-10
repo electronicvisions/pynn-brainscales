@@ -376,18 +376,18 @@ class TestMembraneRecording(unittest.TestCase):
         self.assertTrue(samples[2].size > 0)
 
 
-class TestClearBehaviour(unittest.TestCase):
+class TestClearBehavior(unittest.TestCase):
     """
-    Test clear behaviour.
+    Test clear behavior.
 
-    Test proper behaviour of the clear parameter of get_data.
+    Test proper behavior of the clear parameter of get_data.
     """
     n_spikes = 10
     runtime = 10  # ms
 
     def setUp(self) -> None:
         '''
-        Perform experiment an record spikes
+        Perform experiment and record spikes
         '''
         pynn.setup(enable_neuron_bypass=True)
 
@@ -434,7 +434,6 @@ class TestClearBehaviour(unittest.TestCase):
         Only clear recording from one population.
 
         This should not affect the data of the other population.
-        be available.
         """
         spikes_0 = self.pop_0.get_data(clear=True).segments[0].spiketrains[0]
         spikes_1 = self.pop_1.get_data().segments[0].spiketrains[0]
