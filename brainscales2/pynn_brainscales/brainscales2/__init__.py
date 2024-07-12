@@ -274,19 +274,19 @@ def run(runtime: Optional[float],
         simulator.state.preprocess()
     elif command == RunCommand.APPEND:
         if runtime is None:
-            raise ValueError("""Appending a configuration that is executed for
-                    no time is forbidden.""")
+            raise ValueError("Appending a configuration that is executed for "
+                             "no time is forbidden.")
         simulator.state.add(runtime)
     elif command == RunCommand.EXECUTE:
         if runtime is not None:
             simulator.state.add(runtime)
         elif not simulator.state.runtimes:
-            raise ValueError("""No experiment scheduled for execution yet
-                    \nTo schedule an execution of the currently
-                    defined network configuration use
-                    pyNN.RunCommand.APPEND\nTo only perform map and
-                    route operations on the current network
-                    configuration use pyNN.RunCommand.PREPARE""")
+            raise ValueError(
+                "No experiment scheduled for execution yet.\n"
+                "To schedule an execution of the currently defined network "
+                "configuration use `command=pyNN.RunCommand.APPEND`.\n"
+                "To only perform map and route operations on the current "
+                "network configuration use `command=pyNN.RunCommand.PREPARE`")
         simulator.state.run()
     else:
         raise ValueError("Passed command is invalid.")
