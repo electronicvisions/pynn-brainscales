@@ -822,9 +822,11 @@ class State(BaseState):
         inputs.runtime = [{grenade.common.ExecutionInstanceID():
                            runtime_in_clocks}]
 
-        self.configs.append(deepcopy({grenade.common.
-                            ExecutionInstanceID(): self.grenade_chip_config}))
-        self.network_graphs.append(deepcopy(self.grenade_network_graph))
+        self.configs.append({grenade.common.
+                            ExecutionInstanceID():
+                            lola.Chip(self.grenade_chip_config)})
+        self.network_graphs.append(grenade.network.NetworkGraph(
+            self.grenade_network_graph))
         self.inputs.append(inputs)
         self.recordings.append(deepcopy(self.recordings[-1]))
 
