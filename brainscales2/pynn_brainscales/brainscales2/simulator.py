@@ -514,7 +514,7 @@ class State(BaseState):
                 population.celltype.add_to_chip(
                     population.all_cells, self.grenade_chip_config)
 
-    def _generate_network_graph(self):
+    def _generate_network_graph(self, snippet_begin_time, snippet_end_time):
         """
         Generate placed and routed executable network graph representation.
         """
@@ -538,7 +538,8 @@ class State(BaseState):
             proj.add_to_network_graph(
                 self.populations, proj, network_builder)
         for plasticity_rule in self.plasticity_rules:
-            plasticity_rule.add_to_network_graph(network_builder)
+            plasticity_rule.add_to_network_graph(
+                network_builder, snippet_begin_time, snippet_end_time)
 
         self.recordings[-1].config.add_to_network_graph(network_builder)
 
@@ -779,7 +780,7 @@ class State(BaseState):
         self.injection_inside_realtime_end = inside_realtime_end
         self.injection_post_realtime = post_realtime
 
-    def preprocess(self):
+    def preprocess(self, snippet_begin_time, snippet_end_time):
         """
         Execute all steps needed for the hardware back-end.
         Includes place&route of network graph or execution of calibration.
@@ -787,7 +788,7 @@ class State(BaseState):
         CalibHXNeuronCuba/Coba and make adjustments if needed.
         If not called manually is automatically called on run().
         """
-        self._generate_network_graph()
+        self._generate_network_graph(snippet_begin_time, snippet_end_time)
         self._configure_recorders_populations()
         self._reset_changed_since_last_run()
 
@@ -804,7 +805,7 @@ class State(BaseState):
 
         self.realtime_snippet_count += 1
 
-        self.preprocess()
+        self.preprocess(snippet_begin_time, self.t)
 
         # generate external spike trains
         inputs = self._generate_inputs(self.grenade_network_graph,

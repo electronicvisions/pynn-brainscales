@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Dict, Optional, Union
+from math import ceil
 import textwrap
 from pyNN.common import Projection, Population
 from pynn_brainscales.brainscales2 import simulator
@@ -42,7 +43,8 @@ class Timer:
     period = property(_get_period, _set_period)
     num_periods = property(_get_num_periods, _set_num_periods)
 
-    def to_grenade(self) -> grenade.PlasticityRule.Timer:
+    def to_grenade(self, snippet_begin_time, snippet_end_time) \
+            -> grenade.PlasticityRule.Timer:
         def to_ppu_cycles(value: float) -> int:
             # TODO (Issue #3993): calculate frequency from chip config
             result = float(value)
@@ -52,9 +54,14 @@ class Timer:
             return grenade.PlasticityRule.Timer.Value(int(round(result)))
 
         timer = grenade.PlasticityRule.Timer()
-        timer.start = to_ppu_cycles(self.start)
+        pre_snippet_period_count = ceil(
+            (snippet_begin_time - self.start) / self.period)
+        timer.start = to_ppu_cycles(
+            self.period * pre_snippet_period_count + self.start)
         timer.period = to_ppu_cycles(self.period)
-        timer.num_periods = int(self.num_periods)
+        timer.num_periods = ceil(
+            (snippet_end_time - self.start) / self.period) \
+            - pre_snippet_period_count
         return timer
 
 
@@ -155,11 +162,12 @@ class PlasticityRule:
         {}
         """)
 
-    def add_to_network_graph(self, builder: grenade
-                             .NetworkBuilder) \
+    def add_to_network_graph(self, builder: grenade.NetworkBuilder,
+                             snippet_begin_time, snippet_end_time) \
             -> grenade.PlasticityRuleOnNetwork:
         plasticity_rule = grenade.PlasticityRule()
-        plasticity_rule.timer = self.timer.to_grenade()
+        plasticity_rule.timer = self.timer.to_grenade(
+            snippet_begin_time, snippet_end_time)
         if self.observables:
             plasticity_rule.recording = grenade.PlasticityRule\
                 .TimedRecording()

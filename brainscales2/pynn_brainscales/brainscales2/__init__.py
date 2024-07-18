@@ -271,7 +271,7 @@ def run(runtime: Optional[float],
     executing the experiment, if a value is passed for runtime.
     """
     if command == RunCommand.PREPARE:
-        simulator.state.preprocess()
+        simulator.state.preprocess(0, 0)
     elif command == RunCommand.APPEND:
         if runtime is None:
             raise ValueError("Appending a configuration that is executed for "
@@ -302,7 +302,7 @@ def preprocess():
     """
     warn('Please use pyNN.run(None, pyNN.RunCommand.PREPARE)',
          DeprecationWarning, stacklevel=2)
-    simulator.state.preprocess()
+    simulator.state.preprocess(0, 0)
 
 
 reset = common.build_reset(simulator)

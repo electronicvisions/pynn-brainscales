@@ -76,7 +76,8 @@ class StaticRecordingSynapse(
         observables = property(_get_observables, _set_observables)
 
         def add_to_network_graph(
-                self, builder: grenade.NetworkBuilder) \
+                self, builder: grenade.NetworkBuilder,
+                snippet_begin_time, snippet_end_time) \
                 -> grenade.PlasticityRuleOnNetwork:
             observables = set(
                 getattr(
@@ -91,7 +92,8 @@ class StaticRecordingSynapse(
                 grenade.ProjectionOnNetwork(
                     self._simulator.state.projections.index(proj))
                 for proj in self._projections]
-            plasticity_rule.timer = self.timer.to_grenade()
+            plasticity_rule.timer = self.timer.to_grenade(
+                snippet_begin_time, snippet_end_time)
             return builder.add(plasticity_rule)
 
     POSSIBLE_OBSERVABLES: Final[List[str]] = [
