@@ -85,11 +85,17 @@ class PlasticityRule:
     def __init__(self, timer: Timer,
                  observables: Optional[Dict[str, Union[
                      ObservablePerSynapse, ObservablePerNeuron,
-                     ObservableArray]]] = None):
+                     ObservableArray]]] = None,
+                 same_id: int = 0):
         """
         Create a new plasticity rule with timing information.
 
         :param timer: Timer object.
+        :param same_id: Identifier of same plasticity rule.
+            Plasticity rules with equal identifier share their
+            state across realtime snippets.
+            Currently, in addition, the complete provided kernel
+            code is required to be equal.
         """
         self._timer = timer
         if observables is None:
@@ -99,6 +105,7 @@ class PlasticityRule:
         self._projections = []
         self._populations = []
         self._simulator.state.plasticity_rules.append(self)
+        self._same_id = same_id
         self.changed_since_last_run = True
 
     def _set_timer(self, new_timer):
@@ -120,6 +127,16 @@ class PlasticityRule:
         return self._observables
 
     observables = property(_get_observables, _set_observables)
+
+    def _set_same_id(self, new_id):
+        self._same_id = new_id
+        self.changed_since_last_run = True
+
+    def _get_same_id(self):
+        self.changed_since_last_run = True
+        return self._same_id
+
+    same_id = property(_get_same_id, _set_same_id)
 
     def _add_projection(self, new_projection: Projection):
         self._projections.append(new_projection)
@@ -181,6 +198,7 @@ class PlasticityRule:
             pop.celltype.to_plasticity_rule_population_handle(pop)
             for pop in self._populations
         ]
+        plasticity_rule.id = grenade.PlasticityRule.ID(self.same_id)
         return builder.add(plasticity_rule)
 
     def get_data(
