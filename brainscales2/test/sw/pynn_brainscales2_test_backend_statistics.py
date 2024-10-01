@@ -21,7 +21,7 @@ class TestBackendStatistics(unittest.TestCase):
 
         pynn.run(None, pynn.RunCommand.PREPARE)
         string = str(pynn.get_backend_statistics())
-        self.assertTrue("NetworkGraphStatistics" in string)
+        self.assertTrue("MappedTopologyStatistics" in string)
 
 
 if __name__ == '__main__':

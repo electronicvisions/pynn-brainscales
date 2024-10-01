@@ -25,17 +25,17 @@ class TestpyNNSetup(unittest.TestCase):
         pynn.setup(neuronPermutation=range(halco.AtomicNeuronOnDLS.size))
 
     def test_too_large_neuronpermuation(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(OverflowError):
             pynn.setup(
                 neuronPermutation=range(
                     halco.AtomicNeuronOnDLS.size + 1))
 
     def test_too_large_index(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(OverflowError):
             pynn.setup(neuronPermutation=[halco.AtomicNeuronOnDLS.size + 1])
 
     def test_negative_index(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             pynn.setup(neuronPermutation=[-1])
 
     def test_unhandled_parameter(self):
@@ -101,11 +101,11 @@ class TestpyNNSetup(unittest.TestCase):
         config.neuron_block.backends[backend_c].clock_scale_fast = 2
         pynn.setup(initial_config=config)
         pop = pynn.Population(2, pynn.cells.HXNeuron())
+        pynn.run(None, pynn.RunCommand.PREPARE)
         self.assertTrue(
             numpy.array_equal(pop.get("leak_i_bias"), [666, 420]))
-        self.assertEqual(pynn.simulator.state.grenade_chip_config.neuron_block
-                         .backends[backend_c].clock_scale_fast, 2)
-        pynn.run(None, pynn.RunCommand.PREPARE)
+        self.assertEqual(pynn.simulator.state.initial_config
+                         .neuron_block.backends[backend_c].clock_scale_fast, 2)
         pynn.end()
 
 

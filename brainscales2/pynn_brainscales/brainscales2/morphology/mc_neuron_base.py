@@ -11,11 +11,11 @@ from pyNN.standardmodels import build_translations
 
 from dlens_vx_v3 import lola, halco, hal
 import pygrenade_vx.network as grenade
+import pygrenade_common as grenade_common
 
 from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.standardmodels.cells_base import \
     StandardCellType
-from pynn_brainscales.brainscales2.recording import RecordingSite
 from pynn_brainscales.brainscales2.helper import decompose_in_member_names, \
     get_values_of_atomic_neuron
 from pynn_brainscales.brainscales2.morphology.parameters import \
@@ -139,49 +139,83 @@ class McNeuronBase(StandardCellType, ABC):
         cls._update_default_parameters()
 
     @staticmethod
-    def add_to_network_graph(population: Population,
-                             builder: grenade.NetworkBuilder) \
-            -> grenade.PopulationOnNetwork:
-        # get neuron coordinates
-        coords: List[halco.LogicalNeuronOnDLS] = \
-            simulator.state.neuron_placement.id2logicalneuron(
-                population.all_cells)
+    def generate_vertex(population: Population) \
+            -> grenade_common.Population:
+        compartments = {}
+        for comp_id, comp in population.celltype.compartments.items():
+            # convention
+            compartment_receptors = [{
+                grenade_common.ReceptorOnCompartment(0):
+                grenade.Receptor.Type.excitatory,
+                grenade_common.ReceptorOnCompartment(1):
+                grenade.Receptor.Type.inhibitory
+            }] * comp.size
+            compartment = grenade.abstract.UncalibratedNeuron.Compartment(
+                grenade.abstract.UncalibratedNeuron.Compartment
+                .SpikeMaster(0),
+                compartment_receptors)
+            compartments.update({
+                grenade_common.CompartmentOnNeuron(comp_id):
+                compartment})
 
-        # create receptors
-        receptors = set([
-            grenade.Receptor(
-                grenade.Receptor.ID(),
-                grenade.Receptor.Type.excitatory),
-            grenade.Receptor(
-                grenade.Receptor.ID(),
-                grenade.Receptor.Type.inhibitory),
-        ])
+        cell = grenade.abstract.UncalibratedNeuron(
+            compartments=compartments,
+            shape=population.celltype.logical_compartments)
 
-        neurons = []
-        for cell_id, coord in zip(population.all_cells, coords):
-            comps = {}
-            for comp_id, comp in population.celltype.compartments.items():
-                record = RecordingSite(cell_id, comp_id) in \
-                    population.recorder.recorded["spikes"]
-                spike_master = grenade.Population.Neuron\
-                    .Compartment.SpikeMaster(0, record)
-                comps[comp_id] = grenade.Population.Neuron\
-                    .Compartment(spike_master, [receptors] * comp.size)
+        shape = grenade_common.CuboidMultiIndexSequence(
+            [len(population)],
+            [grenade_common.CellOnPopulationDimensionUnit()])
 
-            neurons.append(grenade.Population.Neuron(coord, comps))
-        # create grenade population
-        gpopulation = grenade.Population(neurons)
-        # add to builder
-        descriptor = builder.add(gpopulation)
+        cell_num_neuron_circuits = {}
+        for comp_id, comp in population.celltype.compartments.items():
+            cell_num_neuron_circuits.update({
+                grenade_common.CompartmentOnNeuron(comp_id): comp.size})
+        parameter_space = grenade.abstract.UncalibratedNeuron.ParameterSpace(
+            len(population), cell_num_neuron_circuits)
 
-        return descriptor
+        return grenade_common.Population(
+            cell=cell,
+            shape=shape,
+            parameter_space=parameter_space,
+            time_domain=grenade_common.TimeDomainOnTopology())
 
-    @staticmethod
-    def add_to_input_generator(
+    def generate_input_data(
+            self,
             population: Population,
-            builder: grenade.InputGenerator,
-            snippet_begin_time, snippet_end_time):
-        pass
+            experiment: grenade.abstract.frontend.ExperimentSnippet,
+            snippet_begin_time: float,
+            snippet_end_time: float) \
+            -> Dict[int, grenade_common.PortData]:
+        parameterization = grenade.abstract.UncalibratedNeuron\
+            .ParameterSpace.Parameterization()
+
+        # TODO: implement fetch of mapped parameterization from chip object
+        coords = grenade.abstract.reverse_mapping\
+            .get_locally_placed_neuron_coordinates(
+                population.grenade_descriptor, experiment.mapped_topology)
+        population.celltype.apply_config(coords)
+
+        parameter_space = population.celltype.parameter_space
+        parameter_space.shape = (population.size,)
+        # we want to iterate over parameter space -> evaluate to get rid of
+        # laziness
+        parameter_space.evaluate(
+            mask=population._mask_local, simplify=False)  # pylint: disable=protected-access
+
+        configs = []
+        for cell_in_pop, _ in enumerate(population.all_cells):
+            logical_neuron = population.celltype.get_logical_neuron(
+                cell_in_pop).collapse_neuron()
+            configs.append({
+                grenade_common.CompartmentOnNeuron(comp_id):
+                comp for comp_id, comp in logical_neuron.items()})
+
+        parameterization.configs = configs
+        parameterization.base_configs = [(
+            list(range(len(population))),
+            simulator.state.initial_config)]
+
+        return {1: parameterization}
 
     @classmethod
     def get_compartment_ids(cls, labels: Sequence[str]
@@ -464,31 +498,6 @@ class McNeuronBase(StandardCellType, ABC):
                 new_values.append(self._change_all_but_first_circuit(
                     old_value, new_value))
             self.parameter_space.update(**{name: new_values})
-
-    def add_to_chip(self, cell_ids: List, config: lola.Chip) -> None:
-        """
-        Add configuration of each neuron in the parameter space to the give
-        chip object.
-
-
-        :param cell_ids: Cell IDs for each neuron in the parameter space of
-            this celltype object.
-        :param chip: Lola chip object which is altered.
-        """
-        for cell_in_pop, cell_id in enumerate(cell_ids):
-            logical_neuron = self.get_logical_neuron(cell_in_pop)
-            logical_coord = \
-                simulator.state.neuron_placement.id2logicalneuron(cell_id)
-            placed_compartments = logical_coord.get_placed_compartments()
-
-            for comp_id, atomic_neurons in logical_neuron.collapse_neuron()\
-                    .items():
-                for atomic_coord, atomic_config in zip(
-                        placed_compartments[comp_id], atomic_neurons):
-                    atomic_config.event_routing.analog_output = \
-                        atomic_config.EventRouting.AnalogOutputMode.normal
-                    config.neuron_block.atomic_neurons[atomic_coord] = \
-                        atomic_config
 
 
 McNeuronBase.translations = McNeuronBase._create_translation()  # pylint: disable=protected-access

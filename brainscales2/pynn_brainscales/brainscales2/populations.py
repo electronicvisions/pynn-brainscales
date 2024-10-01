@@ -6,6 +6,7 @@ from pyNN.parameters import ParameterSpace, simplify
 from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.plasticity_rules import PlasticityRuleHandle
 from pynn_brainscales.brainscales2.recording import Recorder
+import pygrenade_vx.network.abstract.frontend as grenade
 from neo.io import NixIO
 
 
@@ -37,17 +38,22 @@ class Assembly(pyNN.common.Assembly):
 
 
 # pylint:disable=abstract-method
-class Population(pyNN.common.Population):
+class Population(pyNN.common.Population, grenade.ExperimentElement):
     __doc__ = pyNN.common.Population.__doc__
     _simulator = simulator
     _recorder_class = Recorder
     _assembly_class = Assembly
     all_cells: np.ndarray
     _mask_local: np.ndarray
-    changed_since_last_run = True
     _description_cache = {
         # hash of describe(…) call arguments -> return value
     }
+
+    def __init__(self, *args, **kwargs):
+        grenade.ExperimentElement.__init__(
+            self, self._simulator.state.grenade_experiment)
+        self.grenade_descriptor = None
+        super().__init__(*args, **kwargs)
 
     def _create_cells(self):
         id_range = np.arange(self._simulator.state.id_counter,
@@ -58,14 +64,6 @@ class Population(pyNN.common.Population):
 
         for cell_id in self.all_cells:
             cell_id.parent = self
-
-        if hasattr(self.celltype, "logical_compartments"):
-            simulator.state.neuron_placement.register_neuron(
-                self.all_cells, self.celltype.logical_compartments)
-            if hasattr(self.celltype, "apply_config"):
-                coords = simulator.state.neuron_placement.\
-                    id2logicalneuron(self.all_cells)
-                self.celltype.apply_config(coords)
 
         parameter_space = self.celltype.parameter_space
         parameter_space.shape = (self.size,)
@@ -95,7 +93,7 @@ class Population(pyNN.common.Population):
 
     def _set_parameters(self, parameter_space):
         """parameter_space should contain native parameters"""
-        self.changed_since_last_run = True
+        self.changed_input_data = True
         self._description_cache.clear()
         parameter_space.evaluate(simplify=False)
         for name, value in parameter_space.items():
@@ -164,13 +162,19 @@ class Population(pyNN.common.Population):
             raise RuntimeError(
                 "Celltype doesn't have requested observable.")
 
+        if self.celltype.plasticity_rule._recording_data is None:  # pylint: disable=protected-access
+            raise RuntimeError(
+                "Plasticity rule observables only available after execution.")
         observable_data = []
-        for neuronal_observables in self._simulator.state.neuronal_observables:
-            if observable in neuronal_observables[
-                    self._simulator.state.populations.index(self)]:
-                observable_data.append(neuronal_observables[
-                    self._simulator.state.populations.
-                    index(self)][observable])
+        for snippet in self.celltype.plasticity_rule._recording_data:  # pylint: disable=protected-access
+            if snippet is not None and observable in snippet.data_per_neuron:
+                observable_data.append(
+                    snippet.data_per_neuron[observable][
+                        self.celltype.plasticity_rule._populations.index(  # pylint: disable=protected-access
+                            self)][
+                        simulator.state.batch_entry])
+            else:
+                observable_data.append(None)
 
         return observable_data
 
@@ -269,6 +273,37 @@ class Population(pyNN.common.Population):
     def find_units(self, variable):
         return self.celltype.units[variable]
 
+    def add_to_topology(
+            self,
+            experiment: grenade.ExperimentSnippet):
+        if self.grenade_descriptor is not None and \
+                experiment.topology.contains(self.grenade_descriptor):
+            experiment.topology.set(
+                self.grenade_descriptor,
+                self.celltype.generate_vertex(self))
+        else:
+            self.grenade_descriptor = experiment.topology.add_vertex(
+                self.celltype.generate_vertex(self))
+        return True
+
+    def add_to_input_data(
+            self,
+            experiment: grenade.ExperimentSnippet,
+            snippet_begin_time,
+            snippet_end_time):
+        input_data = self.celltype.generate_input_data(
+            self, experiment, snippet_begin_time, snippet_end_time)
+        if input_data is None:
+            return
+        for port_on_vertex, port_data in input_data.items():
+            experiment.input_data.ports.set(
+                (self.grenade_descriptor, port_on_vertex), port_data)
+
+    def extract_output_data(
+            self,
+            experiment: List[grenade.ExperimentSnippet]):
+        pass
+
 
 # pylint:disable=abstract-method
 class PopulationView(pyNN.common.PopulationView):
@@ -292,7 +327,7 @@ class PopulationView(pyNN.common.PopulationView):
 
     def _set_parameters(self, parameter_space):
         """parameter_space should contain native parameters"""
-        self.parent.changed_since_last_run = True
+        self.parent.changed_input_data = True
         parameter_space.evaluate(simplify=False)
         for name, value in parameter_space.items():
             self.celltype.parameter_space[name][self.mask] = value

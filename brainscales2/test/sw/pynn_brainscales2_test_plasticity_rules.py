@@ -2,8 +2,6 @@
 
 import unittest
 import numpy as np
-import pygrenade_vx.network as grenade
-from dlens_vx_v3 import halco
 import pynn_brainscales.brainscales2 as pynn
 
 
@@ -31,11 +29,6 @@ class TestPlasticityRule(unittest.TestCase):
             proj.synapse_type,
             pynn.plasticity_rules.PlasticityRuleHandle))
 
-        handle = proj.synapse_type.to_plasticity_rule_projection_handle(proj)
-
-        expectation = grenade.ProjectionOnNetwork()
-        self.assertEqual(handle, expectation)
-
         pynn.run(None, pynn.RunCommand.PREPARE)
 
     def test_population_no_readout(self):
@@ -48,16 +41,6 @@ class TestPlasticityRule(unittest.TestCase):
         self.assertTrue(isinstance(
             pop.celltype,
             pynn.plasticity_rules.PlasticityRuleHandle))
-
-        handle = pop.celltype.to_plasticity_rule_population_handle(pop)
-
-        expectation = \
-            grenade.PlasticityRule.PopulationHandle()
-        expectation.neuron_readout_sources = [
-            {halco.CompartmentOnLogicalNeuron(): [None]},
-            {halco.CompartmentOnLogicalNeuron(): [None]},
-            {halco.CompartmentOnLogicalNeuron(): [None]}]
-        self.assertEqual(handle, expectation)
 
         pynn.run(None, pynn.RunCommand.PREPARE)
 
@@ -74,17 +57,6 @@ class TestPlasticityRule(unittest.TestCase):
         self.assertTrue(isinstance(
             pop.celltype,
             pynn.plasticity_rules.PlasticityRuleHandle))
-
-        handle = pop.celltype.to_plasticity_rule_population_handle(pop)
-
-        expectation = \
-            grenade.PlasticityRule.PopulationHandle()
-        expectation.neuron_readout_sources = [
-            {halco.CompartmentOnLogicalNeuron(): [
-             pynn.cells.HXNeuron.ReadoutSource.membrane]}
-        ] * len(pop)
-
-        self.assertEqual(handle, expectation)
 
         self.assertTrue(
             np.array_equal(pop.get(

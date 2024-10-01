@@ -8,6 +8,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pynn_brainscales.brainscales2 as pynn
+from pygrenade_vx.network.abstract.reverse_mapping \
+    import get_locally_placed_neuron_coordinates
 from dlens_vx_v3 import halco
 
 
@@ -289,12 +291,12 @@ class ChipPlotter:
             pops_allcells.append(pop.all_cells)
         external_pops = []
         pops_pos = []
-        for i, _ in enumerate(self.pops):
-            if not isinstance((self.pops[i]).celltype, pynn.cells.ExternalNeuron):
-                pop = pops_allcells[i]
-                logical_neurons = (
-                    pynn.simulator.state.neuron_placement.id2logicalneuron(pop)
-                )
+        for i, pop in enumerate(self.pops):
+            if not isinstance(pop.celltype, pynn.cells.ExternalNeuron):
+                logical_neurons = get_locally_placed_neuron_coordinates(
+                    pop.grenade_descriptor,
+                    pynn.simulator.state.grenade_experiment.snippets[-1].mapped_topology)
+
                 pop_pos = []
                 for neuron in logical_neurons:
                     x_coord = int(neuron.get_atomic_neurons()[0].toNeuronColumnOnDLS())
@@ -327,8 +329,12 @@ class ChipPlotter:
             connections_of_p_i = self.projections[i].placed_connections
             for connections_i_j in connections_of_p_i:
                 for connections_i_j_k in connections_i_j:
-                    row = int(connections_i_j_k.synapse_row)
-                    col = int(connections_i_j_k.synapse_on_row)
+                    row = int(halco.SynapseRowOnDLS(
+                        connections_i_j_k.toSynapseOnSynram()
+                        .toSynapseRowOnSynram(),
+                        connections_i_j_k.toSynramOnDLS()))
+                    col = int(connections_i_j_k.toSynapseOnSynram()
+                              .toSynapseOnSynapseRow())
                     synapse_map_part.append([col, row])
                     if row not in used_rows:
                         used_rows.append(row)

@@ -127,19 +127,19 @@ class TestCalibHXNeuronCuba(unittest.TestCase):
         Test correct assignment/masking in population views.
         """
         self.pop.set(synapse_dac_bias=[400, 500, 500])
-        with self.assertRaises(AttributeError):
+        with self.assertRaises(RuntimeError):
             pynn.run(1)
         pynn.reset()
         self.pop.set(synapse_dac_bias=400)
 
         self.pop.set(i_synin_gm_E=[400, 500, 500])
-        with self.assertRaises(AttributeError):
+        with self.assertRaises(RuntimeError):
             pynn.run(1)
         pynn.reset()
         self.pop.set(i_synin_gm_E=500)
 
         self.pop.set(i_synin_gm_I=[400, 500, 500])
-        with self.assertRaises(AttributeError):
+        with self.assertRaises(RuntimeError):
             pynn.run(1)
         pynn.reset()
         self.pop.set(i_synin_gm_I=500)
@@ -245,19 +245,19 @@ class TestCalibHXNeuronCoba(unittest.TestCase):
         Test correct assignment/masking in population views.
         """
         self.pop.set(synapse_dac_bias=[400, 500, 500])
-        with self.assertRaises(AttributeError):
+        with self.assertRaises(RuntimeError):
             pynn.run(1)
         pynn.reset()
         self.pop.set(synapse_dac_bias=400)
 
         self.pop.set(i_synin_gm_E=[400, 500, 500])
-        with self.assertRaises(AttributeError):
+        with self.assertRaises(RuntimeError):
             pynn.run(1)
         pynn.reset()
         self.pop.set(i_synin_gm_E=500)
 
         self.pop.set(i_synin_gm_I=[400, 500, 500])
-        with self.assertRaises(AttributeError):
+        with self.assertRaises(RuntimeError):
             pynn.run(1)
         pynn.reset()
         self.pop.set(i_synin_gm_I=500)

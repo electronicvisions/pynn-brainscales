@@ -1,18 +1,14 @@
 import time
-import itertools
-from copy import copy, deepcopy
-from typing import Optional, Final, List, Dict, Union, NamedTuple, Any, \
-    Sequence
+from copy import deepcopy
+from typing import Optional, Final, List, Dict, Union, NamedTuple
 import numpy as np
 from pyNN.common import IDMixin, Population, Projection
 from pyNN.common.control import BaseState
-from dlens_vx_v3 import hal, halco, sta, lola, logger
+from dlens_vx_v3 import hal, halco, sta, logger
 import pygrenade_vx as grenade
+import pygrenade_common as grenade_common
 
 from pynn_brainscales.brainscales2.recording_data import Recording
-
-from calix.spiking.neuron import NeuronCalibTarget
-from calix import calibrate
 
 
 name = "HX"  # for use in annotating output data
@@ -26,6 +22,39 @@ class ADCRecording(NamedTuple):
     values: np.ndarray
 
 
+class Connection:
+    """
+    Wrapper for connection to hardware supporting both using a connection
+    supplied by the user and constructing an executor from the environment.
+    """
+    def __init__(self, connection_from_outside: Optional[
+            grenade.execution.JITGraphExecutorHandle] = None):
+        """
+        Construct connection.
+
+        :param connection_from_outside: Optionally supplied connection
+        """
+        self._conn = connection_from_outside
+        self._conn_manager = None
+
+    def get(self):
+        """
+        Get connection.
+        """
+        if self._conn is None:
+            self._conn_manager = grenade.execution.ManagedJITGraphExecutor()
+            self._conn = self._conn_manager.__enter__()  # pylint: disable=unnecessary-dunder-call
+        return self._conn
+
+    def end(self):
+        """
+        Descruct connection if created during instance construction and not
+        supplied from the outside.
+        """
+        if self._conn_manager is not None:
+            self._conn_manager.__exit__()
+
+
 class ID(int, IDMixin):
     __doc__ = IDMixin.__doc__
 
@@ -36,196 +65,24 @@ class ID(int, IDMixin):
         IDMixin.__init__(self)
 
 
-class NeuronPlacement:
-    """
-    Tracks the assignment of pyNN IDs to LogicalNeuronOnDLS.
-
-    This tracking is needed for all neuron types which are placed in the
-    neuron array. By default the anchor of the neurons are placed in increasing
-    order of the hardware enumeration.
-
-    :param neuron_id: Look up table for permutation. Index: HW related
-                    population neuron enumeration. Value: HW neuron
-                    enumeration.
-    """
-    _id_2_coord: Dict[ID, halco.LogicalNeuronOnDLS]
-    _available_coords: np.ndarray
-    _MAX_NUM_ENTRIES: Final[int] = halco.AtomicNeuronOnDLS.size
-    DEFAULT_PERMUTATION: Final[List[int]] = range(halco.AtomicNeuronOnDLS.size)
-
-    def __init__(self, permutation: List[int] = None):
-        if permutation is None:
-            permutation = range(self._MAX_NUM_ENTRIES)
-        self._id_2_coord = {}
-        self._available_coords = self._check_and_transform(permutation)
-
-    def register_neuron(self, neuron_id: Union[List[ID], ID],
-                        logical_compartments: halco.LogicalNeuronCompartments):
+class GrenadeExperiment(grenade.network.abstract.frontend.Experiment):
+    def generate_runtimes(self, runtime: float) -> Dict[
+            grenade_common.TimeDomainOnTopology,
+            grenade_common.TimeDomainRuntimes]:
         """
-        Register new IDs to placement.
+        Generate grenade runtimes.
 
-        :param neuron_id: pyNN neuron IDs to be registered.
-        :param logical_compartments: LogicalNeuronCompartments which belong
-            to the neurons which should be registered. All neurons which should
-            be registered have to share the same morphology, i.e. have the same
-            LogicalNeuronCompartments coordinate.
+        PyNN only manages one time domain and one batch entry.
+
+        :param runtime: Runtime in ms wall-clock time
         """
-        if not (hasattr(neuron_id, "__iter__")
-                and hasattr(neuron_id, "__len__")):
-            neuron_id = [neuron_id]
-
-        compartments = logical_compartments.get_compartments().values()
-        circuits_per_neuron = np.sum([len(comp) for comp in compartments])
-        if len(neuron_id) * circuits_per_neuron > len(self._available_coords):
-            raise ValueError(
-                f"Cannot register more than {len(self._available_coords)} "
-                "neuron circuits.")
-        for idx in neuron_id:
-            placed = False
-            # try one available coordinate after another as an anchor
-            for anchor in self._available_coords:
-                try:
-                    logical_neuron = halco.LogicalNeuronOnDLS(
-                        logical_compartments, anchor)
-                except RuntimeError:
-                    # logical neuron extends over edge of neuron array
-                    continue
-
-                atomic_neurons = logical_neuron.get_atomic_neurons()
-                if not np.isin(atomic_neurons, self._available_coords).all():
-                    continue
-
-                self._available_coords = self._available_coords[
-                    ~np.isin(self._available_coords, atomic_neurons)]
-                self._id_2_coord[idx] = logical_neuron
-                placed = True
-                break
-
-            if not placed:
-                raise ValueError("LogicalNeuron cannot be placed.")
-
-    def id2logicalneuron(self, neuron_id: Union[List[ID], ID]) \
-            -> Union[List[halco.LogicalNeuronOnDLS], halco.LogicalNeuronOnDLS]:
-        """
-        Get hardware coordinate from pyNN ID
-        :param neuron_id: pyNN neuron ID
-        """
-        try:
-            return [self._id_2_coord[idx] for idx in
-                    neuron_id]
-        except TypeError:
-            return self._id_2_coord[neuron_id]
-
-    def id2first_circuit(self, neuron_id: Union[List[ID], ID]) \
-            -> Union[List[int], int]:
-        """
-        Get hardware coordinate of first circuit in first compartment as plain
-        int from pyNN ID.
-
-        :param neuron_id: pyNN neuron ID
-        :return: Enums of first circuits in first compartments.
-        """
-        logical_neurons = self.id2logicalneuron(neuron_id)
-        try:
-            return [int(idx.get_atomic_neurons()[0].toEnum()) for
-                    idx in logical_neurons]
-        except TypeError:
-            return int(logical_neurons.get_atomic_neurons()[0].toEnum())
-
-    @staticmethod
-    def _check_and_transform(lut: list) -> list:
-
-        cell_id_size = NeuronPlacement._MAX_NUM_ENTRIES
-        if len(lut) > cell_id_size:
-            raise ValueError("Too many elements in HW LUT.")
-        if len(lut) > len(set(lut)):
-            raise ValueError("Non unique entries in HW LUT.")
-        permutation = []
-        for neuron_idx in lut:
-            if not 0 <= neuron_idx < cell_id_size:
-                raise ValueError(
-                    f"NeuronPermutation list entry {neuron_idx} out of range. "
-                    + f"Needs to be in range [0, {cell_id_size - 1}]"
-                )
-            coord = halco.AtomicNeuronOnDLS(halco.common.Enum(neuron_idx))
-            permutation.append(coord)
-        return np.array(permutation)
-
-
-class BackgroundSpikeSourcePlacement:
-    """
-    Tracks assignment of pyNN IDs of SpikeSourcePoissonOnChip based populations
-    to the corresponding hardware entity, i.e. BackgroundSpikeSourceOnDLS. We
-    use one source on each hemisphere to ensure arbitrary routing works.
-    Default constructed with reversed 1 to 1 permutation to yield better
-    distribution for small networks.
-
-    :cvar DEFAULT_PERMUTATION: Default permutation, where allocation is ordered
-                               to start at the highest-enum PADI-bus to reduce
-                               overlap with allocated neurons.
-    """
-    _pb_2_id: Dict[halco.PADIBusOnPADIBusBlock, List[ID]]
-    _permutation: List[halco.PADIBusOnPADIBusBlock]
-    _MAX_NUM_ENTRIES: Final[int] = halco.PADIBusOnPADIBusBlock.size
-    DEFAULT_PERMUTATION: Final[List[int]] = list(reversed(range(
-        halco.PADIBusOnPADIBusBlock.size)))
-
-    def __init__(self, permutation: List[int] = None):
-        """
-        :param permutation: Look up table for permutation. Index: HW related
-                            population neuron enumeration. Value: HW neuron
-                            enumeration.
-        """
-
-        if permutation is None:
-            permutation = self.DEFAULT_PERMUTATION
-        self._pb_2_id = {}
-        self._permutation = self._check_and_transform(permutation)
-
-    def register_id(self, neuron_id: Union[List[ID], ID]):
-        """
-        Register a new ID to placement
-
-        :param neuron_id: pyNN neuron ID to be registered
-        """
-        if not (hasattr(neuron_id, "__iter__")
-                and hasattr(neuron_id, "__len__")):
-            neuron_id = [neuron_id]
-        if len(self._pb_2_id) + 1 > len(self._permutation):
-            raise ValueError(
-                f"Cannot register more than {len(self._permutation)} ID sets")
-        self._pb_2_id[self._permutation[len(self._pb_2_id)]] = neuron_id
-
-    def id2source(self, neuron_id: Union[List[ID], ID]) \
-            -> halco.PADIBusOnPADIBusBlock:
-        """
-        Get hardware coordinate from pyNN ID
-
-        :param neuron_id: pyNN neuron ID
-        """
-        for padi_bus, ids in self._pb_2_id.items():
-            if all(i in ids for i in neuron_id):
-                return padi_bus
-        raise RuntimeError("No ID found.")
-
-    @staticmethod
-    def _check_and_transform(lut: list) -> list:
-
-        cell_id_size = BackgroundSpikeSourcePlacement._MAX_NUM_ENTRIES
-        if len(lut) > cell_id_size:
-            raise ValueError("Too many elements in HW LUT.")
-        if len(lut) > len(set(lut)):
-            raise ValueError("Non unique entries in HW LUT.")
-        permutation = []
-        for idx in lut:
-            if not 0 <= idx < cell_id_size:
-                raise ValueError(
-                    f"BackgroundSpikeSourcePermutation list entry {idx} out of"
-                    + f" range. Needs to be in range [0, {cell_id_size - 1}]"
-                )
-            coord = halco.PADIBusOnPADIBusBlock(idx)
-            permutation.append(coord)
-        return permutation
+        runtime_in_clocks = int(
+            runtime * int(hal.Timer.Value.fpga_clock_cycles_per_us) * 1000)
+        return {
+            grenade_common.TimeDomainOnTopology():
+            grenade.network.abstract.ClockCycleTimeDomainRuntimes(
+                values=[grenade.common.Time(runtime_in_clocks)],
+                inter_batch_entry_wait=grenade.common.Time(0))}
 
 
 class State(BaseState):
@@ -234,6 +91,8 @@ class State(BaseState):
     # pylint: disable=invalid-name
     # TODO: replace by calculation (cf. feature #3594)
     dt: Final[float] = 3.4e-05  # average time between two MADC samples
+    # batch entry in grenade data structures, PyNN only uses one batch entry
+    batch_entry: Final[int] = 0
 
     # pylint: disable=invalid-name,too-many-statements
     def __init__(self):
@@ -250,24 +109,19 @@ class State(BaseState):
         self.t_start = 0
         self.min_delay = 0
         self.max_delay = 0
-        self.neuron_placement = None
-        self.background_spike_source_placement = None
         self.populations: List[Population] = []
-        self.recorders = set([])
-        self.recordings = [Recording()]
         self.projections: List[Projection] = []
+        self.recorders = set([])
         self.plasticity_rules: List["PlasticityRule"] = []
-        self.synaptic_observables: List[List[Dict[str, object]]] = []
-        self.neuronal_observables: List[List[Dict[str, object]]] = []
-        self.array_observables: List[List[Dict[str, object]]] = []
+        self.recordings = [Recording()]
+        self.grenade_experiment = GrenadeExperiment()
         self.id_counter = 0
         self.current_sources = []
         self.segment_counter = -1
         self.log = logger.get("pyNN.brainscales2")
+        self.initial_config = None
         self.injected_config = None
         self.injected_readout = None
-        self.injected_calib_target = None
-        self.injected_calib_options = None
         self.pre_realtime_tickets = None
         self.inside_realtime_begin_tickets = None
         self.inside_realtime_end_tickets = None
@@ -277,25 +131,14 @@ class State(BaseState):
         self.inside_realtime_end_read = {}
         self.post_realtime_read = {}
         self.ppu_symbols_read = {}
-        self.conn_manager = None
-        self.conn = None
-        self.conn_comes_from_outside = False
-        self.grenade_network = None
-        self.grenade_network_graph = None
-        self.grenade_chip_config = None
+        self.connection = None
         self.injection_pre_static_config = None
         self.injection_pre_realtime = None
         self.injection_inside_realtime_begin = None
         self.injection_inside_realtime = None
         self.injection_inside_realtime_end = None
         self.injection_post_realtime = None
-        self.initial_config = None
-        self.execution_time_info = None
-        self.execution_health_info = None
-        self.calib_cache_dir = None
-        self.configs = []
-        self.network_graphs = []
-        self.inputs = []
+        self.execution_instance_data = None
         self.realtime_snippet_count = 0
 
     def run_until(self, tstop):
@@ -307,18 +150,12 @@ class State(BaseState):
         self.populations = []
         self.projections = []
         self.plasticity_rules = []
-        self.synaptic_observables = []
-        self.neuronal_observables = []
-        self.array_observables = []
         self.id_counter = 0
         self.current_sources = []
         self.segment_counter = -1
-        self.neuron_placement = None
-        self.background_spike_source_placement = None
+        self.initial_config = None
         self.injected_readout = None
         self.injected_config = None
-        self.injected_calib_target = None
-        self.injected_calib_options = None
         self.pre_realtime_tickets = None
         self.inside_realtime_begin_tickets = None
         self.inside_realtime_end_tickets = None
@@ -328,22 +165,13 @@ class State(BaseState):
         self.inside_realtime_end_read = {}
         self.post_realtime_read = {}
         self.ppu_symbols_read = {}
-        self.grenade_network = None
-        self.grenade_network_graph = None
-        self.grenade_chip_config = None
         self.injection_pre_static_config = None
         self.injection_pre_realtime = None
         self.injection_inside_realtime_begin = None
         self.injection_inside_realtime = None
         self.injection_inside_realtime_end = None
         self.injection_post_realtime = None
-        self.initial_config = None
-        self.execution_time_info = None
-        self.execution_health_info = None
-        self.calib_cache_dir = None
-        self.configs = []
-        self.network_graphs = []
-        self.inputs = []
+        self.execution_instance_data = None
 
         self.reset()
 
@@ -354,292 +182,9 @@ class State(BaseState):
         self.runtimes = []
         self.t_start = 0
         self.segment_counter += 1
-        self.configs = []
-        self.inputs = []
-        self.network_graphs = []
+        self.grenade_experiment.reset()
         self.recordings = [self.recordings[-1]]
-        self.synaptic_observables = []
-        self.array_observables = []
-        self.neuronal_observables = []
         self.realtime_snippet_count = 0
-
-    # Note for return type: Any should be recording.GrenadeRecId.
-    # We do not annotate the correct type due to cyclic imports.
-    def _get_madc_samples(self,
-                          network_graph: grenade.network.NetworkGraph,
-                          outputs: grenade.signal_flow.OutputDataSnippet,
-                          recording: Recording
-                          ) -> Dict[Any, ADCRecording]:
-        """
-        Get MADC samples with times in ms.
-        :param network_graph: Network graph to use for lookup of
-                              MADC output vertex descriptor
-        :param outputs: All outputs of a single execution to extract
-                        samples from
-        :return: Dictionary with a madc recording site as key and a
-            ADCRecording as value.
-        """
-        samples = grenade.network.extract_madc_samples(
-            outputs, network_graph)
-        return self._filter_samples(samples, recording.config.madc)
-
-    # Note for return type: Any should be recording.GrenadeRecId.
-    # We do not annotate the correct type due to cyclic imports.
-    def _get_cadc_samples(self,
-                          network_graph: grenade.network.NetworkGraph,
-                          outputs: grenade.signal_flow.OutputDataSnippet,
-                          recording: Recording
-                          ) -> Dict[Any, ADCRecording]:
-        """
-        Get CADC samples with times in ms.
-        :param network_graph: Network graph to use for lookup of
-                              CADC output vertex descriptor
-        :param outputs: All outputs of a single execution to extract
-                        samples from
-        :return: Dictionary with a cadc recording site as key and a
-            ADCRecording as value.
-        """
-        samples = grenade.network.extract_cadc_samples(
-            outputs, network_graph)
-        return self._filter_samples(samples, recording.config.cadc)
-
-    # Note for return type: Any should be recording.GrenadeRecId.
-    # We do not annotate the correct type due to cyclic imports.
-    @staticmethod
-    def _filter_samples(samples: Sequence,
-                        recording_sites: List[Any]):
-        """
-        Filter CADC/MADC samples returned from grenade.
-
-        Only keep samples for sites where a recording was requested.
-
-        :param samples: CADC/MADC samples returned by grenade.
-        :param recording_sites: GrenadeRecIds of sites for which to
-            extract the data.
-        :return: Dictionary with a madc recording site as key and a
-            ADCRecording as value.
-        """
-        samples = samples[0] if samples else []
-        data = {}
-        for site in recording_sites:
-            local_times, population, neuron_on_population, \
-                compartment_on_neuron, _, local_values = samples
-            # converting compartment_on_neuron to an integer increases the
-            # speed of the comparison
-            local_filter = (population == site.population) \
-                & (neuron_on_population == site.neuron_on_population) \
-                & (compartment_on_neuron == int(site.compartment_on_neuron))
-            data[site] = ADCRecording(times=local_times[local_filter],
-                                      values=local_values[local_filter])
-        return data
-
-    def _get_synaptic_observables(
-            self,
-            network_graph: grenade.network.NetworkGraph,
-            outputs: grenade.signal_flow.OutputDataSnippet
-    ) -> List[Dict[str, np.ndarray]]:
-        """
-        Get synaptic observables.
-        :param network_graph: Network graph to use for lookup of
-                              plasticity rule descriptor.
-        :param outputs: All outputs of a single execution to extract
-                        samples from.
-        :return: List over projections and recorded data.
-        """
-
-        observables = [{} for projection in self.projections]
-        for plasticity_rule in self.plasticity_rules:
-            if not plasticity_rule.observables:
-                continue
-            data = plasticity_rule.get_data(network_graph, outputs)
-            for obsv_name, data in data.data_per_synapse.items():
-                for descriptor, value in data.items():
-                    observables[descriptor].update({obsv_name: value[0]})
-        return observables
-
-    def _get_neuronal_observables(
-            self,
-            network_graph: grenade.network.NetworkGraph,
-            outputs: grenade.signal_flow.OutputDataSnippet)\
-            -> Dict[str, np.ndarray]:
-        """
-        Get neuronal observables.
-        :param network_graph: Network graph to use for lookup of
-                              plasticity rule descriptor
-        :param outputs: All outputs of a single execution to extract
-                        samples from
-        :return: Dict over projections and recorded data
-        """
-
-        observables = [{} for population in self.populations]
-        for plasticity_rule in self.plasticity_rules:
-            if not plasticity_rule.observables:
-                continue
-            data = plasticity_rule.get_data(network_graph, outputs)
-            for obsv_name, data in data.data_per_neuron.items():
-                for descriptor, value in data.items():
-                    observables[descriptor].update({obsv_name: value[0]})
-        return observables
-
-    def _get_array_observables(
-            self,
-            network_graph: grenade.network.NetworkGraph,
-            outputs: grenade.signal_flow.OutputDataSnippet) \
-            -> List[Dict[str, np.ndarray]]:
-        """
-        Get general array observables.
-
-        :param network_graph: Network graph to use for lookup of
-                              plasticity rule descriptor
-        :param outputs: All outputs of a single execution to extract
-                        samples from
-        :return: List of dicts over plasticity rules and recorded data,
-            one dict per plasticity rule
-        """
-
-        observables = []
-        for plasticity_rule in self.plasticity_rules:
-            if not plasticity_rule.observables:
-                observables.append({})
-            else:
-                data = plasticity_rule.get_data(network_graph, outputs)
-                observables.append(data.data_array)
-        return observables
-
-    def _configure_recorders_populations(self):
-        changed = set()
-        for population in self.populations:
-            if population.changed_since_last_run:
-                changed.add(population)
-        if not changed:
-            return
-
-        neuron_target = NeuronCalibTarget().DenseDefault
-        # initialize shared parameters between neurons with None to allow check
-        # for different values in different populations
-        neuron_target.synapse_dac_bias = None
-        neuron_target.i_synin_gm = np.array([None, None])
-
-        # gather calibration information
-        execute_calib = False
-        for population in changed:
-            if hasattr(population.celltype, 'add_calib_params'):
-                population.celltype.add_calib_params(
-                    neuron_target, population.all_cells)
-                execute_calib = True
-
-        if execute_calib:
-            if self.initial_config is not None:
-                self.log.WARN("Using automatically calibrating neurons with "
-                              "initial_config. Initial configuration will be "
-                              "overwritten")
-            calib_target = copy(self.injected_calib_target)
-            calib_target.neuron_target = neuron_target
-            # release JITGraphExecuter connection to establish a new one for
-            # calibration (JITGraphExecuter conenctions can not be shared with
-            # lower layers).
-            if self.conn is not None and not self.conn_comes_from_outside:
-                self.conn_manager.__exit__()
-            result = calibrate(
-                calib_target,
-                self.injected_calib_options,
-                self.calib_cache_dir)
-            if self.conn is not None and not self.conn_comes_from_outside:
-                self.conn = self.conn_manager.__enter__()  # pylint: disable=unnecessary-dunder-call
-            dumper = sta.PlaybackProgramBuilderDumper()
-            result.apply(dumper)
-            self.grenade_chip_config = sta.convert_to_chip(
-                dumper.done(), self.grenade_chip_config)
-
-        for population in changed:
-            if hasattr(population.celltype, 'add_to_chip'):
-                population.celltype.add_to_chip(
-                    population.all_cells, self.grenade_chip_config)
-
-    def _generate_network_graph(self, snippet_begin_time, snippet_end_time):
-        """
-        Generate placed and routed executable network graph representation.
-        """
-        # check if populations, recorders, projections or plasticity changed
-        changed_since_last_run = any(
-            elem.changed_since_last_run for elem in itertools.chain(
-                iter(self.populations),
-                iter(self.recorders),
-                iter(self.projections),
-                iter(self.plasticity_rules)))
-        if not changed_since_last_run:
-            if self.grenade_network_graph is not None:
-                return
-
-        # generate network
-        network_builder = grenade.network.NetworkBuilder()
-        for pop in self.populations:
-            pop.celltype.add_to_network_graph(
-                pop, network_builder)
-        for proj in self.projections:
-            proj.add_to_network_graph(
-                self.populations, proj, network_builder)
-        for plasticity_rule in self.plasticity_rules:
-            plasticity_rule.add_to_network_graph(
-                network_builder, snippet_begin_time, snippet_end_time)
-
-        self.recordings[-1].config.add_to_network_graph(network_builder)
-
-        network = network_builder.done()
-
-        # route network if required
-        routing_result = None
-        if self.grenade_network_graph is None \
-                or grenade.network.requires_routing(
-                    network, self.grenade_network_graph):
-            routing_result = grenade.network.routing.PortfolioRouter()(
-                network)
-
-        self.grenade_network = network
-
-        # build or update network graph
-        if routing_result is not None:
-            self.grenade_network_graph = grenade.network\
-                .build_network_graph(
-                    self.grenade_network, routing_result)
-        else:
-            grenade.network.update_network_graph(
-                self.grenade_network_graph, self.grenade_network)
-
-    def _reset_changed_since_last_run(self):
-        """
-        Reset changed_since_last_run flag to track incremental changes for the
-        next run.
-        """
-        for pop in self.populations:
-            pop.changed_since_last_run = False
-        for recorder in self.recorders:
-            recorder.changed_since_last_run = False
-        for proj in self.projections:
-            proj.changed_since_last_run = False
-        for plasticity_rule in self.plasticity_rules:
-            plasticity_rule.changed_since_last_run = False
-
-    def _generate_inputs(
-            self, network_graph: grenade.network.NetworkGraph,
-            snippet_begin_time, snippet_end_time) \
-            -> grenade.signal_flow.InputDataSnippet:
-        """
-        Generate external input events from the routed network graph
-        representation.
-        """
-        if network_graph.graph_translation.execution_instances and \
-                network_graph.graph_translation.execution_instances[
-                grenade.common.ExecutionInstanceID()].event_input_vertex\
-                is None:
-            return grenade.signal_flow.InputDataSnippet()
-        input_generator = grenade.network.InputGenerator(
-            network_graph)
-        for population in self.populations:
-            population.celltype.add_to_input_generator(
-                population, input_generator,
-                snippet_begin_time, snippet_end_time)
-        return input_generator.done()
 
     def _generate_hooks(self):
         assert self.injection_pre_static_config is not None
@@ -774,10 +319,6 @@ class State(BaseState):
         return cocos
 
     def prepare_static_config(self):
-        if self.initial_config is None:
-            self.grenade_chip_config = lola.Chip()
-        else:
-            self.grenade_chip_config = copy(self.initial_config)
         builder1 = sta.PlaybackProgramBuilder()
 
         def add_configuration(
@@ -795,9 +336,6 @@ class State(BaseState):
 
         # injected configuration pre non realtime
         add_configuration(builder1, self.injected_config.pre_non_realtime)
-
-        # reset dirty-flags
-        self._reset_changed_since_last_run()
 
         # injected configuration pre realtime
         pre_realtime = sta.PlaybackProgramBuilder()
@@ -832,9 +370,8 @@ class State(BaseState):
         CalibHXNeuronCuba/Coba and make adjustments if needed.
         If not called manually is automatically called on run().
         """
-        self._generate_network_graph(snippet_begin_time, snippet_end_time)
-        self._configure_recorders_populations()
-        self._reset_changed_since_last_run()
+        self.grenade_experiment.fill_snippet(
+            snippet_begin_time, snippet_end_time, self.connection.get())
 
     def add(self, runtime: float):
         """
@@ -849,31 +386,9 @@ class State(BaseState):
 
         self.realtime_snippet_count += 1
 
-        self.preprocess(snippet_begin_time, self.t)
+        self.grenade_experiment.add_snippet(
+            snippet_begin_time, self.t, self.connection.get())
 
-        # generate external spike trains
-        inputs = self._generate_inputs(self.grenade_network_graph,
-                                       snippet_begin_time, self.t)
-        runtime_in_clocks = int(
-            runtime * int(hal.Timer.Value.fpga_clock_cycles_per_us) * 1000)
-        total_runtime_in_clocks = int(
-            self.t * int(hal.Timer.Value.fpga_clock_cycles_per_us) * 1000)
-        if total_runtime_in_clocks > hal.Timer.Value.max:
-            max_runtime = hal.Timer.Value.max /\
-                1000 / int(hal.Timer.Value.fpga_clock_cycles_per_us)
-            raise ValueError(f"Total runtime of {self.t} to long. "
-                             f"Maximum supported runtime {max_runtime}")
-
-        inputs.runtime = [{grenade.common.ExecutionInstanceID():
-                           runtime_in_clocks}]
-
-        self.configs.append({grenade.common.
-                            ExecutionInstanceID():
-                            {grenade.common.ChipOnConnection():
-                             lola.Chip(self.grenade_chip_config)}})
-        self.network_graphs.append(grenade.network.NetworkGraph(
-            self.grenade_network_graph))
-        self.inputs.append(inputs)
         self.recordings.append(deepcopy(self.recordings[-1]))
 
         time_after_add = time.time()
@@ -896,70 +411,35 @@ class State(BaseState):
                 "supported.")
         self.running = True
 
-        if not self.conn_comes_from_outside and \
-           self.conn_manager is None:
-            self.conn_manager = grenade.execution.ManagedJITGraphExecutor()
-            assert self.conn is None
-            self.conn = self.conn_manager.__enter__()  # pylint: disable=unnecessary-dunder-call
-
-        time_after_preparations = time.time()
-        self.log.DEBUG("run(): Preparations finished in "
-                       f"{(time_after_preparations - time_begin):.3f}s")
-
-        inputs = grenade.signal_flow.InputData()
-        inputs.snippets = self.inputs
-
-        outputs = grenade.network.run(
-            self.conn, self.network_graphs, self.configs,
-            inputs, {grenade.common.ExecutionInstanceID():
-                     self._generate_hooks()})
-
-        self.log.DEBUG("run(): Execution finished in "
-                       f"{(time.time() - time_after_preparations):.3f}s")
-        time_after_hw_run = time.time()
-
-        for i, output_snippet in enumerate(outputs.snippets):
-            spikes = grenade.network.\
-                extract_neuron_spikes(
-                    output_snippet, self.network_graphs[i])
-            self.recordings[i].data.spikes = spikes[0] if spikes else {}
-
-            self.recordings[i].data.madc = self._get_madc_samples(
-                self.network_graphs[i], output_snippet,
-                self.recordings[i])
-
-            self.recordings[i].data.cadc = self._get_cadc_samples(
-                self.network_graphs[i], output_snippet,
-                self.recordings[i])
-
-            self.synaptic_observables.append(self._get_synaptic_observables(
-                self.network_graphs[i], output_snippet))
-            self.array_observables.append(self._get_array_observables(
-                self.network_graphs[i], output_snippet))
-
-            self.neuronal_observables.append(self._get_neuronal_observables(
-                self.network_graphs[i], output_snippet))
+        self.grenade_experiment.hooks = {
+            grenade.common.ExecutionInstanceOnExecutor():
+            self._generate_hooks()}
+        self.grenade_experiment.run(self.connection.get())
 
         self.pre_realtime_read = self._get_pre_realtime_read()
         self.post_realtime_read = self._get_post_realtime_read()
-        if outputs.read_ppu_symbols and outputs.read_ppu_symbols[0]:
-            self.ppu_symbols_read = outputs.read_ppu_symbols[0][
-                grenade.common.ExecutionInstanceID()]
+        # The last snippet is the next to be added snippet
+        last_executed_snippet_index = -2
+        execution_instances = self.grenade_experiment.snippets[
+            last_executed_snippet_index].output_data\
+            .execution_instances
+        if execution_instances\
+                .contains(grenade.common.ExecutionInstanceOnExecutor()) \
+                and execution_instances.get(
+                    grenade.common.ExecutionInstanceOnExecutor()) \
+                .read_ppu_symbols \
+                and execution_instances.get(
+                    grenade.common.ExecutionInstanceOnExecutor())\
+                .read_ppu_symbols[self.batch_entry]:
+            self.ppu_symbols_read = execution_instances\
+                .get(grenade.common.ExecutionInstanceOnExecutor())\
+                .read_ppu_symbols[self.batch_entry]
         else:
             self.ppu_symbols_read = {}
 
-        self.execution_time_info = outputs.execution_time_info
-        assert self.execution_time_info is not None
-        # We return the first entry, since they are all equal since
-        # they are measured for the full runtime and not the individual
-        # snippets. Grenade should introduce a global field instead of
-        # having only fields for the individual snippet results.
-        self.execution_health_info = outputs.execution_health_info
-        assert self.execution_health_info is not None
+        self.execution_instance_data = execution_instances
 
-        self.log.DEBUG("run(): Postprocessing finished in "
-                       f"{(time.time() - time_after_hw_run):.3f}s")
-        self.log.DEBUG("run(): Completed in "
+        self.log.DEBUG("run(): Execution finished in "
                        f"{(time.time() - time_begin):.3f}s")
 
 

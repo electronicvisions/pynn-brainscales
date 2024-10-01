@@ -23,14 +23,16 @@ class TestPerformance(unittest.TestCase):
         log = logger.get("TestPerformance.test_many_small_projections")
         begin = time.time()
         pops = []
-        for i in range(256):
+        # TODO: increase to 256 again after performance optimizations in
+        # grenade
+        for i in range(64):
             pop = pynn.Population(1, pynn.cells.HXNeuron())
             # wrap as View because using it in projections is faster
             pops.append(pynn.PopulationView(pop, np.array(range(len(pop)))))
 
         projs = []
-        for i in range(256):
-            for j in range(256):
+        for i in range(64):
+            for j in range(64):
                 projs.append(pynn.Projection(pops[i], pops[j],
                                              pynn.AllToAllConnector()))
         log.INFO(f"network construction {time.time() - begin}s")

@@ -19,8 +19,10 @@ from pynn_brainscales.brainscales2.standardmodels.cells_base import (
     ExternalNeuron,
 )
 from dlens_vx_v3 import lola, hal, halco, sta, hxcomm
-import pygrenade_vx.network as grenade
-from quantities.quantity import Quantity
+import pygrenade_vx.network.abstract as grenade
+import pygrenade_vx.network as grenade_network
+import pygrenade_vx.common as grenade_vx_common
+import pygrenade_common as grenade_common
 
 
 class HXNeuron(NeuronCellType):
@@ -181,8 +183,8 @@ class HXNeuron(NeuronCellType):
         param_dict = {}
         for coord in coords:
             try:
-                atomic_neuron = simulator.state.initial_config.neuron_block.\
-                    atomic_neurons[coord]
+                atomic_neuron = simulator.state.initial_config\
+                    .neuron_block.atomic_neurons[coord]
             except KeyError as err:
                 raise KeyError(f"No coco entry for {coord}") from err
             param_per_neuron.append(get_values_of_atomic_neuron(
@@ -198,81 +200,78 @@ class HXNeuron(NeuronCellType):
         self.parameter_space.update(**self._user_provided_parameters)
 
     @staticmethod
-    def add_to_network_graph(population: Population,
-                             builder: grenade.NetworkBuilder) \
-            -> grenade.PopulationOnNetwork:
-        # pyNN is more performant when operating on integer cell ids
-        pop_cells_int = np.asarray(population.all_cells, dtype=int)
+    def generate_vertex(population: Population) \
+            -> grenade_common.Population:
+        compartment_receptors = [{
+            grenade_common.ReceptorOnCompartment(0):
+            grenade_network.Receptor.Type.excitatory,
+            grenade_common.ReceptorOnCompartment(1):
+            grenade_network.Receptor.Type.inhibitory
+        }]
+        compartment = grenade.UncalibratedNeuron.Compartment(
+            grenade.UncalibratedNeuron.Compartment
+            .SpikeMaster(0),
+            compartment_receptors)
+        compartments = {
+            grenade_common.CompartmentOnNeuron():
+            compartment}
 
-        # get neuron coordinates
-        coords: List[halco.LogicalNeuronOnDLS] = \
-            simulator.state.neuron_placement.id2logicalneuron(
-                population.all_cells)  # pop_cells_int is slower here
-        # create receptors
-        receptors = set([
-            grenade.Receptor(
-                grenade.Receptor.ID(),
-                grenade.Receptor.Type.excitatory),
-            grenade.Receptor(
-                grenade.Receptor.ID(),
-                grenade.Receptor.Type.inhibitory),
-        ])
-        # get recorder configuration
-        enable_record_spikes = np.zeros((len(coords)), dtype=bool)
-        if "spikes" in population.recorder.recorded:
-            recording_ids = [neuron_comp[0] for neuron_comp in
-                             population.recorder.recorded["spikes"]]
-            enable_record_spikes = np.isin(pop_cells_int, recording_ids)
-        # create neurons
-        neurons: List[grenade.Population.Neuron] = [
-            grenade.Population.Neuron(
-                coord,
-                {halco.CompartmentOnLogicalNeuron():
-                 grenade.Population.Neuron.Compartment(
-                     grenade.Population
-                     .Neuron.Compartment.SpikeMaster(
-                         0, enable_record_spikes[i]), [receptors])})
-            for i, coord in enumerate(coords)
-        ]
-        # create grenade population
-        gpopulation = grenade.Population(neurons)
-        # add to builder
-        descriptor = builder.add(gpopulation)
+        cell = grenade.UncalibratedNeuron(
+            compartments=compartments,
+            shape=halco.LogicalNeuronCompartments({
+                halco.CompartmentOnLogicalNeuron():
+                [halco.AtomicNeuronOnLogicalNeuron()]}))
 
-        return descriptor
+        shape = grenade_common.CuboidMultiIndexSequence(
+            [len(population)],
+            [grenade_common.CellOnPopulationDimensionUnit()])
 
-    @staticmethod
-    def add_to_input_generator(
+        cell_num_neuron_circuits = {
+            grenade_common.CompartmentOnNeuron(): 1}
+
+        parameter_space = grenade.UncalibratedNeuron.ParameterSpace(
+            len(population), cell_num_neuron_circuits)
+
+        return grenade_common.Population(
+            cell=cell,
+            shape=shape,
+            parameter_space=parameter_space,
+            time_domain=grenade_common.TimeDomainOnTopology())
+
+    def generate_input_data(
+            self,
             population: Population,
-            builder: grenade.InputGenerator,
-            snippet_begin_time, snippet_end_time):
-        pass
+            experiment: grenade.frontend.ExperimentSnippet,
+            snippet_begin_time: float,
+            snippet_end_time: float) \
+            -> Dict[int, grenade_common.PortData]:
+        parameterization = grenade.UncalibratedNeuron.ParameterSpace\
+            .Parameterization()
 
-    # TODO circular import -> can not import ID for type hint of conn_indices
-    def add_to_chip(self, cell_ids: List, config: lola.Chip):
-        """
-        Add configuration of each neuron in the parameter space to the give
-        chip object.
+        coords = grenade.reverse_mapping.get_locally_placed_neuron_coordinates(
+            population.grenade_descriptor, experiment.mapped_topology)
+        population.celltype.apply_config(coords)
 
+        parameterization.configs = [
+            {grenade_common.CompartmentOnNeuron():
+             [HXNeuron.create_hw_entity({
+                 key: values[i] for key, values
+                 in population.celltype.parameter_space.items()})]}
+            for i in range(len(population))]
 
-        :param cell_ids: Cell IDs for each neuron in the parameter space of
-            this celltype object.
-        :param chip: Lola chip object which is altered.
-        """
-        for cell_id, parameters in zip(cell_ids, self.parameter_space):
-            atomic_neuron = self.create_hw_entity(parameters)
+        for i in range(len(population)):
+            # analog output is needed for spiking -> enable globally
+            # TODO: move to reasonable place
+            parameterization.configs[i][grenade_common.CompartmentOnNeuron()][
+                0].event_routing.analog_output = \
+                lola.AtomicNeuron.EventRouting.AnalogOutputMode.normal
 
-            # anlog output is needed for spiking -> enable globally
-            atomic_neuron.event_routing.analog_output = \
-                atomic_neuron.EventRouting.AnalogOutputMode.normal
+        # TODO: make more efficient with less duplicate entries
+        parameterization.base_configs = [
+            (list(range(len(population))),
+             simulator.state.initial_config)]
 
-            # HXNeurons consist of single compartments with single circuits
-            logical_coord = \
-                simulator.state.neuron_placement.id2logicalneuron(cell_id)
-            assert len(logical_coord.get_atomic_neurons()) == 1
-            coord = logical_coord.get_atomic_neurons()[0]
-
-            config.neuron_block.atomic_neurons[coord] = atomic_neuron
+        return {1: parameterization}
 
 
 HXNeuron.default_parameters = HXNeuron.get_default_values()
@@ -418,21 +417,135 @@ class CalibHXNeuronCuba(NeuronCellType):
             {halco.CompartmentOnLogicalNeuron():
              [halco.AtomicNeuronOnLogicalNeuron()]})
 
-    @staticmethod
-    def add_to_network_graph(population: Population,
-                             builder: grenade.NetworkBuilder) \
-            -> grenade.PopulationOnNetwork:
-        return HXNeuron.add_to_network_graph(population, builder)
-
-    @staticmethod
-    def add_to_input_generator(population: Population,
-                               builder: grenade.InputGenerator,
-                               snippet_begin_time, snippet_end_time):
-        pass
-
     def can_record(self, variable: str, location=None) -> bool:
         del location  # for BSS-2 observables do not depend on the location
         return variable in self.recordable
+
+    @staticmethod
+    def generate_vertex(population: Population) \
+            -> grenade_common.Population:
+        compartment_receptors = [{
+            grenade_common.ReceptorOnCompartment(0):
+            grenade_network.Receptor.Type.excitatory,
+            grenade_common.ReceptorOnCompartment(1):
+            grenade_network.Receptor.Type.inhibitory
+        }]
+        compartment = grenade.CalibratedNeuron.Compartment(
+            grenade.CalibratedNeuron.Compartment
+            .SpikeMaster(0),
+            compartment_receptors)
+        compartments = {
+            grenade_common.CompartmentOnNeuron():
+            compartment}
+
+        cell = grenade.CalibratedNeuron(
+            compartments=compartments,
+            shape=halco.LogicalNeuronCompartments({
+                halco.CompartmentOnLogicalNeuron():
+                [halco.AtomicNeuronOnLogicalNeuron()]}))
+
+        shape = grenade_common.CuboidMultiIndexSequence(
+            [len(population)],
+            [grenade_common.CellOnPopulationDimensionUnit()])
+
+        parameter_space = grenade.CalibratedNeuron.ParameterSpace(
+            CalibHXNeuronCuba.generate_calibration_targets(population))
+
+        return grenade_common.Population(
+            cell=cell,
+            shape=shape,
+            parameter_space=parameter_space,
+            time_domain=grenade_common.TimeDomainOnTopology())
+
+    @staticmethod
+    def generate_calibration_targets(population: Population) \
+            -> List[Dict[grenade_common.CompartmentOnNeuron,
+                         List[grenade.CalibratedNeuron
+                              .ParameterSpace.CalibrationTarget]]]:
+        population.celltype._calib_target = copy.deepcopy(  # pylint: disable=protected-access
+            population.celltype.parameter_space)
+        calibration_targets = []
+        for parameters in population.celltype.parameter_space:
+            calibration_target = grenade.CalibratedNeuron.ParameterSpace\
+                .CalibrationTarget()
+            calibration_target.synaptic_input_excitatory = \
+                grenade.CalibratedNeuron.ParameterSpace\
+                .CalibrationTarget.CubaSynapticInput()
+            calibration_target.synaptic_input_inhibitory = \
+                grenade.CalibratedNeuron.ParameterSpace\
+                .CalibrationTarget.CubaSynapticInput()
+
+            calibration_target.membrane_capacitance = lola.AtomicNeuron\
+                .MembraneCapacitance.CapacitorSize(parameters["cm"])
+            calibration_target.v_leak = int(parameters["v_rest"])
+            calibration_target.tau_membrane = float(parameters["tau_m"]) * 1e-6
+
+            calibration_target.v_threshold = int(parameters["v_thresh"])
+            calibration_target.v_reset = int(parameters["v_reset"])
+
+            calibration_target.refractory_period.refractory_time = \
+                float(parameters["tau_refrac"]) * 1e-6
+
+            calibration_target.synaptic_input_excitatory.i_synin_gm = \
+                int(parameters["i_synin_gm_E"])
+            calibration_target.synaptic_input_inhibitory.i_synin_gm = \
+                int(parameters["i_synin_gm_I"])
+
+            calibration_target.synaptic_input_excitatory.tau_syn = \
+                float(parameters["tau_syn_E"]) * 1e-6
+            calibration_target.synaptic_input_inhibitory.tau_syn = \
+                float(parameters["tau_syn_I"]) * 1e-6
+
+            calibration_target.synaptic_input_excitatory.synapse_dac_bias = \
+                int(parameters["synapse_dac_bias"])
+            calibration_target.synaptic_input_inhibitory.synapse_dac_bias = \
+                int(parameters["synapse_dac_bias"])
+
+            calibration_targets.append(
+                {grenade_common.CompartmentOnNeuron(): [calibration_target]})
+        return calibration_targets
+
+    def generate_input_data(
+            self,
+            population: Population,
+            experiment: grenade.frontend.ExperimentSnippet,
+            snippet_begin_time: float,
+            snippet_end_time: float) \
+            -> Dict[int, grenade_common.PortData]:
+        logical_neuron_configs = grenade.reverse_mapping\
+            .get_calibrated_neuron_actual_hardware_parameters(
+                population.grenade_descriptor,
+                experiment.mapped_topology)
+
+        configs = []
+        for logical_neuron in logical_neuron_configs:
+            configs.append(
+                logical_neuron[grenade_common.CompartmentOnNeuron()][0])
+
+        self._calib_hwparams = copy.deepcopy(configs)
+        self._actual_hwparams = configs
+
+        # readout source defaulting to membrane
+        readout_sources = [{grenade_common.CompartmentOnNeuron():
+                            [lola.AtomicNeuron.Readout.Source.membrane]}
+                           for i in range(len(population))]
+        for i in population.recorder.recorded["exc_synin"]:
+            readout_sources[population.all_cells.index(i.cell_id)[0]] = \
+                {grenade_common.CompartmentOnNeuron():
+                 [lola.AtomicNeuron.Readout.Source.exc_synin]}
+        for i in population.recorder.recorded["inh_synin"]:
+            readout_sources[population.all_cells.index(i.cell_id)[0]] = \
+                {grenade_common.CompartmentOnNeuron():
+                 [lola.AtomicNeuron.Readout.Source.inh_synin]}
+        for i in population.recorder.recorded["adaptation"]:
+            readout_sources[population.all_cells.index(i.cell_id)[0]] = \
+                {grenade_common.CompartmentOnNeuron():
+                 [lola.AtomicNeuron.Readout.Source.adaptation]}
+
+        return {1: grenade.CalibratedNeuron.ParameterSpace
+                .Parameterization(
+                    CalibHXNeuronCuba.generate_calibration_targets(population),
+                    readout_sources)}
 
     # map between pynn and hardware parameter names. Cannot utilize pyNN
     # translations as it need to be bijective
@@ -454,81 +567,6 @@ class CalibHXNeuronCuba(NeuronCellType):
         'adaptation': 'adaptation',
         **{key: translation["translated_name"]
            for key, translation in NeuronCellType.translations.items()}}
-
-    # pylint: disable=too-many-branches
-    def add_calib_params(self, calib_params: Dict, cell_ids: List) -> Dict:
-        self._calib_target = copy.deepcopy(self.parameter_space)
-        paradict = calib_params.__dict__
-        for parameters, cell_id in zip(self.parameter_space, cell_ids):
-            for param in parameters:
-                coord = simulator.state.neuron_placement.id2first_circuit(
-                    cell_id)
-                myparam = self.param_trans[param]
-                if myparam not in paradict:
-                    # no calib parameter
-                    continue
-                if param == "tau_syn_E":
-                    paradict[myparam][0][coord] = Quantity(
-                        parameters[param], "us")
-                elif param == "tau_syn_I":
-                    paradict[myparam][1][coord] = Quantity(
-                        parameters[param], "us")
-                elif param == "synapse_dac_bias":
-                    if paradict[param] is not None and\
-                            parameters[param] != paradict[param]:
-                        raise AttributeError(
-                            "synapse_dac_bias requires same value for all "
-                            "neurons")
-                    paradict[param] = parameters[param]
-                elif param == "i_synin_gm_E":
-                    if paradict[myparam][0] is not None and\
-                            parameters[param] !=\
-                            paradict[myparam][0]:
-                        raise AttributeError(
-                            "i_synin_gm_ex requires same value for all "
-                            "neurons")
-                    paradict["i_synin_gm"][0] = parameters[param]
-                elif param == "i_synin_gm_I":
-                    if paradict[myparam][1] is not None and\
-                            parameters[param] !=\
-                            paradict[myparam][1]:
-                        raise AttributeError(
-                            "i_synin_gm_in needs to have same value for all "
-                            "neurons")
-                    paradict[myparam][1] = parameters[param]
-                # FIXME handling of Quantity
-                elif isinstance(paradict[myparam][coord], Quantity):
-                    paradict[myparam][coord] = Quantity(
-                        parameters[param], "us")
-                else:
-                    paradict[myparam][coord] = parameters[param]
-        return calib_params
-
-    def add_to_chip(self, cell_ids: List, config: lola.Chip):
-        """
-        Add configuration of each neuron in the parameter space to the given
-        chip object.
-
-
-        :param cell_ids: Cell IDs for each neuron in the parameter space of
-            this celltype object.
-        :param chip: Lola chip object which is altered.
-        """
-
-        calib_result = []
-        for cell_id in cell_ids:
-
-            logical_coord = \
-                simulator.state.neuron_placement.id2logicalneuron(cell_id)
-            assert len(logical_coord.get_atomic_neurons()) == 1
-            coord = logical_coord.get_atomic_neurons()[0]
-            atomic_neuron = config.neuron_block.atomic_neurons[coord]
-
-            calib_result.append(
-                atomic_neuron)
-
-        self._calib_hwparams = copy.deepcopy(calib_result)
-        self._actual_hwparams = calib_result
 
     @property
     def actual_hwparams(self) -> Optional[Tuple[lola.AtomicNeuron]]:
@@ -733,58 +771,137 @@ class CalibHXNeuronCoba(CalibHXNeuronCuba):
         **{key: translation["translated_name"]
            for key, translation in NeuronCellType.translations.items()}}
 
-    # pylint: disable=too-many-branches
-    def add_calib_params(self, calib_params: Dict, cell_ids: List) -> Dict:
-        self._calib_target = copy.deepcopy(self.parameter_space)
-        paradict = calib_params.__dict__
-        for parameters, cell_id in zip(self.parameter_space, cell_ids):
-            for param in parameters:
-                coord = simulator.state.neuron_placement.id2first_circuit(
-                    cell_id)
-                myparam = self.param_trans[param]
-                if myparam not in paradict:
-                    # no calib parameter
-                    continue
-                if param == "tau_syn_E":
-                    paradict[myparam][0][coord] = Quantity(
-                        parameters[param], "us")
-                elif param == "tau_syn_I":
-                    paradict[myparam][1][coord] = Quantity(
-                        parameters[param], "us")
-                elif param == "e_rev_E":
-                    paradict[myparam][0][coord] = parameters[param]
-                elif param == "e_rev_I":
-                    paradict[myparam][1][coord] = parameters[param]
-                elif param == "synapse_dac_bias":
-                    if paradict[param] is not None and\
-                            parameters[param] != paradict[param]:
-                        raise AttributeError(
-                            "synapse_dac_bias requires same value for all "
-                            "neurons")
-                    paradict[param] = parameters[param]
-                elif param == "i_synin_gm_E":
-                    if paradict[myparam][0] is not None and\
-                            parameters[param] !=\
-                            paradict[myparam][0]:
-                        raise AttributeError(
-                            "i_synin_gm_ex requires same value for all "
-                            "neurons")
-                    paradict["i_synin_gm"][0] = parameters[param]
-                elif param == "i_synin_gm_I":
-                    if paradict[myparam][1] is not None and\
-                            parameters[param] !=\
-                            paradict[myparam][1]:
-                        raise AttributeError(
-                            "i_synin_gm_in needs to have same value for all "
-                            "neurons")
-                    paradict[myparam][1] = parameters[param]
-                # FIXME handling of Quantity
-                elif isinstance(paradict[myparam][coord], Quantity):
-                    paradict[myparam][coord] = Quantity(
-                        parameters[param], "us")
-                else:
-                    paradict[myparam][coord] = parameters[param]
-        return calib_params
+    @staticmethod
+    def generate_vertex(population: Population) \
+            -> grenade_common.Population:
+        compartment_receptors = [{
+            grenade_common.ReceptorOnCompartment(0):
+            grenade_network.Receptor.Type.excitatory,
+            grenade_common.ReceptorOnCompartment(1):
+            grenade_network.Receptor.Type.inhibitory
+        }]
+        compartment = grenade.CalibratedNeuron.Compartment(
+            grenade.CalibratedNeuron.Compartment
+            .SpikeMaster(0),
+            compartment_receptors)
+        compartments = {
+            grenade_common.CompartmentOnNeuron():
+            compartment}
+
+        cell = grenade.CalibratedNeuron(
+            compartments=compartments,
+            shape=halco.LogicalNeuronCompartments({
+                halco.CompartmentOnLogicalNeuron():
+                [halco.AtomicNeuronOnLogicalNeuron()]}))
+
+        shape = grenade_common.CuboidMultiIndexSequence(
+            [len(population)],
+            [grenade_common.CellOnPopulationDimensionUnit()])
+
+        parameter_space = grenade.CalibratedNeuron.ParameterSpace(
+            CalibHXNeuronCoba.generate_calibration_targets(population))
+
+        return grenade_common.Population(
+            cell=cell,
+            shape=shape,
+            parameter_space=parameter_space,
+            time_domain=grenade_common.TimeDomainOnTopology())
+
+    @staticmethod
+    def generate_calibration_targets(population: Population) \
+            -> List[Dict[grenade_common.CompartmentOnNeuron,
+                         List[grenade.CalibratedNeuron
+                              .ParameterSpace.CalibrationTarget]]]:
+        # pylint: disable=protected-access
+        population.celltype._calib_target = copy.deepcopy(
+            population.celltype.parameter_space)
+        calibration_targets = []
+        for parameters in population.celltype.parameter_space:
+            calibration_target = grenade.CalibratedNeuron.ParameterSpace\
+                .CalibrationTarget()
+            calibration_target.synaptic_input_excitatory = \
+                grenade.CalibratedNeuron.ParameterSpace\
+                .CalibrationTarget.CobaSynapticInput()
+            calibration_target.synaptic_input_inhibitory = \
+                grenade.CalibratedNeuron.ParameterSpace\
+                .CalibrationTarget.CobaSynapticInput()
+
+            calibration_target.membrane_capacitance = lola.AtomicNeuron\
+                .MembraneCapacitance.CapacitorSize(parameters["cm"])
+            calibration_target.v_leak = int(parameters["v_rest"])
+            calibration_target.tau_membrane = float(parameters["tau_m"]) * 1e-6
+
+            calibration_target.v_threshold = int(parameters["v_thresh"])
+            calibration_target.v_reset = int(parameters["v_reset"])
+
+            calibration_target.refractory_period.refractory_time = \
+                float(parameters["tau_refrac"]) * 1e-6
+
+            calibration_target.synaptic_input_excitatory.i_synin_gm = \
+                int(parameters["i_synin_gm_E"])
+            calibration_target.synaptic_input_inhibitory.i_synin_gm = \
+                int(parameters["i_synin_gm_I"])
+
+            calibration_target.synaptic_input_excitatory.tau_syn = \
+                float(parameters["tau_syn_E"]) * 1e-6
+            calibration_target.synaptic_input_inhibitory.tau_syn = \
+                float(parameters["tau_syn_I"]) * 1e-6
+
+            calibration_target.synaptic_input_excitatory.e_reversal = \
+                int(parameters["e_rev_E"])
+            calibration_target.synaptic_input_inhibitory.e_reversal = \
+                int(parameters["e_rev_I"])
+
+            calibration_target.synaptic_input_excitatory.synapse_dac_bias = \
+                int(parameters["synapse_dac_bias"])
+            calibration_target.synaptic_input_inhibitory.synapse_dac_bias = \
+                int(parameters["synapse_dac_bias"])
+
+            calibration_targets.append(
+                {grenade_common.CompartmentOnNeuron(): [calibration_target]})
+        return calibration_targets
+
+    def generate_input_data(
+            self,
+            population: Population,
+            experiment: grenade.frontend.ExperimentSnippet,
+            snippet_begin_time: float,
+            snippet_end_time: float) \
+            -> Dict[int, grenade_common.PortData]:
+        logical_neuron_configs = grenade.reverse_mapping\
+            .get_calibrated_neuron_actual_hardware_parameters(
+                population.grenade_descriptor,
+                experiment.mapped_topology)
+
+        configs = []
+        for logical_neuron in logical_neuron_configs:
+            configs.append(
+                logical_neuron[grenade_common.CompartmentOnNeuron()][0])
+
+        self._calib_hwparams = copy.deepcopy(configs)
+        self._actual_hwparams = configs
+
+        # readout source defaulting to membrane
+        readout_sources = [{grenade_common.CompartmentOnNeuron():
+                            [lola.AtomicNeuron.Readout.Source.membrane]}
+                           for i in range(len(population))]
+        for i in population.recorder.recorded["exc_synin"]:
+            readout_sources[population.all_cells.index(i.cell_id)[0]] = \
+                {grenade_common.CompartmentOnNeuron():
+                 [lola.AtomicNeuron.Readout.Source.exc_synin]}
+        for i in population.recorder.recorded["inh_synin"]:
+            readout_sources[population.all_cells.index(i.cell_id)[0]] = \
+                {grenade_common.CompartmentOnNeuron():
+                 [lola.AtomicNeuron.Readout.Source.inh_synin]}
+        for i in population.recorder.recorded["adaptation"]:
+            readout_sources[population.all_cells.index(i.cell_id)[0]] = \
+                {grenade_common.CompartmentOnNeuron():
+                 [lola.AtomicNeuron.Readout.Source.adaptation]}
+
+        return {1: grenade.CalibratedNeuron.ParameterSpace
+                .Parameterization(
+                    CalibHXNeuronCoba.generate_calibration_targets(population),
+                    readout_sources)}
 
 
 class SpikeSourcePoissonOnChip(StandardCellType):
@@ -802,9 +919,6 @@ class SpikeSourcePoissonOnChip(StandardCellType):
         ('seed', 'seed'),
     )
 
-    _simulator = simulator
-    _padi_bus: Optional[halco.PADIBusOnPADIBusBlock] = None
-
     background_source_clock_freq: ClassVar[float]
 
     recordable: Final[List[str]] = ['spikes']
@@ -814,18 +928,23 @@ class SpikeSourcePoissonOnChip(StandardCellType):
         return variable in self.recordable
 
     @staticmethod
-    def add_to_network_graph(
+    def generate_vertex(population: Population) \
+            -> grenade_common.Population:
+        return grenade_common.Population(
+            grenade.PoissonSourceNeuron(),
+            grenade_common.CuboidMultiIndexSequence(
+                [len(population)],
+                [grenade_common.CellOnPopulationDimensionUnit()]),
+            grenade.PoissonSourceNeuron.ParameterSpace(len(population)),
+            grenade_common.TimeDomainOnTopology())
+
+    def generate_input_data(
+            self,
             population: Population,
-            builder: grenade.NetworkBuilder) \
-            -> grenade.PopulationOnNetwork:
-        # register hardware utilisation
-        if not population.celltype._padi_bus:  # pylint: disable=protected-access
-            simulator.state.background_spike_source_placement.register_id(
-                list(population.all_cells))
-            # pylint: disable-next=protected-access
-            population.celltype._padi_bus = simulator.state \
-                .background_spike_source_placement.id2source(
-                    list(population.all_cells))
+            experiment: grenade.frontend.ExperimentSnippet,
+            snippet_begin_time: float,
+            snippet_end_time: float) \
+            -> Dict[int, grenade_common.PortData]:
         # calculate period and rate from rate[Hz]
         assert np.all(population.celltype.parameter_space["rate"]
                       == population.celltype.parameter_space["rate"][0])
@@ -845,37 +964,14 @@ class SpikeSourcePoissonOnChip(StandardCellType):
         period = hal.BackgroundSpikeSource.Period(
             int(round(SpikeSourcePoissonOnChip
                 .background_source_clock_freq / hwrate * prob) - 1))
-        pop_cells_int = np.asarray(population.all_cells, dtype=int)
-        enable_record_spikes = np.zeros((len(pop_cells_int)), dtype=bool)
-        if "spikes" in population.recorder.recorded:
-            recording_ids = [neuron_comp[0] for neuron_comp in
-                             population.recorder.recorded["spikes"]]
-            enable_record_spikes = np.isin(pop_cells_int, recording_ids)
-        # create grenade population
-        config = \
-            grenade.BackgroundSourcePopulation.Config()
-        config.period = period
-        config.rate = rate
-        config.seed = hal.BackgroundSpikeSource.Seed(
+        # create grenade parameterization
+        parameterization = grenade.PoissonSourceNeuron.ParameterSpace\
+            .Parameterization(len(population))
+        parameterization.period = period
+        parameterization.rate = rate
+        parameterization.seed = hal.BackgroundSpikeSource.Seed(
             population.celltype.parameter_space["seed"][0])
-        config.enable_random = True
-        # we need both hemispheres because of possibly arbitrary connection
-        # targets
-        gpopulation = grenade.BackgroundSourcePopulation(
-            [grenade.BackgroundSourcePopulation.Neuron(enable_record_spikes[i])
-             for i in range(len(pop_cells_int))],
-            {halco.HemisphereOnDLS(0): population.celltype._padi_bus,  # pylint: disable=protected-access
-             halco.HemisphereOnDLS(1): population.celltype._padi_bus},  # pylint: disable=protected-access
-            config
-        )
-        return builder.add(gpopulation)
-
-    @staticmethod
-    def add_to_input_generator(
-            population: Population,
-            builder: grenade.InputGenerator,
-            snippet_begin_time, snippet_end_time):
-        pass
+        return {0: parameterization}
 
 
 # pylint: disable=no-member,unsubscriptable-object
@@ -968,28 +1064,17 @@ class SpikeSourcePoisson(ExternalNeuron, cells.SpikeSourcePoisson):
         return self._spike_times
 
     @staticmethod
-    def add_to_network_graph(population: Population,
-                             builder: grenade.NetworkBuilder) \
-            -> grenade.PopulationOnNetwork:
-        # create grenade population
-        pop_cells_int = np.asarray(population.all_cells, dtype=int)
-        enable_record_spikes = np.zeros((len(pop_cells_int)), dtype=bool)
-        if "spikes" in population.recorder.recorded:
-            recording_ids = [neuron_comp[0] for neuron_comp in
-                             population.recorder.recorded["spikes"]]
-            enable_record_spikes = np.isin(pop_cells_int, recording_ids)
-        gpopulation = grenade.ExternalSourcePopulation([
-            grenade.ExternalSourcePopulation.Neuron(enable_record_spikes[i])
-            for i in range(len(pop_cells_int))])
-        # add to builder
-        return builder.add(gpopulation)
+    def generate_vertex(population: Population) \
+            -> grenade_common.Population:
+        return SpikeSourceArray.generate_vertex(population)
 
-    @staticmethod
-    def add_to_input_generator(
+    def generate_input_data(
+            self,
             population: Population,
-            builder: grenade.InputGenerator,
-            snippet_begin_time, snippet_end_time):
-
+            experiment: grenade.frontend.ExperimentSnippet,
+            snippet_begin_time: float,
+            snippet_end_time: float) \
+            -> Dict[int, grenade_common.PortData]:
         spiketimes = population.celltype.get_spike_times()
         filtered_spiketimes = []
         for spiketimes_neuron in spiketimes:
@@ -998,12 +1083,14 @@ class SpikeSourcePoisson(ExternalNeuron, cells.SpikeSourcePoisson):
                     snippet_begin_time <= spiketimes_neuron,
                     spiketimes_neuron < snippet_end_time)] \
                 - snippet_begin_time
+            filtered_spiketimes.append([
+                grenade_vx_common.Time(int(time))
+                for time in filtered_spiketimes_neuron
+                * 1000.
+                * grenade_vx_common.Time.fpga_clock_cycles_per_us.value()])
 
-            filtered_spiketimes.append(np.sort(filtered_spiketimes_neuron))
-
-        descriptor = grenade.PopulationOnNetwork(
-            simulator.state.populations.index(population))
-        builder.add(filtered_spiketimes, descriptor)
+        return {0: grenade.ExternalSourceNeuron.Dynamics(
+                [filtered_spiketimes])}
 
 
 class SpikeSourceArray(ExternalNeuron, cells.SpikeSourceArray):
@@ -1025,27 +1112,23 @@ class SpikeSourceArray(ExternalNeuron, cells.SpikeSourceArray):
         return variable in self.recordable
 
     @staticmethod
-    def add_to_network_graph(population: Population,
-                             builder: grenade.NetworkBuilder) \
-            -> grenade.PopulationOnNetwork:
-        # create grenade population
-        pop_cells_int = np.asarray(population.all_cells, dtype=int)
-        enable_record_spikes = np.zeros((len(pop_cells_int)), dtype=bool)
-        if "spikes" in population.recorder.recorded:
-            recording_ids = [neuron_comp[0] for neuron_comp in
-                             population.recorder.recorded["spikes"]]
-            enable_record_spikes = np.isin(pop_cells_int, recording_ids)
-        gpopulation = grenade.ExternalSourcePopulation([
-            grenade.ExternalSourcePopulation.Neuron(enable_record_spikes[i])
-            for i in range(len(pop_cells_int))])
-        # add to builder
-        return builder.add(gpopulation)
+    def generate_vertex(population: Population) \
+            -> grenade_common.Population:
+        return grenade_common.Population(
+            grenade.ExternalSourceNeuron(),
+            grenade_common.CuboidMultiIndexSequence(
+                [len(population)],
+                [grenade_common.CellOnPopulationDimensionUnit()]),
+            grenade.ExternalSourceNeuron.ParameterSpace(len(population)),
+            grenade_common.TimeDomainOnTopology())
 
-    @staticmethod
-    def add_to_input_generator(
+    def generate_input_data(
+            self,
             population: Population,
-            builder: grenade.InputGenerator,
-            snippet_begin_time, snippet_end_time):
+            experiment: grenade.frontend.ExperimentSnippet,
+            snippet_begin_time: float,
+            snippet_end_time: float) \
+            -> Dict[int, grenade_common.PortData]:
         spiketimes = population.celltype.parameter_space["spike_times"]
         filtered_spiketimes = []
         for spiketimes_neuron in spiketimes:
@@ -1054,11 +1137,14 @@ class SpikeSourceArray(ExternalNeuron, cells.SpikeSourceArray):
                     snippet_begin_time <= spiketimes_neuron.value,
                     spiketimes_neuron.value < snippet_end_time)] \
                 - snippet_begin_time
-            filtered_spiketimes.append(filtered_spiketimes_neuron)
+            filtered_spiketimes.append([
+                grenade_vx_common.Time(int(time))
+                for time in filtered_spiketimes_neuron
+                * 1000.
+                * grenade_vx_common.Time.fpga_clock_cycles_per_us.value()])
 
-        descriptor = grenade.PopulationOnNetwork(
-            simulator.state.populations.index(population))
-        builder.add(filtered_spiketimes, descriptor)
+        return {0: grenade.ExternalSourceNeuron.Dynamics(
+                [filtered_spiketimes])}
 
 
 class SpikeIOCell(ExternalNeuron, StandardCellType):
@@ -1103,10 +1189,23 @@ class OffChipSource(SpikeIOCell):
     SpikeIO Input (RX) population
     """
     @staticmethod
-    def add_to_network_graph(
-            population: Population, builder: grenade.NetworkBuilder
-    ) -> grenade.PopulationOnNetwork:
+    def generate_vertex(population: Population) \
+            -> grenade_common.Population:
+        return grenade_common.Population(
+            grenade.SpikeIOSourceNeuron(),
+            grenade_common.CuboidMultiIndexSequence(
+                [len(population)],
+                [grenade_common.CellOnPopulationDimensionUnit()]),
+            grenade.SpikeIOSourceNeuron.ParameterSpace(len(population)),
+            grenade_common.TimeDomainOnTopology())
 
+    def generate_input_data(
+            self,
+            population: Population,
+            experiment: grenade.frontend.ExperimentSnippet,
+            snippet_begin_time: float,
+            snippet_end_time: float) \
+            -> Dict[int, grenade_common.PortData]:
         param_space = population.celltype.parameter_space
 
         for k in ("enable_internal_loopback", "data_rate_scaler"):
@@ -1134,24 +1233,11 @@ class OffChipSource(SpikeIOCell):
             raise ValueError("OffChipSource: label must be unique"
                              " within the population.")
 
-        pop_cells_int = np.asarray(population.all_cells, dtype=int)
-
-        enable_record_spikes = np.zeros((len(pop_cells_int)), dtype=bool)
-        if "spikes" in population.recorder.recorded:
-            recording_ids = [neuron_comp[0]
-                             for neuron_comp in population.recorder.
-                             recorded["spikes"]]
-            enable_record_spikes = np.isin(pop_cells_int, recording_ids)
-
-        config = grenade.SpikeIOSourcePopulation.Config()
-        config.enable_internal_loopback = enable_internal_loopback
-        config.data_rate_scaler = data_rate_scaler
+        parameterization = grenade.SpikeIOSourceNeuron.Parameterization()
+        parameterization.config.enable_internal_loopback = \
+            enable_internal_loopback
+        parameterization.config.data_rate_scaler = data_rate_scaler
         # assigns per neuron sensor ids
-        grenade_neurons = [
-            grenade.SpikeIOSourcePopulation.Neuron(label_list[i],
-                                                   enable_record_spikes[i])
-            for i in range(len(pop_cells_int))
-        ]
+        parameterization.labels = label_list
 
-        gpopulation = grenade.SpikeIOSourcePopulation(grenade_neurons, config)
-        return builder.add(gpopulation)
+        return {0: parameterization}

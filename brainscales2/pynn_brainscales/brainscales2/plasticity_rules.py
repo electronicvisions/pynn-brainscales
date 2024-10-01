@@ -1,12 +1,12 @@
 from __future__ import annotations
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, List
 from math import ceil
 import textwrap
 from pyNN.common import Projection, Population
 from pynn_brainscales.brainscales2 import simulator
+import pygrenade_common as grenade_common
 import pygrenade_vx.network as grenade
-import pygrenade_vx.signal_flow as grenade_signal_flow
-from dlens_vx_v3 import hal, halco
+from dlens_vx_v3 import hal
 
 
 class Timer:
@@ -43,17 +43,19 @@ class Timer:
     period = property(_get_period, _set_period)
     num_periods = property(_get_num_periods, _set_num_periods)
 
-    def to_grenade(self, snippet_begin_time, snippet_end_time) \
-            -> grenade.PlasticityRule.Timer:
+    def to_grenade(
+            self, snippet_begin_time: float, snippet_end_time: float) \
+            -> grenade.abstract.PlasticityRule.Dynamics.Timer:
         def to_ppu_cycles(value: float) -> int:
             # TODO (Issue #3993): calculate frequency from chip config
             result = float(value)
             result = result * float(hal.Timer.Value.fpga_clock_cycles_per_us)
             result = result * 1000.  # ms -> us
             result = result * 2  # 250MHz vs. 125MHz
-            return grenade.PlasticityRule.Timer.Value(int(round(result)))
+            return grenade.abstract.PlasticityRule.Dynamics.Timer.Value(
+                int(round(result)))
 
-        timer = grenade.PlasticityRule.Timer()
+        timer = grenade.abstract.PlasticityRule.Dynamics.Timer()
         pre_snippet_period_count = ceil(
             max(snippet_begin_time - self.start, 0) / self.period)
         timer.start = to_ppu_cycles(
@@ -65,7 +67,7 @@ class Timer:
         return timer
 
 
-class PlasticityRule:
+class PlasticityRule(grenade.abstract.frontend.ExperimentElement):
     """
     Plasticity rule base class.
     Inheritance is to be used for actual implementations.
@@ -75,12 +77,12 @@ class PlasticityRule:
     """
     _simulator = simulator
 
-    ObservablePerSynapse = grenade.PlasticityRule\
-        .TimedRecording.ObservablePerSynapse
-    ObservablePerNeuron = grenade.PlasticityRule\
-        .TimedRecording.ObservablePerNeuron
-    ObservableArray = grenade.PlasticityRule\
-        .TimedRecording.ObservableArray
+    ObservablePerSynapse = grenade.abstract.PlasticityRule\
+        .TimedRecordingConfig.ObservablePerSynapse
+    ObservablePerNeuron = grenade.abstract.PlasticityRule\
+        .TimedRecordingConfig.ObservablePerNeuron
+    ObservableArray = grenade.abstract.PlasticityRule\
+        .TimedRecordingConfig.ObservableArray
 
     def __init__(self, timer: Timer,
                  observables: Optional[Dict[str, Union[
@@ -106,53 +108,55 @@ class PlasticityRule:
         self._populations = []
         self._simulator.state.plasticity_rules.append(self)
         self._same_id = same_id
-        self.changed_since_last_run = True
+        self._recording_data = None
+        self.grenade_descriptor = None
+        super().__init__(self._simulator.state.grenade_experiment)
 
     def _set_timer(self, new_timer):
         self._timer = new_timer
-        self.changed_since_last_run = True
+        self.changed_input_data = True
 
     def _get_timer(self):
-        self.changed_since_last_run = True
+        self.changed_input_data = True
         return self._timer
 
     timer = property(_get_timer, _set_timer)
 
     def _set_observables(self, new_observables):
         self._observables = new_observables
-        self.changed_since_last_run = True
+        self.changed_topology = True
 
     def _get_observables(self):
-        self.changed_since_last_run = True
+        self.changed_topology = True
         return self._observables
 
     observables = property(_get_observables, _set_observables)
 
     def _set_same_id(self, new_id):
         self._same_id = new_id
-        self.changed_since_last_run = True
+        self.changed_topology = True
 
     def _get_same_id(self):
-        self.changed_since_last_run = True
+        self.changed_topology = True
         return self._same_id
 
     same_id = property(_get_same_id, _set_same_id)
 
     def _add_projection(self, new_projection: Projection):
         self._projections.append(new_projection)
-        self.changed_since_last_run = True
+        self.changed_topology = True
 
     def _remove_projection(self, old_projection: Projection):
         self._projections.remove(old_projection)
-        self.changed_since_last_run = True
+        self.changed_topology = True
 
     def _add_population(self, new_population: Population):
         self._populations.append(new_population)
-        self.changed_since_last_run = True
+        self.changed_topology = True
 
     def _remove_population(self, old_population: Population):
         self._populations.remove(old_population)
-        self.changed_since_last_run = True
+        self.changed_topology = True
 
     def generate_kernel(self) -> str:
         """
@@ -179,49 +183,129 @@ class PlasticityRule:
         {}
         """)
 
-    def add_to_network_graph(self, builder: grenade.NetworkBuilder,
-                             snippet_begin_time, snippet_end_time) \
-            -> grenade.PlasticityRuleOnNetwork:
-        plasticity_rule = grenade.PlasticityRule()
-        plasticity_rule.timer = self.timer.to_grenade(
-            snippet_begin_time, snippet_end_time)
+    def generate_vertex(self) \
+            -> grenade.abstract.PlasticityRule:
+        recording = None
         if self.observables:
-            plasticity_rule.recording = grenade.PlasticityRule\
-                .TimedRecording()
-            plasticity_rule.recording.observables = self.observables
-        plasticity_rule.kernel = self.generate_kernel()
-        plasticity_rule.projections = [
-            proj.synapse_type.to_plasticity_rule_projection_handle(proj)
-            for proj in self._projections
-        ]
-        plasticity_rule.populations = [
-            pop.celltype.to_plasticity_rule_population_handle(pop)
-            for pop in self._populations
-        ]
-        plasticity_rule.id = grenade.PlasticityRule.ID(self.same_id)
-        return builder.add(plasticity_rule)
+            recording = grenade.abstract.PlasticityRule.TimedRecordingConfig()
+            recording.observables = self.observables
+        projection_shapes = []
+        for proj in self._projections:
+            projection_shapes.append(
+                grenade_common.CuboidMultiIndexSequence([len(proj)]))
+        population_shapes = []
+        for pop in self._populations:
+            population_shapes.append(
+                grenade_common.CuboidMultiIndexSequence(
+                    [len(pop)],
+                    [grenade_common.CellOnPopulationDimensionUnit()]))
+        plasticity_rule = grenade.abstract.PlasticityRule(
+            recording,
+            grenade.abstract.PlasticityRule.ID(self.same_id),
+            population_shapes,
+            projection_shapes,
+            grenade_common.TimeDomainOnTopology())
+        return plasticity_rule
 
-    def get_data(
+    def generate_dynamics(self, snippet_begin_time, snippet_end_time) \
+            -> grenade.abstract.PlasticityRule.Dynamics:
+        return grenade.abstract.PlasticityRule.Dynamics(
+            timer=self.timer.to_grenade(snippet_begin_time, snippet_end_time),
+            batch_size=1)
+
+    def generate_parameterization(self) \
+            -> grenade.abstract.PlasticityRule.Parameterization:
+        return grenade.abstract.PlasticityRule.Parameterization(
+            self.generate_kernel())
+
+    def add_to_topology(
             self,
-            network_graph: grenade.NetworkGraph,
-            outputs: grenade_signal_flow.OutputData) \
-            -> grenade.PlasticityRule.RecordingData:
-        """
-        Get synaptic and neuron observables of plasticity rule.
+            experiment: grenade.abstract.frontend.ExperimentSnippet):
+        for proj in self._projections:
+            if proj.grenade_descriptor is None:
+                return False
+        for pop in self._populations:
+            if pop.grenade_descriptor is None:
+                return False
 
-        :param network_graph: Network graph to use for lookup of
-                              MADC output vertex descriptor.
-        :param outputs: All outputs of a single execution to extract
-                        samples from.
-        :return: Recording data.
-        """
+        if self.grenade_descriptor is not None and \
+                experiment.topology.contains(
+                    self.grenade_descriptor):
+            experiment.topology.clear_vertex(self.grenade_descriptor)
+            experiment.topology.set(
+                self.grenade_descriptor,
+                self.generate_vertex())
+        else:
+            self.grenade_descriptor = experiment.topology.add_vertex(
+                self.generate_vertex())
 
-        recording_data = grenade\
-            .extract_plasticity_rule_recording_data(
-                outputs, network_graph,
-                grenade.PlasticityRuleOnNetwork(
-                    self._simulator.state.plasticity_rules.index(self)))
-        return recording_data
+        # Add edges from projections and populations to different ports of
+        # plasticity rule
+        port = 0
+        for proj in self._projections:
+            edge = grenade_common.Edge(
+                channels_on_source=grenade_common.CuboidMultiIndexSequence(
+                    [len(proj)]),
+                channels_on_target=grenade_common.CuboidMultiIndexSequence(
+                    [len(proj)]),
+                port_on_source=1, port_on_target=port)
+
+            experiment.topology.add_edge(
+                proj.grenade_descriptor,
+                self.grenade_descriptor,
+                edge)
+
+            port += 1
+        for pop in self._populations:
+            edge = grenade_common.Edge(
+                channels_on_source=grenade_common.CuboidMultiIndexSequence(
+                    [len(pop), 1, 1],
+                    [grenade_common.CellOnPopulationDimensionUnit(),
+                     grenade_common.CompartmentOnNeuronDimensionUnit(),
+                     grenade.abstract.AtomicNeuronOnCompartmentDimensionUnit()]
+                ),
+                channels_on_target=grenade_common.CuboidMultiIndexSequence(
+                    [len(pop)],
+                    [grenade_common.CellOnPopulationDimensionUnit()]),
+                port_on_source=1, port_on_target=port)
+
+            experiment.topology.add_edge(
+                pop.grenade_descriptor,
+                self.grenade_descriptor,
+                edge)
+
+            port += 1
+        return True
+
+    def add_to_input_data(
+            self,
+            experiment: grenade.abstract.frontend.ExperimentSnippet,
+            snippet_begin_time,
+            snippet_end_time):
+        dynamics_port_index = len(experiment.topology.get(
+            self.grenade_descriptor).get_input_ports()) - 1
+        experiment.input_data.ports.set(
+            (self.grenade_descriptor, dynamics_port_index),
+            self.generate_dynamics(
+                snippet_begin_time, snippet_end_time))
+
+        parameterization_port_index = len(experiment.topology.get(
+            self.grenade_descriptor).get_input_ports()) - 2
+        experiment.input_data.ports.set(
+            (self.grenade_descriptor, parameterization_port_index),
+            self.generate_parameterization())
+
+    def extract_output_data(
+            self,
+            experiment: List[grenade.abstract.frontend.ExperimentSnippet]):
+        self._recording_data = []
+        for snippet in experiment:
+            if snippet.output_data.ports.contains(
+                    (self.grenade_descriptor, 0)):
+                self._recording_data.append(snippet.output_data.ports.get(
+                    (self.grenade_descriptor, 0)).data)
+            else:
+                self._recording_data.append(None)
 
     def get_observable_array(self, observable: str) -> object:
         """
@@ -248,13 +332,15 @@ class PlasticityRule:
                 "For observables per synapse, use the `get_data` function "
                 "of the respective projection.")
 
+        if self._recording_data is None:
+            raise RuntimeError(
+                "Plasticity rule observables only available after execution.")
         observable_data = []
-        for array_observables in self._simulator.state.array_observables:
-            if observable in array_observables[
-                    self._simulator.state.plasticity_rules.index(self)]:
-                observable_data.append(array_observables[
-                    self._simulator.state.plasticity_rules.
-                    index(self)][observable][0])
+        for snippet in self._recording_data:
+            if observable in snippet.data_array:
+                observable_data.append(
+                    snippet.data_array[observable][
+                        simulator.state.batch_entry])
 
         return observable_data
 
@@ -276,52 +362,14 @@ class PlasticityRuleHandle:
                                    instance.
         """
         self._plasticity_rule = plasticity_rule
-        self.changed_since_last_run = True
+        self.changed_topology = True
 
     def _set_plasticity_rule(self, new_plasticity_rule):
         self._plasticity_rule = new_plasticity_rule
-        self.changed_since_last_run = True
+        self.changed_topology = True
 
     def _get_plasticity_rule(self):
-        self.changed_since_last_run = True
+        self.changed_topology = True
         return self._plasticity_rule
 
     plasticity_rule = property(_get_plasticity_rule, _set_plasticity_rule)
-
-    # pylint: disable=invalid-name
-    @classmethod
-    def to_plasticity_rule_population_handle(cls, population: Population) \
-            -> grenade.PlasticityRule.PopulationHandle:
-        """
-        Convert observable options to population handle of plasticity rule
-        to backend representation, when plasticity rule handle is assoiated
-        to neuron cell type and used in a population.
-
-        :param population: Population for which to convert
-        :return: Representation in grenade
-        """
-        handle = grenade.PlasticityRule.PopulationHandle()
-        handle.descriptor = grenade.PopulationOnNetwork(
-            cls._simulator.state.populations.index(population))
-        handle.neuron_readout_sources = [
-            {halco.CompartmentOnLogicalNeuron(): [None]}
-            for i in range(len(population))
-        ]
-        return handle
-
-    # pylint: disable=invalid-name
-    @classmethod
-    def to_plasticity_rule_projection_handle(cls, projection: Projection) \
-            -> grenade.ProjectionOnNetwork:
-        """
-        Convert observable options to projection handle of plasticity rule
-        to backend representation, when plasticity rule handle is assoiated
-        to synapse type and used in a projection.
-
-        Currently no options are available.
-
-        :param projection: Projection for which to convert
-        :return: Representation in grenade
-        """
-        return grenade.ProjectionOnNetwork(
-            cls._simulator.state.projections.index(projection))

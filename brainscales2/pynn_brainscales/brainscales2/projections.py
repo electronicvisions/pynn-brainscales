@@ -1,18 +1,23 @@
 from __future__ import annotations
-from typing import List
 from copy import deepcopy
+from typing import List
+import math
 import numpy as np
 import pyNN.common
-from pyNN.common import Population, PopulationView, Assembly
+import pyNN.errors
+from pyNN.common import PopulationView, Assembly
 from pyNN.space import Space
 from pynn_brainscales.brainscales2.standardmodels.synapses import StaticSynapse
 from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.plasticity_rules import PlasticityRuleHandle
 import pygrenade_vx.network as grenade
+import pygrenade_common as grenade_common
 from dlens_vx_v3 import halco
 
 
-class Projection(pyNN.common.Projection):
+class Projection(
+        pyNN.common.Projection,
+        grenade.abstract.frontend.ExperimentElement):
     _simulator = simulator
     _static_synapse_class = StaticSynapse
 
@@ -62,8 +67,17 @@ class Projection(pyNN.common.Projection):
         """
         super().__init__(presynaptic_neurons, postsynaptic_neurons, connector,
                          synapse_type, source, receptor_type, space, label)
+
+        grenade.abstract.frontend.ExperimentElement.__init__(
+            self, self._simulator.state.grenade_experiment)
+        self.grenade_descriptor = None
         self.connections = []
-        connector.connect(self)
+
+        try:
+            connector.connect(self)
+        except pyNN.errors.ConnectionError as err:
+            self._simulator.state.grenade_experiment.elements.remove(self)
+            raise err
 
         def key(connection):
             return (connection.presynaptic_index,
@@ -73,24 +87,22 @@ class Projection(pyNN.common.Projection):
         self.connections = sorted(self.connections, key=key)
 
         self._simulator.state.projections.append(self)
-        self.changed_since_last_run = True
 
         # determine from which to which compartment the connection will be
         # established
         self.pre_compartment = halco.CompartmentOnLogicalNeuron()
         if connector.source_location_selector is not None:
-            pre = self.pre.grandparent if hasattr(self.pre, "grandparent")\
-                else self.pre
+            pre = getattr(self.pre, "grandparent", self.pre)
             self.pre_compartment = \
                 self._get_comp_id_from_location(
                     connector.source_location_selector, pre.celltype)
         self.post_compartment = halco.CompartmentOnLogicalNeuron()
         if connector.location_selector is not None:
-            post = self.post.grandparent if hasattr(self.post, "grandparent")\
-                else self.post
+            post = getattr(self.post, "grandparent", self.post)
             self.post_compartment = \
-                self._get_comp_id_from_location(connector.location_selector,
-                                                post.celltype)
+                self._get_comp_id_from_location(
+                    connector.location_selector,
+                    post.celltype)
 
     @staticmethod
     def _get_comp_id_from_location(location: str, celltype
@@ -168,73 +180,135 @@ class Projection(pyNN.common.Projection):
                                     **filtered_connection_parameters)
             self.connections.append(connection)
 
-    @staticmethod
-    def add_to_network_graph(populations: List[Population],
-                             projection: Projection,
-                             builder: grenade.NetworkBuilder) \
-            -> grenade.ProjectionOnNetwork:
+    def _generate_parameterization(self) \
+            -> grenade_common.Computation.Parameterization:
+        return grenade.abstract.UncalibratedSynapse.ParameterSpace\
+            .Parameterization([
+                grenade.abstract.UncalibratedSynapse.Weight(
+                    int(abs(c.weight)))
+                for c in self.connections])
 
-        if isinstance(projection.pre, Assembly):
-            raise NotImplementedError("Assemblies are not supported yet")
-        if isinstance(projection.post, Assembly):
+    # pylint: disable=too-many-locals
+    def add_to_topology(
+            self,
+            experiment: grenade.abstract.frontend.ExperimentSnippet):
+        if isinstance(self.pre, Assembly):
             raise NotImplementedError("Assemblies are not supported yet")
 
         # grenade has no concept of pop views, we therefore need to
         # get pre- and post-synaptic population descriptor of the parent in
         # case of pop views
-        pre_has_grandparent = hasattr(projection.pre, "grandparent")
-        post_has_grandparent = hasattr(projection.post, "grandparent")
-        pre = projection.pre.grandparent if \
-            pre_has_grandparent else projection.pre
-        post = projection.post.grandparent if \
-            post_has_grandparent else projection.post
+        pre = getattr(self.pre, "grandparent", self.pre)
 
-        population_pre = grenade.PopulationOnNetwork(
-            populations.index(pre))
-        population_post = grenade.PopulationOnNetwork(
-            populations.index(post))
+        # grenade has no concept of pop views, we therefore need to
+        # get pre- and post-synaptic population descriptor of the parent in
+        # case of pop views
+        post = getattr(self.post, "grandparent", self.post)
 
-        connections = np.empty((len(projection.connections), 5), dtype=int)
-        for i, conn in enumerate(projection.connections):
-            connections[i, 0] = conn.pop_pre_index
-            connections[i, 1] = int(projection.pre_compartment)
-            connections[i, 2] = conn.pop_post_index
-            connections[i, 3] = int(projection.post_compartment)
-            connections[i, 4] = int(abs(conn.weight))
+        if pre.grenade_descriptor is None:
+            return False
+        if post.grenade_descriptor is None:
+            return False
 
-        if projection.receptor_type == "excitatory":
-            receptor_type = \
-                grenade.Receptor(
-                    grenade.Receptor.ID(),
-                    grenade.Receptor.Type.excitatory)
-        elif projection.receptor_type == "inhibitory":
-            receptor_type = \
-                grenade.Receptor(
-                    grenade.Receptor.ID(),
-                    grenade.Receptor.Type.inhibitory)
+        # generate vertex
+        pre_dimension = 0
+        post_dimension = 1
+        connections_points = np.empty((len(self.connections), 2), dtype=int)
+        for i, conn in enumerate(self.connections):
+            connections_points[i, pre_dimension] = conn.pop_pre_index
+            connections_points[i, post_dimension] = conn.pop_post_index
+        connections_sequence = grenade_common.ListMultiIndexSequence([])
+        connections_sequence.from_numpy(
+            connections_points,
+            [grenade_common.CellOnPopulationDimensionUnit(),
+             grenade_common.CellOnPopulationDimensionUnit()])
+
+        input_sequence = connections_sequence\
+            .distinct_projection({pre_dimension})
+        output_sequence = connections_sequence\
+            .distinct_projection({post_dimension})
+
+        vertex = grenade_common.Projection(
+            synapse=grenade.abstract.UncalibratedSynapse(),
+            parameter_space=grenade.abstract.UncalibratedSynapse
+            .ParameterSpace([
+                grenade.abstract.UncalibratedSynapse.Weight(
+                    Connection.round_up_63(int(abs(c.weight))))
+                for c in self.connections]),
+            connector=grenade_common.SequenceConnector(
+                input_sequence,
+                output_sequence,
+                connections_sequence),
+            time_domain=grenade_common.TimeDomainOnTopology())
+
+        if self.grenade_descriptor is not None and \
+                experiment.topology.contains(self.grenade_descriptor):
+            experiment.topology.clear_vertex(self.grenade_descriptor)
+            experiment.topology.set(self.grenade_descriptor, vertex)
         else:
-            raise NotImplementedError(
-                "grenade.Projection.RecetorType does "
-                + f"not support {projection.receptor_type}.")
+            self.grenade_descriptor = experiment.topology.add_vertex(vertex)
 
-        gprojection = grenade.Projection()
-        gprojection.from_numpy(
-            receptor_type, connections, population_pre, population_post)
+        # add in-edge
+        in_edge = grenade_common.Edge(
+            input_sequence.cartesian_product(
+                grenade_common.ListMultiIndexSequence([
+                    grenade_common.MultiIndex([int(self.pre_compartment)])],
+                    [grenade_common.CompartmentOnNeuronDimensionUnit()])),
+            input_sequence
+        )
+        experiment.topology.add_edge(
+            pre.grenade_descriptor,
+            self.grenade_descriptor,
+            in_edge)
 
-        return builder.add(gprojection)
+        # add out-edge
+        receptor_on_compartment = post.celltype.get_receptor(
+            self.receptor_type, self.post_compartment)
+
+        post_compartment_on_neuron = grenade_common.CuboidMultiIndexSequence(
+            [1],
+            grenade_common.MultiIndex([int(self.post_compartment)]),
+            [grenade_common.CompartmentOnNeuronDimensionUnit()])
+
+        out_edge = grenade_common.Edge(
+            output_sequence,
+            output_sequence
+            .cartesian_product(post_compartment_on_neuron)
+            .cartesian_product(receptor_on_compartment)
+        )
+        experiment.topology.add_edge(
+            self.grenade_descriptor,
+            post.grenade_descriptor,
+            out_edge)
+
+        return True
+
+    def add_to_input_data(
+            self,
+            experiment: grenade.abstract.frontend.ExperimentSnippet,
+            snippet_begin_time: float,
+            snippet_end_time: float):
+        experiment.input_data.ports.set(
+            (self.grenade_descriptor, 1),
+            self._generate_parameterization())
+
+    def extract_output_data(self, experiment):
+        pass
 
     @property
-    def placed_connections(self):
+    def placed_connections(self) -> List[List[halco.SynapseOnDLS]]:
         """
         Query the last routing run for placement of this projection.
         """
-        if self._simulator.state.grenade_network_graph is None:
+        if self.grenade_descriptor is None:
             raise RuntimeError(
                 "placed_connections requires a previous routing run"
                 ", which is executed on pynn.run().")
-        return self._simulator.state.grenade_network_graph \
-            .get_placed_connections(grenade.ProjectionOnNetwork(
-                self._simulator.state.projections.index(self)))
+        return grenade.abstract.reverse_mapping\
+            .get_uncalibrated_synapse_coordinates(
+                self.grenade_descriptor,
+                self._simulator.state.grenade_experiment.snippets[-1]
+                .mapped_topology)
 
     def get_data(self, observable: str):
         """
@@ -259,13 +333,20 @@ class Projection(pyNN.common.Projection):
             raise RuntimeError(
                 "Synapse type doesn't have requested observable.")
 
+        if self.synapse_type.plasticity_rule._recording_data is None:
+            raise RuntimeError(
+                "Plasticity rule observables only available after execution.")
         observable_data = []
-        for synaptic_observables in self._simulator.state.synaptic_observables:
-            if observable in synaptic_observables[
-                    self._simulator.state.projections.index(self)]:
-                observable_data.append(synaptic_observables[
-                    self._simulator.state.projections.
-                    index(self)][observable])
+        for snippet in self.synapse_type.plasticity_rule._recording_data:  # pylint: disable=protected-access
+            projection_on_plasticity_rule = self.synapse_type.plasticity_rule\
+                ._projections.index(self)  # pylint: disable=protected-access
+            if snippet is not None and observable in snippet.data_per_synapse:
+                observable_data.append(
+                    snippet.data_per_synapse[observable][
+                        projection_on_plasticity_rule][
+                        simulator.state.batch_entry])
+            else:
+                observable_data.append(None)
 
         return observable_data
 
@@ -280,7 +361,7 @@ class Connection(pyNN.common.Connection):
     def __init__(self, projection, pre_index, post_index, **parameters):
         self.projection = projection
         self.presynaptic_index = pre_index
-        self.changed_since_last_run = True
+        self._weight = None
 
         if isinstance(projection.pre, PopulationView):
             self.pop_pre_index = \
@@ -309,6 +390,16 @@ class Connection(pyNN.common.Connection):
         self.parameters = {x: param for x, param in parameters.items()
                            if x not in ["delay", "weight"]}
 
+    @staticmethod
+    def round_up_63(value):
+        """
+        Grenade expects the maximum weight the user wants to set.
+        We currently do not implement a maximum weight in PyNN.
+        Therefore, we round it up to the maximum weight possible with
+        the given number of synapses needed to realize the given value.
+        """
+        return max(1, math.ceil(abs(value) / 63)) * 63
+
     def _set_weight(self, new_weight):
         new_weight = round(new_weight)
         if ((new_weight < 0)
@@ -319,8 +410,14 @@ class Connection(pyNN.common.Connection):
             raise pyNN.errors.ConnectionError(
                 "Weights must be positive for conductance-based and/or "
                 "excitatory synapses and negative for inhibitory synapses")
+        old_weight_max = None
+        if self._weight is not None:
+            old_weight_max = Connection.round_up_63(self._weight)
         self._weight = new_weight
-        self.projection.changed_since_last_run = True
+        new_weight_max = Connection.round_up_63(new_weight)
+        self.projection.changed_topology = self.projection.changed_topology \
+            or (new_weight_max != old_weight_max)
+        self.projection.changed_input_data = True
 
     def _get_weight(self):
         return self._weight
@@ -329,7 +426,8 @@ class Connection(pyNN.common.Connection):
         if new_delay != 0:
             raise ValueError("Setting the delay unequal 0 is not supported.")
         self._delay = new_delay
-        self.projection.changed_since_last_run = True
+        self.projection.changed_input_data = True
+        self.projection.changed_topology = True
 
     def _get_delay(self):
         return self._delay

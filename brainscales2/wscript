@@ -62,6 +62,7 @@ def build(bld):
         pylint_config = join(get_toplevel_path(), "code-format", "pylintrc"),
         pycodestyle_config = join(get_toplevel_path(), "code-format", "pycodestyle"),
         test_timeout = 960,
+        test_environ = dict(HXCOMM_ENABLE_ZERO_MOCK="1"),
     )
 
     bld(name = 'pynn_brainscales2_hwtest',

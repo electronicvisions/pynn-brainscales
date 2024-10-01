@@ -1,7 +1,7 @@
 from typing import Final, List, Set
 from pyNN.standardmodels import synapses, build_translations
 from pynn_brainscales.brainscales2 import simulator, plasticity_rules
-import pygrenade_vx.network as grenade
+import pygrenade_vx.network.abstract as grenade
 
 
 class StaticSynapse(synapses.StaticSynapse):
@@ -66,7 +66,7 @@ class StaticRecordingSynapse(
                 for obs in self._recording_observables)
             grenade_generator = grenade\
                 .OnlyRecordingPlasticityRuleGenerator(observables)
-            return grenade_generator.generate().recording.observables
+            return grenade_generator.generate()[0].observables
 
         def _set_observables(self, new_observables):
             raise RuntimeError(
@@ -75,10 +75,8 @@ class StaticRecordingSynapse(
 
         observables = property(_get_observables, _set_observables)
 
-        def add_to_network_graph(
-                self, builder: grenade.NetworkBuilder,
-                snippet_begin_time, snippet_end_time) \
-                -> grenade.PlasticityRuleOnNetwork:
+        def generate_vertex(self) -> grenade.PlasticityRule:
+            vertex = super().generate_vertex()
             observables = set(
                 getattr(
                     grenade
@@ -87,14 +85,19 @@ class StaticRecordingSynapse(
                 for obs in self._recording_observables)
             grenade_generator = grenade\
                 .OnlyRecordingPlasticityRuleGenerator(observables)
-            plasticity_rule = grenade_generator.generate()
-            plasticity_rule.projections = [
-                grenade.ProjectionOnNetwork(
-                    self._simulator.state.projections.index(proj))
-                for proj in self._projections]
-            plasticity_rule.timer = self.timer.to_grenade(
-                snippet_begin_time, snippet_end_time)
-            return builder.add(plasticity_rule)
+            vertex.recording = grenade_generator.generate()[0]
+            return vertex
+
+        def generate_kernel(self) -> str:
+            observables = set(
+                getattr(
+                    grenade
+                    .OnlyRecordingPlasticityRuleGenerator.Observable,
+                    obs)
+                for obs in self._recording_observables)
+            grenade_generator = grenade\
+                .OnlyRecordingPlasticityRuleGenerator(observables)
+            return grenade_generator.generate()[1].kernel
 
     POSSIBLE_OBSERVABLES: Final[List[str]] = [
         "weights", "correlation_causal", "correlation_acausal"]
@@ -106,14 +109,14 @@ class StaticRecordingSynapse(
         plasticity_rules.PlasticityRuleHandle.__init__(
             self, self.RecordingRule(timer, self._observables))
         StaticSynapse.__init__(self, weight=weight)
-        self.changed_since_last_run = True
+        self.changed_topology = True
 
     def _get_observables(self):
-        self.changed_since_last_run = True
+        self.changed_topology = True
         return self._observables
 
     def _set_observables(self, value: Set[str]):
-        self.changed_since_last_run = True
+        self.changed_topology = True
         self._observables = value
         super().plasticity_rule._recording_observables = self._observables  # pylint: disable=protected-access
 

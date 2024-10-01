@@ -80,6 +80,12 @@ class TestProjection(unittest.TestCase):
         self.assertEqual(proj.get("weight", format="list"), connection_list)
         pynn.run(None, pynn.RunCommand.PREPARE)
 
+    def test_placed_connections(self):
+        synapse = pynn.standardmodels.synapses.StaticSynapse(weight=32)
+        pynn.Projection(self.pop4, self.pop3, pynn.AllToAllConnector(),
+                        synapse_type=synapse)
+        pynn.run(None, pynn.RunCommand.PREPARE)
+
     def test_weight_sign(self):
         synapse_exc = pynn.standardmodels.synapses.StaticSynapse(weight=32)
         synapse_inh = pynn.standardmodels.synapses.StaticSynapse(weight=-32)

@@ -239,6 +239,7 @@ class TestPopulation(unittest.TestCase):
         # Repeat tests with population_size > 1 (values should be collapsed
         # and the returns should be the same as above)
         pop = pynn.Population(5, self.McNeuron())
+        pynn.preprocess()
         # Get single value
         self.assertEqual(pop.get('leak_v_leak'), self.v_leak)
 
@@ -307,6 +308,7 @@ class TestCalibration(unittest.TestCase):
         v_threshold = McCircuitParameters(v_threshold)
 
         pop = pynn.Population(1, McNeuron())
+        pynn.preprocess()
 
         # Get single value
         self.assertEqual(pop.get('leak_v_leak'), v_leak)

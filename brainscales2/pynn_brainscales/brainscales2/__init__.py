@@ -26,6 +26,7 @@ from pynn_brainscales.brainscales2.plasticity_rules import Timer, \
 from pynn_brainscales.brainscales2 import helper
 from dlens_vx_v3 import lola, hal, halco, sta
 import pygrenade_vx as grenade
+import pygrenade_common as grenade_common
 import pylogging as logger
 from calix.spiking import SpikingCalibTarget, SpikingCalibOptions
 
@@ -178,20 +179,21 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
         max_delay = 0
     simulator.state.min_delay = min_delay
     simulator.state.max_delay = max_delay
-    simulator.state.neuron_placement = simulator.NeuronPlacement(
-        extra_params.pop("neuronPermutation",
-                         simulator.NeuronPlacement.DEFAULT_PERMUTATION))
-    simulator.state.background_spike_source_placement = \
-        simulator.BackgroundSpikeSourcePlacement(
-            extra_params.pop("backgroundPermutation",
-                             simulator.BackgroundSpikeSourcePlacement
-                             .DEFAULT_PERMUTATION))
+    if "neuronPermutation" in extra_params:
+        simulator.state.grenade_experiment.mapper.neuron_permutation = \
+            [halco.AtomicNeuronOnDLS(halco.AtomicNeuronOnDLS.enum_type(n))
+             for n in extra_params.pop("neuronPermutation")]
+    if "backgroundPermutation" in extra_params:
+        simulator.state.grenade_experiment.mapper\
+            .background_source_permutation = \
+            [halco.PADIBusOnPADIBusBlock(b)
+             for b in extra_params.pop("backgroundPermutation")]
     simulator.state.injected_config = \
         extra_params.pop('injected_config', InjectedConfiguration())
     simulator.state.injected_readout = \
         extra_params.pop('injected_readout', InjectedReadout())
-    simulator.state.conn = extra_params.pop('connection', None)
-    simulator.state.conn_comes_from_outside = simulator.state.conn is not None
+    simulator.state.connection = simulator.Connection(
+        extra_params.pop('connection', None))
     initial_config = extra_params.pop('initial_config', None)
     enable_neuron_bypass = extra_params.pop('enable_neuron_bypass', False)
     if enable_neuron_bypass:
@@ -200,13 +202,15 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
                 "setup(): Supplied initial_config "
                 "overwritten by enable_neuron_bypass")
         initial_config = lola.Chip.default_neuron_bypass
+    if initial_config is None:
+        initial_config = lola.Chip()
     simulator.state.initial_config = initial_config
     simulator.state.prepare_static_config()
-    simulator.state.calib_cache_dir = extra_params.pop('calibration_cache',
-                                                       None)
-    simulator.state.injected_calib_target = \
+    simulator.state.grenade_experiment.calibration.cache_paths = \
+        extra_params.pop('calibration_cache', None)
+    simulator.state.grenade_experiment.calibration.target = \
         extra_params.pop('injected_calib_target', SpikingCalibTarget())
-    simulator.state.injected_calib_options = \
+    simulator.state.grenade_experiment.calibration.options = \
         extra_params.pop('injected_calib_options', SpikingCalibOptions())
 
     if extra_params:
@@ -224,13 +228,7 @@ def end():
         io_file = get_io(filename)
         population.write_data(io_file, variables)
     simulator.state.write_on_end = []
-
-    if not simulator.state.conn_comes_from_outside and \
-       simulator.state.conn_manager is not None:
-        simulator.state.conn_manager.__exit__()
-        simulator.state.conn_manager = None
-        assert simulator.state.conn is not None
-        simulator.state.conn = None
+    simulator.state.connection.end()
     simulator.state.log.DEBUG(
         f"end(): Completed in {(time.time() - time_begin):.3f}s")
     # remove instance singleton
@@ -368,7 +366,7 @@ def get_post_realtime_read_ppu_symbols() -> Dict[
 
 
 def get_backend_statistics() \
-        -> grenade.network.NetworkGraphStatistics:
+        -> grenade.network.MappedTopologyStatistics:
     """
     Get statistics of placement and routing like amount of time spent and
     number of hardware entities used.
@@ -382,56 +380,35 @@ def get_backend_statistics() \
         raise RuntimeError(
             "Backend statistics are only available for active "
             "simulator after calling setup().")
-    if not simulator.state.grenade_network_graph:
+    if not simulator.state.grenade_experiment.snippets[-1]\
+            .mapped_topology:
         raise RuntimeError(
             "Backend statistics are only available after first mapping and"
             " routing execution, which happens in pynn.run().")
     return grenade.network.extract_statistics(
-        simulator.state.grenade_network_graph)
+        simulator.state.grenade_experiment.snippets[-1]
+        .mapped_topology)
 
 
-def get_execution_time_info() -> grenade.signal_flow.ExecutionTimeInfo:
+def get_execution_instance_data() \
+        -> grenade_common.OutputData.ExecutionInstances:
     """
-    Get time information of last execution.
+    Get execution instance data.
     :raises RuntimeError: If the simulator is not active, i.e. pynn.setup()
                           was not called.
     :raises RuntimeError: If no info is available, i.e. pynn.run() was not
                           called.
-    :return: Time info object.
+    :return: Execution instance data object.
     """
     if not simulator.state:
         raise RuntimeError(
-            "Execution time information is only available for active "
+            "Execution instance data is only available for active "
             "simulator after calling setup()."
         )
-    if simulator.state.execution_time_info is None:
+    if simulator.state.execution_instance_data is None:
         raise RuntimeError(
-            "Execution time information is only available after the hardware "
+            "Execution instance data is only available after the hardware "
             "configuration has been determined. Call pynn.run(...) (you can "
             "pass `None` as an argument if want to determine the hardware "
             "configuration without an emulation on hardware.")
-    return simulator.state.execution_time_info
-
-
-def get_execution_health_info() -> grenade.signal_flow.ExecutionHealthInfo:
-    """
-    Get health information of last execution.
-
-    :raises RuntimeError: If the simulator is not active, i.e. pynn.setup()
-                          was not called.
-    :raises RuntimeError: If no info is available, i.e. pynn.run() was not
-                          called.
-    :return: Health info object.
-    """
-    if not simulator.state:
-        raise RuntimeError(
-            "Execution health information is only available for active "
-            "simulator after calling setup()."
-        )
-    if simulator.state.execution_time_info is None:
-        raise RuntimeError(
-            "Execution health information is only available after the "
-            "hardware configuration has been determined. Call pynn.run(...) "
-            "(you can pass `None` as an argument if want to determine the "
-            "hardware configuration without an emulation on hardware.")
-    return simulator.state.execution_health_info
+    return simulator.state.execution_instance_data

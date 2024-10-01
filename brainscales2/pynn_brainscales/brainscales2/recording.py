@@ -1,5 +1,5 @@
 from itertools import product, compress
-from typing import Sequence, Set, List, Optional, Tuple
+from typing import Sequence, Set, List, Optional, Tuple, Type
 from datetime import datetime
 from warnings import warn
 import numpy as np
@@ -13,8 +13,11 @@ from pyNN.recording import gather_blocks, filter_by_variables, \
 
 from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.recording_data import RecordingSite, \
-    RecordingConfig, GrenadeRecId, RecordingType
+    RecordingConfig, GrenadeRecId, RecordingType, ADCData
 from dlens_vx_v3 import halco
+import pygrenade_vx.network.abstract as grenade
+import pygrenade_vx.common as grenade_vx_common
+import pygrenade_common as grenade_common
 
 
 def normalize_variables_arg(variables):
@@ -24,13 +27,24 @@ def normalize_variables_arg(variables):
     return variables
 
 
-class Recorder(pyNN.recording.Recorder):
+class Recorder(pyNN.recording.Recorder, grenade.frontend.ExperimentElement):
 
     _simulator = simulator
 
     def __init__(self, population, file=None):
         super().__init__(population, file=file)
-        self.changed_since_last_run = True
+        grenade.frontend.ExperimentElement.__init__(
+            self, self._simulator.state.grenade_experiment)
+        # grenade descriptor of vertex in topology per experiment index
+        # the index table is only updated when the topology is changed
+        self.grenade_spike_descriptor = \
+            grenade.utils.SnippetDataDictionary({0: None})
+        self.grenade_madc_descriptor = \
+            grenade.utils.SnippetDataDictionary({0: None})
+        self.grenade_cadc_descriptor = \
+            grenade.utils.SnippetDataDictionary({0: None})
+        self.grenade_pad_descriptor = \
+            grenade.utils.SnippetDataDictionary({0: None})
 
     def _get_recording_sites(self, neuron_ids: List[int],
                              locations: Optional[Sequence[str]] = None
@@ -52,7 +66,8 @@ class Recorder(pyNN.recording.Recorder):
 
     def record(self, variables, ids, sampling_interval=None,
                locations=None, *, device="madc"):
-        self.changed_since_last_run = True
+        self.changed_topology = True
+        self.changed_input_data = True
         # MADC based recording is only possible for one neuron on a chip
         # it is therefore checked for population size one and no multi
         # assignment before the parent record function is called which modifies
@@ -65,6 +80,10 @@ class Recorder(pyNN.recording.Recorder):
         recording_sites = self._get_recording_sites(ids, locations)
         grenade_ids = {self._rec_site_to_grenade_index(rec_site) for rec_site
                        in recording_sites}
+
+        if "spikes" in variables:
+            self._simulator.state.recordings[-1].config.add_spike_recording(
+                list(grenade_ids))
 
         if device == "madc":
             self._simulator.state.recordings[-1].config.add_madc_recording(
@@ -132,7 +151,8 @@ class Recorder(pyNN.recording.Recorder):
         pass
 
     def _reset(self):
-        self.changed_since_last_run = True
+        self.changed_topology = True
+        self.changed_input_data = True
 
         for variable in self.recorded:
             for rec_site in self.recorded[variable]:
@@ -404,3 +424,251 @@ class Recorder(pyNN.recording.Recorder):
         if clear:
             self.clear()
         return data
+
+    def _add_recorder_to_experiment(
+            self,
+            recorder_type: Type[grenade.Recorder],
+            recorder_descriptors: grenade.utils.SnippetDataDictionary,
+            recording_ids: grenade_common.MultiIndexSequence,
+            source_port: int,
+            experiment: grenade.frontend.ExperimentSnippet):
+        """
+        Add recorder to or update recorder in experiment snippet's topology.
+
+        :param recorder_type: Type of recorder to construct
+        :param recorder_descriptors: Map to look up and update vertex
+                                     descriptor of recorder by snippet index
+        :param recording_ids: Recording identifiers as multi-index sequence,
+                              sources on compartments on neurons on
+                              population
+        :param source_port: Port on source population to attach recorder to
+        :param experiment: Experiment snippet to add recorder to
+        """
+        snippet_index = self._simulator.state.grenade_experiment.snippets\
+            .index(experiment)
+        recorder_vertex = recorder_type(
+            shape=grenade_common.CuboidMultiIndexSequence([
+                recording_ids.size()]),
+            time_domain=grenade_common.TimeDomainOnTopology())
+        recorder_descriptor = recorder_descriptors.get(snippet_index)
+        if recorder_descriptor is not None and \
+                experiment.topology.contains(
+                    recorder_descriptor):
+            experiment.topology.clear_vertex(recorder_descriptor)
+            if recording_ids.size() == 0:
+                experiment.topology.remove_vertex(recorder_descriptor)
+                recorder_descriptor = None
+            else:
+                experiment.topology.set(
+                    recorder_descriptor,
+                    recorder_vertex)
+        elif recording_ids.size() != 0:
+            recorder_descriptor = experiment.topology.add_vertex(
+                recorder_vertex)
+
+        if recorder_descriptor is not None:
+            edge = grenade_common.Edge(
+                channels_on_source=recording_ids,
+                channels_on_target=grenade_common.CuboidMultiIndexSequence(
+                    [recording_ids.size()]),
+                port_on_source=source_port,
+                port_on_target=0)
+
+            experiment.topology.add_edge(
+                source=self.population.grenade_descriptor,
+                target=recorder_descriptor,
+                edge=edge)
+        recorder_descriptors.update({snippet_index: recorder_descriptor})
+
+    def add_to_topology(
+            self,
+            experiment: grenade.frontend.ExperimentSnippet):
+        # TODO: remove sorting of PyNN IDs once grenade supports
+        # non-sorted edges to recorders at all below occurrences
+        spike_recording_ids = grenade_common.ListMultiIndexSequence(
+            [grenade_common.MultiIndex(
+             [self._rec_site_to_grenade_index(i).neuron_on_population,
+              self._rec_site_to_grenade_index(i).compartment_on_neuron])
+             for i in sorted(self.recorded["spikes"])],
+            [grenade_common.CellOnPopulationDimensionUnit(),
+             grenade_common.CompartmentOnNeuronDimensionUnit()])
+        self._add_recorder_to_experiment(
+            grenade.SpikeRecorder,
+            self.grenade_spike_descriptor,
+            spike_recording_ids,
+            0,
+            experiment)
+
+        def get_recording_ids(config):
+            recording_ids = []
+            for variable, ids in self.recorded.items():
+                if variable == "spikes":
+                    continue
+                for i in sorted(ids):
+                    if self._rec_site_to_grenade_index(i) \
+                            in config:
+                        recording_ids.append(grenade_common.MultiIndex(
+                            [self._rec_site_to_grenade_index(i)
+                             .neuron_on_population,
+                             self._rec_site_to_grenade_index(i)
+                             .compartment_on_neuron, 0]))
+            recording_ids = grenade_common.ListMultiIndexSequence(
+                recording_ids,
+                [grenade_common.CellOnPopulationDimensionUnit(),
+                 grenade_common.CompartmentOnNeuronDimensionUnit(),
+                 grenade.AtomicNeuronOnCompartmentDimensionUnit()])
+            return recording_ids
+
+        madc_recording_ids = get_recording_ids(
+            self._simulator.state.recordings[-1].config.madc)
+
+        self._add_recorder_to_experiment(
+            recorder_type=grenade.MADCRecorder,
+            recorder_descriptors=self.grenade_madc_descriptor,
+            recording_ids=madc_recording_ids,
+            source_port=1,
+            experiment=experiment)
+
+        cadc_recording_ids = get_recording_ids(
+            self._simulator.state.recordings[-1].config.cadc)
+
+        def wrapped_cadc_recorder(shape, time_domain):
+            return grenade.CADCRecorder(shape, False, time_domain)
+
+        self._add_recorder_to_experiment(
+            recorder_type=wrapped_cadc_recorder,
+            recorder_descriptors=self.grenade_cadc_descriptor,
+            recording_ids=cadc_recording_ids,
+            source_port=1,
+            experiment=experiment)
+
+        pad_recording_ids = []
+        pads = []
+        for variable, ids in self.recorded.items():
+            if variable == "spikes":
+                continue
+            for i in sorted(ids):
+                for pad_on_dls, config in self._simulator.state.recordings[-1]\
+                        .config.pads.items():
+                    if self._rec_site_to_grenade_index(i) == config.rec_site:
+                        pad_recording_ids.append(
+                            grenade_common.MultiIndex([
+                                config.rec_site.neuron_on_population,
+                                config.rec_site.compartment_on_neuron,
+                                0]))
+                        pads.append(pad_on_dls)
+
+        pad_recording_ids = grenade_common.ListMultiIndexSequence(
+            pad_recording_ids,
+            [grenade_common.CellOnPopulationDimensionUnit(),
+             grenade_common.CompartmentOnNeuronDimensionUnit(),
+             grenade.AtomicNeuronOnCompartmentDimensionUnit()])
+
+        def wrapped_pad_recorder(shape, time_domain):
+            return grenade.PadRecorder(pads, shape, time_domain)
+
+        self._add_recorder_to_experiment(
+            recorder_type=wrapped_pad_recorder,
+            recorder_descriptors=self.grenade_pad_descriptor,
+            recording_ids=pad_recording_ids,
+            source_port=1,
+            experiment=experiment)
+
+        return True
+
+    def add_to_input_data(
+            self,
+            experiment: grenade.frontend.ExperimentSnippet,
+            snippet_begin_time,
+            snippet_end_time):
+        snippet_index = self._simulator.state.grenade_experiment.snippets\
+            .index(experiment)
+
+        if self.grenade_pad_descriptor.get(snippet_index) is None:
+            return
+
+        enable_buffered = []
+        for variable, ids in self.recorded.items():
+            if variable == "spikes":
+                continue
+            for i in sorted(ids):
+                for _, config in self._simulator.state\
+                        .recordings[-1].config.pads.items():
+                    if self._rec_site_to_grenade_index(i)\
+                            == config.rec_site:
+                        enable_buffered.append(config.buffered)
+        parameterization = grenade.PadRecorder.Parameterization()
+        parameterization.enable_buffered = enable_buffered
+        experiment.input_data.ports.set(
+            (self.grenade_pad_descriptor.get(snippet_index), 1),
+            parameterization)
+
+    def extract_output_data(
+            self, experiment: List[grenade.frontend.ExperimentSnippet]):
+        for i, snippet in enumerate(experiment):
+            if self.grenade_spike_descriptor.get(i) is not None:
+                grenade_spikes = snippet.output_data.ports.get(
+                    (self.grenade_spike_descriptor.get(i), 0)).spikes
+                in_edge = snippet.topology.get(snippet.topology.in_edges(
+                    self.grenade_spike_descriptor.get(i))[0])
+                for j, grenade_id in enumerate(
+                        in_edge.get_channels_on_source().get_elements()):
+                    self._simulator.state.recordings[i].data.spikes.update({
+                        GrenadeRecId(
+                            self._simulator.state.populations.index(
+                                self.population),
+                            grenade_id.value[0],
+                            grenade_id.value[1]):
+                        [float(s)
+                         / grenade_vx_common.Time.fpga_clock_cycles_per_us
+                         .value()
+                         / 1000. for s in grenade_spikes[
+                            simulator.state.batch_entry][j]]})
+
+            if self.grenade_madc_descriptor.get(i) is not None:
+                grenade_madc_samples = snippet.output_data.ports.get(
+                    (self.grenade_madc_descriptor.get(i), 0)).samples
+                in_edge = snippet.topology.get(snippet.topology.in_edges(
+                    self.grenade_madc_descriptor.get(i))[0])
+                for j, grenade_id in enumerate(
+                        in_edge.get_channels_on_source().get_elements()):
+                    self._simulator.state.recordings[i].data.madc.update({
+                        GrenadeRecId(
+                            self._simulator.state.populations.index(
+                                self.population),
+                            grenade_id.value[0],
+                            grenade_id.value[1]):
+                        ADCData(
+                            np.array([
+                                float(s[0])
+                                / grenade_vx_common.Time
+                                .fpga_clock_cycles_per_us.value()
+                                / 1000. for s in grenade_madc_samples[
+                                    simulator.state.batch_entry][j]]),
+                            np.array(
+                                [s[1] for s in grenade_madc_samples[
+                                    simulator.state.batch_entry][j]]))})
+
+            if self.grenade_cadc_descriptor.get(i) is not None:
+                grenade_cadc_samples = snippet.output_data.ports.get(
+                    (self.grenade_cadc_descriptor.get(i), 0)).samples
+                in_edge = snippet.topology.get(snippet.topology.in_edges(
+                    self.grenade_cadc_descriptor.get(i))[0])
+                for j, grenade_id in enumerate(
+                        in_edge.get_channels_on_source().get_elements()):
+                    self._simulator.state.recordings[i].data.cadc.update({
+                        GrenadeRecId(
+                            self._simulator.state.populations.index(
+                                self.population),
+                            grenade_id.value[0],
+                            grenade_id.value[1]):
+                        ADCData(
+                            np.array([
+                                float(s[0])
+                                / grenade_vx_common.Time
+                                .fpga_clock_cycles_per_us.value()
+                                / 1000. for s in grenade_cadc_samples[
+                                    simulator.state.batch_entry][j]]),
+                            np.array(
+                                [s[1] for s in grenade_cadc_samples[
+                                    simulator.state.batch_entry][j]]))})

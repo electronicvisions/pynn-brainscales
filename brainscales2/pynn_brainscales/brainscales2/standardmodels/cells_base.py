@@ -4,9 +4,10 @@ from pyNN.common import Population
 from pyNN.standardmodels import build_translations
 from pyNN.standardmodels import StandardCellType \
     as UpstreamStandardCellType
-import pygrenade_vx.network as grenade
+import pygrenade_common as grenade
+import pygrenade_vx as grenade_vx
 from pynn_brainscales.brainscales2 import plasticity_rules
-from dlens_vx_v3 import lola, halco
+from dlens_vx_v3 import lola
 
 
 class StandardCellType(ABC, UpstreamStandardCellType):
@@ -24,29 +25,51 @@ class StandardCellType(ABC, UpstreamStandardCellType):
 
     @staticmethod
     @abstractmethod
-    def add_to_network_graph(population: Population,
-                             builder: grenade.NetworkBuilder) \
-            -> grenade.PopulationOnNetwork:
+    def generate_vertex(population: Population) \
+            -> grenade.Population:
         """
-        Add population to network builder.
-        :param population: Population to add featuring this cell's celltype.
-        :param builder: Network builder to add population to.
-        :return: Descriptor of added population
+        Generate vertex representation for this population.
+        :param population: Population featuring this cell's celltype
+        :return: Population vertex
         """
         raise NotImplementedError
 
-    @staticmethod
     @abstractmethod
-    def add_to_input_generator(
+    def generate_input_data(
+            self,
             population: Population,
-            builder: grenade.InputGenerator,
-            snippet_begin_time, snippet_end_time):
+            experiment: grenade_vx.network.abstract.frontend
+            .ExperimentSnippet,
+            snippet_begin_time, snippet_end_time) \
+            -> Dict[int, grenade.PortData]:
         """
-        Add external events to input generator.
-        :param population: Population to add featuring this cell's celltype.
-        :param builder: Input builder to add external events to.
+        Generate input data for this population.
+        :param population: Population featuring this cell's celltype
+        :param experiment: Experiment snippet to generate data for
+        :param snippet_begin_time: Begin time of snippet
+        :param snippet_end_time: End time of snippet
+        :return: Population input data
         """
         raise NotImplementedError
+
+    def get_receptor(
+            self, name: str, compartment: grenade.CompartmentOnNeuron)\
+            -> grenade.MultiIndexSequence:  # pylint: disable=unused-argument
+        """
+        Get receptor by name for compartment.
+        :param name: Name of receptor
+        :param compartment: Compartment identifier
+        """
+        receptor = None
+        if name == "excitatory":
+            receptor = grenade.ReceptorOnCompartment(0)
+        elif name == "inhibitory":
+            receptor = grenade.ReceptorOnCompartment(1)
+        else:
+            raise NotImplementedError("Receptor not implemented.")
+        return grenade.CuboidMultiIndexSequence(
+            [1], grenade.MultiIndex([receptor.value()]),
+            [grenade.ReceptorOnCompartmentDimensionUnit()])
 
 
 class NeuronCellType(StandardCellType, plasticity_rules.PlasticityRuleHandle):
@@ -84,23 +107,6 @@ class NeuronCellType(StandardCellType, plasticity_rules.PlasticityRuleHandle):
         plasticity_rules.PlasticityRuleHandle.__init__(
             self, plasticity_rule=plasticity_rule)
         StandardCellType.__init__(self, **parameters)
-
-    @classmethod
-    def to_plasticity_rule_population_handle(cls, population: Population) \
-            -> grenade.PlasticityRule.PopulationHandle:
-        handle = plasticity_rules.PlasticityRuleHandle\
-            .to_plasticity_rule_population_handle(population)
-        readout_source = population.get(
-            "plasticity_rule_readout_source", simplify=False)
-        enable_readout_source = population.get(
-            "plasticity_rule_enable_readout_source", simplify=False)
-        handle.neuron_readout_sources = [
-            {halco.CompartmentOnLogicalNeuron(): [
-                cls.ReadoutSource(int(readout_source[i])) if
-                enable_readout_source[i] else None]}
-            for i in range(len(readout_source))
-        ]
-        return handle
 
 
 class ExternalNeuron(StandardCellType):
