@@ -45,6 +45,9 @@ class Population(pyNN.common.Population):
     all_cells: np.ndarray
     _mask_local: np.ndarray
     changed_since_last_run = True
+    _description_cache = {
+        # hash of describe(…) call arguments -> return value
+    }
 
     def _create_cells(self):
         id_range = np.arange(self._simulator.state.id_counter,
@@ -93,6 +96,7 @@ class Population(pyNN.common.Population):
     def _set_parameters(self, parameter_space):
         """parameter_space should contain native parameters"""
         self.changed_since_last_run = True
+        self._description_cache.clear()
         parameter_space.evaluate(simplify=False)
         for name, value in parameter_space.items():
             # Since pyNN 0.12.0 a LazyArray is generated when we assign
@@ -126,6 +130,18 @@ class Population(pyNN.common.Population):
 
     def _get_view(self, selector, label=None):
         return PopulationView(self, selector, label)
+
+    def describe(self, *args, **kwargs):
+        # We have a lot of parameters -> super().describe(…) is slow, but may
+        # be called often.
+        call_args = args + tuple(sorted(kwargs.items()))
+        argument_hash = hash(call_args)
+
+        if argument_hash not in self._description_cache:
+            self._description_cache[argument_hash] = \
+                super().describe(*args, **kwargs)
+
+        return self._description_cache[argument_hash]
 
     def get_plasticity_data(self, observable: str):
         """

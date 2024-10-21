@@ -227,6 +227,21 @@ class TestAPopulation(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.hxpop1.record('v', device='pad_0_un_buffered')
 
+    def test_description_cache(self):
+        pop = pynn.Population(1, pynn.cells.HXNeuron())
+
+        result_a = pop.describe()
+        result_b = pop.describe()  # cache hit
+        self.assertEqual(result_a, result_b)
+
+        pop.set(leak_i_bias=pop.get("leak_i_bias") + 10)
+        result_c = pop.describe()  # cache miss
+        self.assertNotEqual(result_a, result_c)
+
+        with self.assertRaisesRegex(KeyError, r".*doesnotexist.*"):
+            # different call parameters, must not hit
+            pop.describe(engine="doesnotexist")
+
 
 class TestLolaNeuronConstruction(unittest.TestCase):
 
