@@ -234,7 +234,7 @@ class TestAPopulation(unittest.TestCase):
         result_b = pop.describe()  # cache hit
         self.assertEqual(result_a, result_b)
 
-        pop.set(leak_i_bias=pop.get("leak_i_bias") + 10)
+        pop.label = "abc"
         result_c = pop.describe()  # cache miss
         self.assertNotEqual(result_a, result_c)
 

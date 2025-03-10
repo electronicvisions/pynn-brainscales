@@ -112,6 +112,7 @@ class Population(pyNN.common.Population):
         # A plasticity rule can be applied to multiple populations
         # and then serve handles to all in the kernel code, for which
         # registration here is required.
+        self._description_cache.clear()
         if name == "celltype":
             if hasattr(self, name):
                 if isinstance(self.celltype, PlasticityRuleHandle) \
