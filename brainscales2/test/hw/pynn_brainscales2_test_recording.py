@@ -305,7 +305,7 @@ class TestMembraneRecording(unittest.TestCase):
 
         # check that recorded traces are not identical
         data = pop.get_data().segments[-1].irregularlysampledsignals
-        self.assertFalse(np.all(data[0].magnitude == data[1].magnitude))
+        self.assertFalse(np.array_equal(data[0].magnitude, data[1].magnitude))
 
     def test_resetting(self):
         """
