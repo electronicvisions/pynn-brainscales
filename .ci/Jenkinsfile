@@ -41,7 +41,7 @@ try {
 	conditionalStage(name: "Module Deployment", skip: !deploy) {
 		runOnSlave(label: "frontend") {
 			inSingularity(app: "dls") {
-				deployModule([name: "pynn-brainscales", source: "bin/ lib/ lib64/ include/ share/ repos_log.txt"])
+				deployModule([name: "pynn-brainscales", source: "bin/ lib/ include/ share/ repos_log.txt"])
 			}
 		}
 	}
