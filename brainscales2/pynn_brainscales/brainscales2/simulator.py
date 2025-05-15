@@ -364,7 +364,7 @@ class State(BaseState):
 
     def _get_v(self,
                network_graph: grenade.network.NetworkGraph,
-               outputs: grenade.signal_flow.OutputData,
+               outputs: grenade.signal_flow.OutputDataSnippet,
                recording: Recording
                # Note: Any should be recording.MADCRecordingSite. We do not
                # annotate the correct type due to cyclic imports.
@@ -397,7 +397,7 @@ class State(BaseState):
     def _get_synaptic_observables(
             self,
             network_graph: grenade.network.NetworkGraph,
-            outputs: grenade.signal_flow.OutputData
+            outputs: grenade.signal_flow.OutputDataSnippet
     ) -> List[Dict[str, np.ndarray]]:
         """
         Get synaptic observables.
@@ -421,7 +421,8 @@ class State(BaseState):
     def _get_neuronal_observables(
             self,
             network_graph: grenade.network.NetworkGraph,
-            outputs: grenade.signal_flow.OutputData) -> Dict[str, np.ndarray]:
+            outputs: grenade.signal_flow.OutputDataSnippet)\
+            -> Dict[str, np.ndarray]:
         """
         Get neuronal observables.
         :param network_graph: Network graph to use for lookup of
@@ -444,7 +445,7 @@ class State(BaseState):
     def _get_array_observables(
             self,
             network_graph: grenade.network.NetworkGraph,
-            outputs: grenade.signal_flow.OutputData) \
+            outputs: grenade.signal_flow.OutputDataSnippet) \
             -> List[Dict[str, np.ndarray]]:
         """
         Get general array observables.
@@ -583,7 +584,7 @@ class State(BaseState):
     def _generate_inputs(
             self, network_graph: grenade.network.NetworkGraph,
             snippet_begin_time, snippet_end_time) \
-            -> grenade.signal_flow.InputData:
+            -> grenade.signal_flow.InputDataSnippet:
         """
         Generate external input events from the routed network graph
         representation.
@@ -592,7 +593,7 @@ class State(BaseState):
                 network_graph.graph_translation.execution_instances[
                 grenade.common.ExecutionInstanceID()].event_input_vertex\
                 is None:
-            return grenade.signal_flow.InputData()
+            return grenade.signal_flow.InputDataSnippet()
         input_generator = grenade.network.InputGenerator(
             network_graph)
         for population in self.populations:
@@ -863,10 +864,13 @@ class State(BaseState):
         self.log.DEBUG("run(): Preparations finished in "
                        f"{(time_after_preparations - time_begin):.3f}s")
 
+        inputs = grenade.signal_flow.InputData()
+        inputs.snippets = self.inputs
+
         outputs = grenade.network.run(
             self.conn, self.network_graphs, self.configs,
-            self.inputs, {grenade.common.ExecutionInstanceID():
-                          self._generate_hooks()})
+            inputs, {grenade.common.ExecutionInstanceID():
+                     self._generate_hooks()})
 
         self.log.DEBUG("run(): Execution finished in "
                        f"{(time.time() - time_after_preparations):.3f}s")
@@ -874,35 +878,37 @@ class State(BaseState):
 
         for i in range(self.realtime_snippet_count):
             spikes = grenade.network.\
-                extract_neuron_spikes(outputs[i], self.network_graphs[i])
+                extract_neuron_spikes(
+                    outputs.snippets[i], self.network_graphs[i])
             self.recordings[i].data.spikes = spikes[0] if spikes else {}
 
             self.recordings[i].data.madc = self._get_v(
-                self.network_graphs[i], outputs[i], self.recordings[i])
+                self.network_graphs[i], outputs.snippets[i],
+                self.recordings[i])
 
             self.synaptic_observables.append(self._get_synaptic_observables(
-                self.network_graphs[i], outputs[i]))
+                self.network_graphs[i], outputs.snippets[i]))
             self.array_observables.append(self._get_array_observables(
-                self.network_graphs[i], outputs[i]))
+                self.network_graphs[i], outputs.snippets[i]))
 
             self.neuronal_observables.append(self._get_neuronal_observables(
-                self.network_graphs[i], outputs[i]))
+                self.network_graphs[i], outputs.snippets[i]))
 
         self.pre_realtime_read = self._get_pre_realtime_read()
         self.post_realtime_read = self._get_post_realtime_read()
-        if outputs[0].read_ppu_symbols and outputs[0].read_ppu_symbols[0]:
-            self.ppu_symbols_read = outputs[0].read_ppu_symbols[0][
+        if outputs.read_ppu_symbols and outputs.read_ppu_symbols[0]:
+            self.ppu_symbols_read = outputs.read_ppu_symbols[0][
                 grenade.common.ExecutionInstanceID()]
         else:
             self.ppu_symbols_read = {}
 
-        self.execution_time_info = outputs[0].execution_time_info
+        self.execution_time_info = outputs.execution_time_info
         assert self.execution_time_info is not None
         # We return the first entry, since they are all equal since
         # they are measured for the full runtime and not the individual
         # snippets. Grenade should introduce a global field instead of
         # having only fields for the individual snippet results.
-        self.execution_health_info = outputs[0].execution_health_info
+        self.execution_health_info = outputs.execution_health_info
         assert self.execution_health_info is not None
 
         self.log.DEBUG("run(): Postprocessing finished in "
