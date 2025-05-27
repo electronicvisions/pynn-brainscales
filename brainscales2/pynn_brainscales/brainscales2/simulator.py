@@ -631,9 +631,9 @@ class State(BaseState):
         post_realtime.copy_back(
             self.injection_post_realtime)
         self._prepare_post_realtime_read(post_realtime)
-        return grenade.signal_flow.ExecutionInstanceHooks(
+        return grenade.execution.ExecutionInstanceHooks(
             grenade.common.ChipOnConnection(),
-            grenade.signal_flow.ExecutionInstanceHooks.Chip(
+            grenade.execution.ExecutionInstanceHooks.Chip(
                 pre_static_config, pre_realtime,
                 inside_realtime_begin, inside_realtime,
                 inside_realtime_end, post_realtime,
