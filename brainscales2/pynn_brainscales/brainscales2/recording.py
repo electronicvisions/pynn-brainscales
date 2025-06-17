@@ -225,7 +225,7 @@ class Recorder(pyNN.recording.Recorder):
                                            "BSS-2 and should not be reached.")
 
                         assert isinstance(data, tuple)
-                        id_array, times = data
+                        id_array, times = data  # pylint: disable=unbalanced-dict-unpacking
                         times *= pq.ms
                         if times.size > 0 and times.max() > t_stop:
                             warn("Recorded at least one spike after t_stop")

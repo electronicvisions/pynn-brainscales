@@ -97,7 +97,7 @@ class TestSpikeSources(unittest.TestCase):
         )
 
         # SpikeSourcePoisson
-        poisson_properties = dict(rate=1e4, start=0, duration=10)
+        poisson_properties = {"rate": 1e4, "start": 0, "duration": 10}
         self.pops_in['poisson1'] = pynn.Population(
             1,
             pynn.cells.SpikeSourcePoisson(**poisson_properties)

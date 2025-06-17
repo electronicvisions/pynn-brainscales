@@ -10,11 +10,11 @@ from pynn_brainscales.brainscales2.standardmodels.synapses import StaticSynapse
 class TestPoissonInput(unittest.TestCase):
 
     def setUp(self):
-        self.bg_props = dict(
-            start=1,  # ms
-            rate=20e3,  # Hz
-            duration=100  # ms
-        )
+        self.bg_props = {
+            "start": 1,  # ms
+            "rate": 20e3,  # Hz
+            "duration": 100  # ms
+        }
         # Emulate the network 1ms longer than Poisson stimulation, in order to
         # convince oneself that the stimulation ends properly.
         self.runtime = self.bg_props["start"] + self.bg_props["duration"] + 1

@@ -934,9 +934,9 @@ class SpikeSourcePoisson(StandardCellType, cells.SpikeSourcePoisson):
             # Get number of neurons in population from 'start' parameter
             pop_size = self.parameter_space["start"].shape[0]
 
-            self._used_parameters = dict(start=np.zeros(pop_size),
-                                         rate=np.zeros(pop_size),
-                                         duration=np.zeros(pop_size))
+            self._used_parameters = {"start": np.zeros(pop_size),
+                                     "rate": np.zeros(pop_size),
+                                     "duration": np.zeros(pop_size)}
             self._spike_times = [np.array([])] * pop_size
 
         # Recalculate spike times for which at least one parameter changed

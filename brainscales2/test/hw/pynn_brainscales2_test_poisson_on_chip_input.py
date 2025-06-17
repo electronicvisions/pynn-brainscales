@@ -12,10 +12,8 @@ class TestPoissonOnChipInput(unittest.TestCase):
     def setUp(self):
         self.runtime = 100
 
-        self.bg_props = dict(
-            rate=20e3,  # Hz
-            seed=1234
-        )
+        self.bg_props = {"rate": 20e3,  # Hz
+                         "seed": 1234}
         # The refractory time was found to must be set slightly larger 0 (DAC
         # value) to achieve a short time on hardware (cf. #3741).
         neuron_params = {"refractory_period_refractory_time": 5}

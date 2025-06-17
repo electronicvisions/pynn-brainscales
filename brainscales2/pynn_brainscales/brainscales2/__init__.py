@@ -191,8 +191,7 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
     simulator.state.injected_readout = \
         extra_params.pop('injected_readout', InjectedReadout())
     simulator.state.conn = extra_params.pop('connection', None)
-    simulator.state.conn_comes_from_outside = \
-        (simulator.state.conn is not None)
+    simulator.state.conn_comes_from_outside = simulator.state.conn is not None
     initial_config = extra_params.pop('initial_config', None)
     enable_neuron_bypass = extra_params.pop('enable_neuron_bypass', False)
     if enable_neuron_bypass:
