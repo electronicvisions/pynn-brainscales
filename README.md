@@ -59,7 +59,7 @@ c ./waf install
 export SINGULARITYENV_PREPEND_PATH=`pwd`/bin:$SINGULARITYENV_PREPEND_PATH
 export SINGULARITYENV_LD_LIBRARY_PATH=`pwd`/lib:$SINGULARITYENV_LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=`pwd`/lib:$LD_LIBRARY_PATH
-export PYTHONPATH=`pwd`/lib/python3.10/site-packages:$PYTHONPATH
+export PYTHONPATH=`pwd`/lib/python3.11/site-packages:$PYTHONPATH
 export PATH=`pwd`/bin:$PATH
 
 # 9) You can now run any program, e.g. plain unit tests
