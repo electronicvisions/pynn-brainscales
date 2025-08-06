@@ -13,7 +13,7 @@ from pynn_brainscales.brainscales2.helper import get_values_of_atomic_neuron, \
     decompose_in_member_names
 from pynn_brainscales.brainscales2.standardmodels.cells_base import \
     StandardCellType, NeuronCellType
-from dlens_vx_v3 import lola, hal, halco, sta
+from dlens_vx_v3 import lola, hal, halco, sta, hxcomm
 import pygrenade_vx.network as grenade
 from quantities.quantity import Quantity
 
@@ -875,12 +875,12 @@ class SpikeSourcePoissonOnChip(StandardCellType):
 
 # pylint: disable=no-member,unsubscriptable-object
 SpikeSourcePoissonOnChip.background_source_clock_freq = \
-    sta.ChipInit() \
-    .adplls[sta.ChipInit().pll_clock_output_block
+    sta.ChipInit(hxcomm.ZeroMockEntry()) \
+    .adplls[sta.ChipInit(hxcomm.ZeroMockEntry()).pll_clock_output_block
             .get_clock_output(
                 halco.PLLClockOutputOnDLS.phy_ref_clk).select_adpll] \
     .calculate_output_frequency(
-        sta.ChipInit().pll_clock_output_block
+        sta.ChipInit(hxcomm.ZeroMockEntry()).pll_clock_output_block
         .get_clock_output(halco.PLLClockOutputOnDLS.phy_ref_clk)
         .select_adpll_output) / 2.  # spl1_clk
 # pylint: enable=no-member,unsubscriptable-object
