@@ -632,11 +632,13 @@ class State(BaseState):
             self.injection_post_realtime)
         self._prepare_post_realtime_read(post_realtime)
         return grenade.signal_flow.ExecutionInstanceHooks(
-            pre_static_config, pre_realtime,
-            inside_realtime_begin, inside_realtime,
-            inside_realtime_end, post_realtime,
-            self.injected_config.ppu_symbols,
-            self.injected_readout.ppu_symbols)
+            grenade.common.ChipOnConnection(),
+            grenade.signal_flow.ExecutionInstanceHooks.Chip(
+                pre_static_config, pre_realtime,
+                inside_realtime_begin, inside_realtime,
+                inside_realtime_end, post_realtime,
+                self.injected_config.ppu_symbols,
+                self.injected_readout.ppu_symbols))
 
     def _prepare_pre_realtime_read(self, builder: sta.PlaybackProgramBuilder):
         """
@@ -828,7 +830,8 @@ class State(BaseState):
 
         self.configs.append({grenade.common.
                             ExecutionInstanceID():
-                            lola.Chip(self.grenade_chip_config)})
+                            {grenade.common.ChipOnConnection():
+                             lola.Chip(self.grenade_chip_config)}})
         self.network_graphs.append(grenade.network.NetworkGraph(
             self.grenade_network_graph))
         self.inputs.append(inputs)

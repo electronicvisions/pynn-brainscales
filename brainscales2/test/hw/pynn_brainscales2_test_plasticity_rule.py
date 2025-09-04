@@ -6,6 +6,7 @@ from pynn_brainscales.brainscales2.examples.plasticity_rule import main, \
     cell_params
 import pynn_brainscales.brainscales2 as pynn
 from dlens_vx_v3 import hal, halco
+import pygrenade_vx as grenade
 
 
 class TestPlasticityRule(unittest.TestCase):
@@ -69,7 +70,8 @@ class TestPlasticityRule(unittest.TestCase):
 
         pynn.run(10)
 
-        actual = pynn.get_post_realtime_read_ppu_symbols()
+        actual = pynn.get_post_realtime_read_ppu_symbols()[
+            grenade.common.ChipOnConnection()]
         self.assertEqual(actual, injected_config.ppu_symbols)
 
         pynn.end()
