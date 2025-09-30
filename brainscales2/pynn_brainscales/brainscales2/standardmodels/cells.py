@@ -1054,3 +1054,99 @@ class SpikeSourceArray(StandardCellType, cells.SpikeSourceArray):
         descriptor = grenade.PopulationOnNetwork(
             simulator.state.populations.index(population))
         builder.add(filtered_spiketimes, descriptor)
+
+
+class SpikeIOCell(StandardCellType):
+    """
+    Base class for OffChipSource and in the future OffChipSink
+    """
+
+    default_parameters = {
+        "enable_internal_loopback": True,
+        "data_rate_scaler": 1,
+        "label": None,
+    }
+    recordable: Final[List[str]] = ["spikes"]
+
+    def can_record(self, variable: str, location=None) -> bool:
+        del location
+        return variable in self.recordable
+
+    def __init__(
+            self,
+            *,
+            enable_internal_loopback: bool = True,
+            data_rate_scaler: int = 1,
+            label: List[int] = None,
+    ):
+        if label is None or len(label) == 0:
+            raise ValueError("OffChipSource: label must be provided "
+                             "(one per neuron).")
+        super().__init__(
+            enable_internal_loopback=enable_internal_loopback,
+            data_rate_scaler=data_rate_scaler,
+            label=label,
+        )
+
+    @staticmethod
+    def add_to_input_generator(*args, **kwargs):
+        pass
+
+
+class OffChipSource(SpikeIOCell):
+    """
+    SpikeIO Input (RX) population
+    """
+    @staticmethod
+    def add_to_network_graph(
+            population: Population, builder: grenade.NetworkBuilder
+    ) -> grenade.PopulationOnNetwork:
+
+        param_space = population.celltype.parameter_space
+
+        for k in ("enable_internal_loopback", "data_rate_scaler"):
+            values = np.asarray(param_space[k])
+            if not np.all(values == values[0]):
+                raise ValueError(
+                    f"OffChipSource parameter '{k}' must be uniform across the"
+                    f"population, but got values {values!r}."
+                )
+        enable_internal_loopback = (
+            bool(param_space["enable_internal_loopback"][0]))
+        data_rate_scaler = int(param_space["data_rate_scaler"][0])
+
+        label = param_space["label"]
+        if label is None or len(label) == 0:
+            raise ValueError("OffChipSource: label must be provided (one per "
+                             "neuron).")
+        # left out of uniformity check since now ids are nonuniform
+        if len(label) != len(population.all_cells):
+            raise ValueError("Internal PyNN Error: Parameter space size "
+                             "mismatch")
+        # check for double ids
+        label_list = [int(x) for x in label]
+        if len(label_list) != len(set(label_list)):
+            raise ValueError("OffChipSource: label must be unique"
+                             " within the population.")
+
+        pop_cells_int = np.asarray(population.all_cells, dtype=int)
+
+        enable_record_spikes = np.zeros((len(pop_cells_int)), dtype=bool)
+        if "spikes" in population.recorder.recorded:
+            recording_ids = [neuron_comp[0]
+                             for neuron_comp in population.recorder.
+                             recorded["spikes"]]
+            enable_record_spikes = np.isin(pop_cells_int, recording_ids)
+
+        config = grenade.SpikeIOSourcePopulation.Config()
+        config.enable_internal_loopback = enable_internal_loopback
+        config.data_rate_scaler = data_rate_scaler
+        # assigns per neuron sensor ids
+        grenade_neurons = [
+            grenade.SpikeIOSourcePopulation.Neuron(label_list[i],
+                                                   enable_record_spikes[i])
+            for i in range(len(pop_cells_int))
+        ]
+
+        gpopulation = grenade.SpikeIOSourcePopulation(grenade_neurons, config)
+        return builder.add(gpopulation)
