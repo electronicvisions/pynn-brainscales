@@ -6,7 +6,7 @@ from dlens_vx_v3 import halco, lola
 import pynn_brainscales.brainscales2 as pynn
 from pynn_brainscales import errors, parameters
 from pynn_brainscales.brainscales2.morphology import create_mc_neuron, \
-    Compartment, SharedLineConnection
+    PlacedCompartment, SharedLineConnection
 
 
 # To be added: PopulationView Test
@@ -17,10 +17,10 @@ class TestAPopulation(unittest.TestCase):
 
     @staticmethod
     def _define_mc_neuron_class():
-        comp_0 = Compartment(positions=[0], label='label0',
-                             connect_shared_line=[0])
-        comp_1 = Compartment(positions=[1], label='label1',
-                             connect_conductance=[(1, 200)])
+        comp_0 = PlacedCompartment(positions=[0], label='label0',
+                                   connect_shared_line=[0])
+        comp_1 = PlacedCompartment(positions=[1], label='label1',
+                                   connect_conductance=[(1, 200)])
         return create_mc_neuron(
             'McNeuron',
             compartments=[comp_0, comp_1],

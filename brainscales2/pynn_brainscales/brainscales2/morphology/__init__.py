@@ -4,27 +4,32 @@ import numpy as np
 
 from dlens_vx_v3 import lola, halco
 
-from pynn_brainscales.brainscales2.morphology.parts import Compartment, \
+from pynn_brainscales.brainscales2.morphology.parts import PlacedCompartment, \
     SharedLineConnection
 from pynn_brainscales.brainscales2.morphology.mc_neuron_base import \
-    McNeuronBase
+    McNeuronManualBase
 from pynn_brainscales.brainscales2.morphology.parameters import \
     McCircuitParameters
 
 
 def create_mc_neuron(name: str,
-                     compartments: List[Compartment],
+                     compartments: List[PlacedCompartment],
                      connections: Optional[List[SharedLineConnection]] = None,
                      single_active_circuit: bool = False
-                     ) -> McNeuronBase:
+                     ) -> McNeuronManualBase:
     '''
-    Create a multicompartment neuron class.
+    Create a multi-compartment neuron class from manually placed compartments.
+
+    This methods uses manually placed compartments, checks that the
+    configuration is valid and generates a neuron class.
+    Furthermore, the connection between the different neuron circuits has
+    to be defined manually.
 
     :param name: Name of the newly created class.
-    :param compartments: Compartments of the multicompartment neuron.
+    :param compartments: Compartments of the multi-compartment neuron.
     :param connections: Specifies where the shared line is connected.
     :param single_active_circuit: Disable leak, capacitance and threshold for
-        all but the first circuit in each comaprtment.
+        all but the first circuit in each compartment.
 
     :return: Class for a multi-compartmental neuron model with the given
         compartments and connections.
@@ -39,7 +44,7 @@ def create_mc_neuron(name: str,
 
     logical_compartments, logical_neuron = morphology.done()
     neuron_class = type(name,
-                        (McNeuronBase,),
+                        (McNeuronManualBase,),
                         {"logical_neuron": logical_neuron,
                          "logical_compartments": logical_compartments,
                          "compartments": comp_dict,
@@ -48,7 +53,7 @@ def create_mc_neuron(name: str,
 
 
 def _add_compartments(morphology: lola.Morphology,
-                      compartments: List[Compartment]
+                      compartments: List[PlacedCompartment]
                       ) -> List[halco.CompartmentOnLogicalNeuron]:
     '''
     Add compartments to the given morphology.

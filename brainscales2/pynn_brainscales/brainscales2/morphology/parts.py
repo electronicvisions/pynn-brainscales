@@ -8,9 +8,12 @@ SharedLineConnection = namedtuple("SharedLineConnection",
                                   ["start", "stop", "row"])
 
 
-class Compartment:
+class PlacedCompartment:
     '''
     A single iso-potential compartment of a multi-compartmental neuron model.
+
+    The neuron circuits representing this compartment have to be placed
+    manually.
     '''
     def __init__(self, *,
                  positions: List[int],

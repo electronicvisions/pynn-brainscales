@@ -92,7 +92,7 @@ class CommonBase(StandardCellType, ABC):
         '''
 
 
-class McNeuronBase(CommonBase):
+class McNeuronManualBase(CommonBase):
     '''
     Base class for manually constructed multi-compartmental neuron models.
 
@@ -101,7 +101,7 @@ class McNeuronBase(CommonBase):
     hardware domain (and are not calibrated).
 
     A subclass is expected to set the following member variables:
-        - compartments: Dictionary of Compartment Ids and Compartments.
+        - compartments: Dictionary of Compartment Ids and PlacedCompartments.
         - logical_neuron: Configuration of the neuron in form of a logical
                           neuron.
         - logical_compartments: Shape of the morphology.
@@ -577,4 +577,4 @@ class McNeuronBase(CommonBase):
             self.parameter_space.update(**{name: new_values})
 
 
-McNeuronBase.translations = McNeuronBase._create_translation()  # pylint: disable=protected-access
+McNeuronManualBase.translations = McNeuronManualBase._create_translation()  # pylint: disable=protected-access

@@ -9,7 +9,7 @@ import neo
 import pynn_brainscales.brainscales2 as pynn
 from pynn_brainscales.brainscales2.standardmodels.synapses import StaticSynapse
 from pynn_brainscales.brainscales2.morphology import create_mc_neuron, \
-    Compartment, SharedLineConnection, McNeuronBase
+    PlacedCompartment, SharedLineConnection, McNeuronManualBase
 from pynn_brainscales.brainscales2.examples.multicompartment import main
 
 
@@ -52,7 +52,7 @@ class TestRecordingAndProjections(unittest.TestCase):
         return psp_heights
 
     @staticmethod
-    def create_chain() -> Tuple[McNeuronBase, List[str]]:
+    def create_chain() -> Tuple[McNeuronManualBase, List[str]]:
         """
         Create a neuron class which represents a chain with
         three compartments.
@@ -61,13 +61,13 @@ class TestRecordingAndProjections(unittest.TestCase):
         """
         labels = [f'comp_{i}' for i in range(3)]
         comps = []
-        comps.append(Compartment(positions=[0], label=labels[0],
-                                 connect_shared_line=[0]))
-        comps.append(Compartment(positions=[1, 2], label=labels[1],
-                                 connect_conductance=[(1, 1000)],
-                                 connect_shared_line=[2]))
-        comps.append(Compartment(positions=[3, 4], label=labels[2],
-                                 connect_conductance=[(3, 1000)]))
+        comps.append(PlacedCompartment(positions=[0], label=labels[0],
+                                       connect_shared_line=[0]))
+        comps.append(PlacedCompartment(positions=[1, 2], label=labels[1],
+                                       connect_conductance=[(1, 1000)],
+                                       connect_shared_line=[2]))
+        comps.append(PlacedCompartment(positions=[3, 4], label=labels[2],
+                                       connect_conductance=[(3, 1000)]))
 
         connections = [SharedLineConnection(start=0, stop=1, row=0),
                        SharedLineConnection(start=2, stop=3, row=0)]

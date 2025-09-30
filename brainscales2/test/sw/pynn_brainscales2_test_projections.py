@@ -4,7 +4,7 @@ import unittest
 import pynn_brainscales.brainscales2 as pynn
 
 from pynn_brainscales.brainscales2.morphology import create_mc_neuron, \
-    Compartment, SharedLineConnection
+    PlacedCompartment, SharedLineConnection
 from dlens_vx_v3 import halco
 
 
@@ -14,10 +14,10 @@ from dlens_vx_v3 import halco
 class TestProjection(unittest.TestCase):
     @staticmethod
     def _define_mc_neuron_class():
-        comp_0 = Compartment(positions=[0], label='label0',
-                             connect_shared_line=[0])
-        comp_1 = Compartment(positions=[1], label='label1',
-                             connect_conductance=[(1, 200)])
+        comp_0 = PlacedCompartment(positions=[0], label='label0',
+                                   connect_shared_line=[0])
+        comp_1 = PlacedCompartment(positions=[1], label='label1',
+                                   connect_conductance=[(1, 200)])
         return create_mc_neuron(
             'McNeuron', compartments=[comp_0, comp_1],
             connections=[SharedLineConnection(start=0, stop=1, row=0)])

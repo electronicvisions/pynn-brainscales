@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 import pynn_brainscales.brainscales2 as pynn
 from pynn_brainscales.brainscales2.morphology import create_mc_neuron, \
-    Compartment, SharedLineConnection
+    PlacedCompartment, SharedLineConnection
 
 
 def create_neuron_class(length: int):
@@ -37,10 +37,10 @@ def create_neuron_class(length: int):
                                      stop=second + 1,
                                      row=0))
         compartments.append(
-            Compartment(positions=[first, second],
-                        label=f'comp{n_comp}',
-                        connect_shared_line=connect_shared_line,
-                        connect_conductance=connect_conductance))
+            PlacedCompartment(positions=[first, second],
+                              label=f'comp{n_comp}',
+                              connect_shared_line=connect_shared_line,
+                              connect_conductance=connect_conductance))
 
     return create_mc_neuron('McNeuron',
                             compartments=compartments,

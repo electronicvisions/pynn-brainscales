@@ -5,7 +5,7 @@ import copy
 import numpy as np
 import pynn_brainscales.brainscales2 as pynn
 from pynn_brainscales.brainscales2.morphology import create_mc_neuron, \
-    McCircuitParameters, Compartment, SharedLineConnection
+    McCircuitParameters, PlacedCompartment, SharedLineConnection
 
 from dlens_vx_v3 import halco, lola
 
@@ -16,25 +16,26 @@ class TestCompartment(unittest.TestCase):
         label = 'my_label'
 
         # only positional arguments
-        comp = Compartment(positions=positions, label=label)
+        comp = PlacedCompartment(positions=positions, label=label)
         self.assertEqual(comp.positions, positions)
         self.assertEqual(comp.label, label)
         self.assertEqual(len(comp.connect_shared_line), 0)
         self.assertEqual(len(comp.connect_conductance), 0)
 
         # connect shared_line
-        comp = Compartment(positions=positions, label=label,
-                           connect_shared_line=positions[:1])
+        comp = PlacedCompartment(positions=positions, label=label,
+                                 connect_shared_line=positions[:1])
         self.assertEqual(len(comp.connect_shared_line), 1)
 
         # connect connect_conductance
-        comp = Compartment(positions=positions, label=label,
-                           connect_conductance=[(positions[1], 200)])
+        comp = PlacedCompartment(positions=positions, label=label,
+                                 connect_conductance=[(positions[1], 200)])
         self.assertEqual(len(comp.connect_conductance), 1)
 
         # parameters (only test construction)
-        comp = Compartment(positions=positions, label=label, some_parameter=0,
-                           some_other_param=[200, 300])
+        comp = PlacedCompartment(positions=positions, label=label,
+                                 some_parameter=0,
+                                 some_other_param=[200, 300])
 
     def test_incorrect_init(self):
         positions = [0, 1]
@@ -42,82 +43,83 @@ class TestCompartment(unittest.TestCase):
 
         # positions non-unique
         with self.assertRaises(TypeError):
-            Compartment(positions=positions + positions, label=label)
+            PlacedCompartment(positions=positions + positions, label=label)
 
         # connect_shared_line
         with self.assertRaises(TypeError):
             # non-iterable
-            Compartment(positions=positions,
-                        label=label,
-                        connect_shared_line=0)
+            PlacedCompartment(positions=positions,
+                              label=label,
+                              connect_shared_line=0)
 
         with self.assertRaises(TypeError):
             # non-unique
-            Compartment(positions=positions,
-                        label=label,
-                        connect_shared_line=[positions[:1] + positions[:1]])
+            PlacedCompartment(
+                positions=positions,
+                label=label,
+                connect_shared_line=[positions[:1] + positions[:1]])
 
         with self.assertRaises(TypeError):
             # positon not in positions
-            Compartment(positions=positions,
-                        label=label,
-                        connect_shared_line=[positions[-1] + 1])
+            PlacedCompartment(positions=positions,
+                              label=label,
+                              connect_shared_line=[positions[-1] + 1])
 
         # connect_conductance
         with self.assertRaises(TypeError):
             # non-iterable
-            Compartment(positions=positions,
-                        label=label,
-                        connect_conductance=0)
+            PlacedCompartment(positions=positions,
+                              label=label,
+                              connect_conductance=0)
 
         with self.assertRaises(TypeError):
             # non-unique positions
-            Compartment(positions=positions,
-                        label=label,
-                        connect_conductance=[(positions[1], 100),
-                                             (positions[1], 200)])
+            PlacedCompartment(positions=positions,
+                              label=label,
+                              connect_conductance=[(positions[1], 100),
+                                                   (positions[1], 200)])
 
         with self.assertRaises(TypeError):
             # positon not in positions
-            Compartment(positions=positions,
-                        label=label,
-                        connect_conductance=[(positions[-1] + 1, 100)])
+            PlacedCompartment(positions=positions,
+                              label=label,
+                              connect_conductance=[(positions[-1] + 1, 100)])
 
         with self.assertRaises(TypeError):
             # wrong shape (not list of tuples)
-            Compartment(positions=positions,
-                        label=label,
-                        connect_conductance=(positions[:1], 100))
+            PlacedCompartment(positions=positions,
+                              label=label,
+                              connect_conductance=(positions[:1], 100))
 
         with self.assertRaises(TypeError):
             # wrong shape (tuples with wrong size)
-            Compartment(positions=positions,
-                        label=label,
-                        connect_conductance=(positions[:1], 100, 10))
+            PlacedCompartment(positions=positions,
+                              label=label,
+                              connect_conductance=(positions[:1], 100, 10))
 
 
 class TestNeuronClass(unittest.TestCase):
     def test_correct_creation(self):
         # single compartment
-        comp_0 = Compartment(positions=[0], label='label0')
+        comp_0 = PlacedCompartment(positions=[0], label='label0')
         neuron_class = create_mc_neuron('McNeuron', compartments=[comp_0])
         self.assertEqual(len(neuron_class.compartments), 1)
 
         # multiple compartments
-        comp_0 = Compartment(positions=[0], label='label0',
-                             connect_shared_line=[0])
-        comp_1 = Compartment(positions=[1], label='label1',
-                             connect_conductance=[(1, 200)])
+        comp_0 = PlacedCompartment(positions=[0], label='label0',
+                                   connect_shared_line=[0])
+        comp_1 = PlacedCompartment(positions=[1], label='label1',
+                                   connect_conductance=[(1, 200)])
         neuron_class = create_mc_neuron(
             'McNeuron', compartments=[comp_0, comp_1],
             connections=[SharedLineConnection(start=0, stop=1, row=0)])
         self.assertEqual(len(neuron_class.compartments), 2)
 
     def test_incorrect_creation(self):
-        comp_0 = Compartment(positions=[0], label='label0',
-                             connect_shared_line=[0])
-        comp_1 = Compartment(positions=[1], label='label1',
-                             connect_conductance=[(1, 200)])
+        comp_0 = PlacedCompartment(positions=[0], label='label0',
+                                   connect_shared_line=[0])
+        comp_1 = PlacedCompartment(positions=[1], label='label1',
+                                   connect_conductance=[(1, 200)])
         connection = SharedLineConnection(start=0, stop=1, row=0)
 
         # Make sure base configuration works:
@@ -164,12 +166,12 @@ class TestNeuronClass(unittest.TestCase):
                              connections=[connection])
 
     def test_retrival_of_labels(self):
-        comp_0 = Compartment(positions=[0], label='my_label',
-                             connect_shared_line=[0])
-        comp_1 = Compartment(positions=[1], label='my_label',
-                             connect_conductance=[(1, 200)])
-        comp_2 = Compartment(positions=[2], label='my_other_label',
-                             connect_conductance=[(2, 200)])
+        comp_0 = PlacedCompartment(positions=[0], label='my_label',
+                                   connect_shared_line=[0])
+        comp_1 = PlacedCompartment(positions=[1], label='my_label',
+                                   connect_conductance=[(1, 200)])
+        comp_2 = PlacedCompartment(positions=[2], label='my_other_label',
+                                   connect_conductance=[(2, 200)])
         connections = [SharedLineConnection(start=0, stop=2, row=0)]
         neuron_class = create_mc_neuron(
             'McNeuron', compartments=[comp_0, comp_1, comp_2],
@@ -202,19 +204,19 @@ class TestPopulation(unittest.TestCase):
         '''
         v_leak = [[1], [2, 3], [4, 4]]
         v_threshold = [[1], [2, 3], [4, 4]]
-        comp_0 = Compartment(positions=[0], label='my_label',
-                             connect_shared_line=[0],
-                             leak_v_leak=v_leak[0],
-                             threshold_v_threshold=v_threshold[0])
-        comp_1 = Compartment(positions=[1, 2], label='my_label',
-                             connect_conductance=[(1, 200)],
-                             leak_v_leak=v_leak[1],
-                             threshold_v_threshold=v_threshold[1])
+        comp_0 = PlacedCompartment(positions=[0], label='my_label',
+                                   connect_shared_line=[0],
+                                   leak_v_leak=v_leak[0],
+                                   threshold_v_threshold=v_threshold[0])
+        comp_1 = PlacedCompartment(positions=[1, 2], label='my_label',
+                                   connect_conductance=[(1, 200)],
+                                   leak_v_leak=v_leak[1],
+                                   threshold_v_threshold=v_threshold[1])
         # assign scalar values
-        comp_2 = Compartment(positions=[3, 4], label='my_label',
-                             connect_conductance=[(3, 200)],
-                             leak_v_leak=v_leak[2][0],
-                             threshold_v_threshold=v_threshold[2][0])
+        comp_2 = PlacedCompartment(positions=[3, 4], label='my_label',
+                                   connect_conductance=[(3, 200)],
+                                   leak_v_leak=v_leak[2][0],
+                                   threshold_v_threshold=v_threshold[2][0])
         connections = [SharedLineConnection(start=0, stop=3, row=0)]
         cls.McNeuron = create_mc_neuron(
             'McNeuron', compartments=[comp_0, comp_1, comp_2],
@@ -280,14 +282,14 @@ class TestInitialization(unittest.TestCase):
     def setUp(self):
         v_leak = [[1], [9999]]
         v_threshold = [[1], [9999]]
-        comp_0 = Compartment(positions=[0], label='my_label',
-                             connect_shared_line=[0],
-                             leak_v_leak=v_leak[0],
-                             threshold_v_threshold=v_threshold[0])
+        comp_0 = PlacedCompartment(positions=[0], label='my_label',
+                                   connect_shared_line=[0],
+                                   leak_v_leak=v_leak[0],
+                                   threshold_v_threshold=v_threshold[0])
         # leak_v_leak and threshold_v_threshold should be taken from
         # calibration
-        comp_1 = Compartment(positions=[1], label='my_label',
-                             connect_conductance=[(1, 200)])
+        comp_1 = PlacedCompartment(positions=[1], label='my_label',
+                                   connect_conductance=[(1, 200)])
         connections = [SharedLineConnection(start=0, stop=1, row=0)]
         self.neuron_class = create_mc_neuron(
             'McNeuron', compartments=[comp_0, comp_1], connections=connections)
@@ -356,7 +358,7 @@ class TestInitialization(unittest.TestCase):
 class TestExecution(unittest.TestCase):
     @staticmethod
     def test_single_compartment():
-        comp_0 = Compartment(positions=[0], label='my_label')
+        comp_0 = PlacedCompartment(positions=[0], label='my_label')
         McNeuron = create_mc_neuron('McNeuron', compartments=[comp_0])
 
         pynn.setup()
@@ -365,7 +367,7 @@ class TestExecution(unittest.TestCase):
         pynn.end()
 
         # multiple circuits
-        comp_0 = Compartment(positions=[0, 1], label='my_label')
+        comp_0 = PlacedCompartment(positions=[0, 1], label='my_label')
         McNeuron = create_mc_neuron('McNeuron', compartments=[comp_0])
 
         pynn.setup()
@@ -375,10 +377,10 @@ class TestExecution(unittest.TestCase):
 
     @staticmethod
     def test_multiple_compartments():
-        comp_0 = Compartment(positions=[0], label='my_label',
-                             connect_shared_line=[0])
-        comp_1 = Compartment(positions=[1], label='my_label',
-                             connect_conductance=[(1, 200)])
+        comp_0 = PlacedCompartment(positions=[0], label='my_label',
+                                   connect_shared_line=[0])
+        comp_1 = PlacedCompartment(positions=[1], label='my_label',
+                                   connect_conductance=[(1, 200)])
         connections = [SharedLineConnection(start=0, stop=1, row=0)]
         McNeuron = create_mc_neuron(
             'McNeuron', compartments=[comp_0, comp_1], connections=connections)
