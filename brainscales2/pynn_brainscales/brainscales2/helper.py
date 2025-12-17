@@ -28,7 +28,7 @@ def chip_from_file(path: Path) -> lola.Chip:
     return chip_from_portable_binary(data)
 
 
-def get_unique_identifier() -> str:
+def get_unique_identifier() -> List[str]:
     """
     Retrieve the unique identifier of the current chip.
 
@@ -44,7 +44,7 @@ def nightly_calib_path() -> Path:
     """
     Find path for nightly calibration.
     """
-    identifier = get_unique_identifier()
+    identifier = get_unique_identifier()[0]
     path = f"/wang/data/calibration/hicann-dls-sr-hx/{identifier}/stable/"\
         "latest/spiking_cocolist.pbin"
     return Path(path)
@@ -54,7 +54,7 @@ def nightly_calib_url() -> str:
     """
     Find url for nightly calibration.
     """
-    identifier = get_unique_identifier()
+    identifier = get_unique_identifier()[0]
     return "https://openproject.bioai.eu/data_calibration/" \
            f"hicann-dls-sr-hx/{identifier}/stable/latest/" \
            "spiking_cocolist.pbin"
@@ -77,8 +77,9 @@ def chip_from_nightly() -> lola.Chip:
             chip = chip_from_portable_binary(data)
 
         except urllib.error.URLError as ex:
+            identifier = get_unique_identifier()[0]
             raise RuntimeError('Could not find a nightly calibration for '
-                               f'setup "{get_unique_identifier()}".') from ex
+                               f'setup "{identifier}".') from ex
 
     return chip
 
