@@ -55,13 +55,13 @@ class Timer:
 
         timer = grenade.PlasticityRule.Timer()
         pre_snippet_period_count = ceil(
-            (snippet_begin_time - self.start) / self.period)
+            max(snippet_begin_time - self.start, 0) / self.period)
         timer.start = to_ppu_cycles(
             self.period * pre_snippet_period_count + self.start)
         timer.period = to_ppu_cycles(self.period)
-        timer.num_periods = ceil(
-            (snippet_end_time - self.start) / self.period) \
-            - pre_snippet_period_count
+        timer.num_periods = min(self.num_periods, ceil(
+            max(snippet_end_time - self.start, 0) / self.period)
+            - pre_snippet_period_count)
         return timer
 
 
