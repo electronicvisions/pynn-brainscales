@@ -23,7 +23,7 @@ class GrenadeRecId(NamedTuple):
     compartment_on_neuron: halco.CompartmentOnLogicalNeuron
 
 
-class MADCData(NamedTuple):
+class ADCData(NamedTuple):
     '''
     Times and values of a MADC recording.
     '''
@@ -58,7 +58,7 @@ class RecordingData:
     This class saves data which was recorded during an experiment run.
     """
     def __init__(self) -> None:
-        self.madc: Dict[GrenadeRecId, MADCData] = {}
+        self.madc: Dict[GrenadeRecId, ADCData] = {}
         self.spikes: Dict[GrenadeRecId, List[float]] = {}
 
     def __getitem__(self, key: RecordingType):

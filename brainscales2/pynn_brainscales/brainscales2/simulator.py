@@ -1,7 +1,8 @@
 import time
 import itertools
 from copy import copy, deepcopy
-from typing import Optional, Final, List, Dict, Union, NamedTuple, Any
+from typing import Optional, Final, List, Dict, Union, NamedTuple, Any, \
+    Sequence
 import numpy as np
 from pyNN.common import IDMixin, Population, Projection
 from pyNN.common.control import BaseState
@@ -17,9 +18,9 @@ from calix import calibrate
 name = "HX"  # for use in annotating output data
 
 
-class MADCRecording(NamedTuple):
+class ADCRecording(NamedTuple):
     '''
-    Times and values of a MADC recording.
+    Times and values of a ADC recording.
     '''
     times: np.ndarray
     values: np.ndarray
@@ -362,13 +363,13 @@ class State(BaseState):
         self.neuronal_observables = []
         self.realtime_snippet_count = 0
 
-    def _get_v(self,
-               network_graph: grenade.network.NetworkGraph,
-               outputs: grenade.signal_flow.OutputDataSnippet,
-               recording: Recording
-               # Note: Any should be recording.GrenadeRecId. We do not
-               # annotate the correct type due to cyclic imports.
-               ) -> Dict[Any, MADCRecording]:
+    # Note for return type: Any should be recording.GrenadeRecId.
+    # We do not annotate the correct type due to cyclic imports.
+    def _get_madc_samples(self,
+                          network_graph: grenade.network.NetworkGraph,
+                          outputs: grenade.signal_flow.OutputDataSnippet,
+                          recording: Recording
+                          ) -> Dict[Any, ADCRecording]:
         """
         Get MADC samples with times in ms.
         :param network_graph: Network graph to use for lookup of
@@ -376,13 +377,31 @@ class State(BaseState):
         :param outputs: All outputs of a single execution to extract
                         samples from
         :return: Dictionary with a madc recording site as key and a
-            MADCRecording as value.
+            ADCRecording as value.
         """
         samples = grenade.network.extract_madc_samples(
             outputs, network_graph)
+        return self._filter_samples(samples, recording.config.madc)
+
+    # Note for return type: Any should be recording.GrenadeRecId.
+    # We do not annotate the correct type due to cyclic imports.
+    @staticmethod
+    def _filter_samples(samples: Sequence,
+                        recording_sites: List[Any]):
+        """
+        Filter CADC/MADC samples returned from grenade.
+
+        Only keep samples for sites where a recording was requested.
+
+        :param samples: CADC/MADC samples returned by grenade.
+        :param recording_sites: GrenadeRecIds of sites for which to
+            extract the data.
+        :return: Dictionary with a madc recording site as key and a
+            ADCRecording as value.
+        """
         samples = samples[0] if samples else []
         data = {}
-        for site in recording.config.madc:
+        for site in recording_sites:
             local_times, population, neuron_on_population, \
                 compartment_on_neuron, _, local_values = samples
             # converting compartment_on_neuron to an integer increases the
@@ -390,8 +409,8 @@ class State(BaseState):
             local_filter = (population == site.population) \
                 & (neuron_on_population == site.neuron_on_population) \
                 & (compartment_on_neuron == int(site.compartment_on_neuron))
-            data[site] = MADCRecording(times=local_times[local_filter],
-                                       values=local_values[local_filter])
+            data[site] = ADCRecording(times=local_times[local_filter],
+                                      values=local_values[local_filter])
         return data
 
     def _get_synaptic_observables(
@@ -885,7 +904,7 @@ class State(BaseState):
                     outputs.snippets[i], self.network_graphs[i])
             self.recordings[i].data.spikes = spikes[0] if spikes else {}
 
-            self.recordings[i].data.madc = self._get_v(
+            self.recordings[i].data.madc = self._get_madc_samples(
                 self.network_graphs[i], outputs.snippets[i],
                 self.recordings[i])
 

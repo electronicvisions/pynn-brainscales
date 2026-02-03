@@ -204,9 +204,9 @@ class TestSpikeRecording(unittest.TestCase):
         self.assertLessEqual(len(spiketrains[2]), len(spikes_6) * 1.05)
 
 
-class TestMembraneRecording(unittest.TestCase):
+class TestMADCRecording(unittest.TestCase):
     """
-    Tests to ensure the correct recording of analog traces.
+    Tests to ensure the correct recording of analog traces via the MADC.
     """
 
     def setUp(self):
@@ -215,7 +215,7 @@ class TestMembraneRecording(unittest.TestCase):
     def tearDown(self):
         pynn.end()
 
-    def test_analog_recording(self):
+    def test_recording(self):
         """
         Here we test that an analog trace is recorded for (and only for) the
         indicated neuron.
@@ -238,7 +238,7 @@ class TestMembraneRecording(unittest.TestCase):
             samples = pop[1:2].get_data("v").segments[-1]\
                 .irregularlysampledsignals[0]
 
-    def test_2ch_analog_recording_split(self):
+    def test_2ch_recording_split(self):
         """
         Here we test that an analog trace is recorded for (and only for) the
         indicated neurons.
@@ -266,7 +266,7 @@ class TestMembraneRecording(unittest.TestCase):
             samples_0 = pop[2:3].get_data("v").segments[-1]\
                 .irregularlysampledsignals[0]
 
-    def test_2ch_analog_recording(self):
+    def test_2ch_recording(self):
         """
         Here we test that an analog trace is recorded for (and only for) the
         indicated neurons.
@@ -347,7 +347,7 @@ class TestMembraneRecording(unittest.TestCase):
         self.assertEqual(
             len(pop_c.get_data().segments[-1].irregularlysampledsignals), 1)
 
-    def test_switch_analog_recording(self):
+    def test_switch_recording(self):
         """
         Test whether there are recorded voltage levels for and only for the
         according realtime snippets, where madc recording was enabled

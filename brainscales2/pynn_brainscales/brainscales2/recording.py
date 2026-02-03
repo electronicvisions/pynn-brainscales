@@ -218,30 +218,33 @@ class Recorder(pyNN.recording.Recorder):
             for train in segment.spiketrains:
                 train.segment = segment
 
-    def add_madc_recording(self,
-                           segment: neo.Segment,
-                           snippet_idx: int,
-                           variable: str,
-                           *,
-                           filter_ids=None,
-                           clear: bool = True,
-                           ) -> None:
+    def add_recording(self,
+                      segment: neo.Segment,
+                      snippet_idx: int,
+                      variable: str,
+                      device: str = "madc",
+                      *,
+                      filter_ids=None,
+                      clear: bool = True,
+                      ) -> None:
         """
-        Add the recorded MADC samples to the segment.
+        Add the recorded samples to the segment.
 
         :param segment: Segment to which add the data.
         :param snippet_idx: Snipped for from which to get the
-            MADC samples.
+            samples.
         :param variable: Name of variable for which to get the data.
+        :param device: Device for which get the samples. I.e. CADC or
+            MADC.
         :param filter_ids: Ids of cells for which to get the data.
-            If None, the MADC samples of all cells are retrieved.
+            If None, the samples of all cells are retrieved.
         :param clear: Clear recorded data.
         """
         t_start = sum(self._simulator.state.runtimes[0:snippet_idx]) * pq.ms
 
         ids = sorted(self.filter_recorded(variable, filter_ids))
         signal_array, times_array = self._get_all_signals(
-            variable, ids, snippet_idx, clear=clear)
+            variable, ids, snippet_idx, device=device, clear=clear)
         times_array += t_start
 
         # may be empty if none of the recorded cells are on this MPI node
@@ -258,7 +261,7 @@ class Recorder(pyNN.recording.Recorder):
                 units=units,
                 time_units=pq.ms,
                 name=variable,
-                device="MADC",
+                device=device,
                 source_ids=[int(cell_id.cell_id)],
                 source_locations=[self._get_location_label(cell_id.comp_id)],
                 source_population=self.population.label,
@@ -291,12 +294,16 @@ class Recorder(pyNN.recording.Recorder):
                     self.add_spike_trains(segment, snippet_idx,
                                           filter_ids=filter_ids, clear=clear)
                 else:
-                    self.add_madc_recording(segment, snippet_idx,
-                                            variable=variable,
-                                            filter_ids=filter_ids, clear=clear)
+                    self.add_recording(segment, snippet_idx,
+                                       variable=variable,
+                                       device="madc",
+                                       filter_ids=filter_ids, clear=clear)
         return segment
 
-    def _get_all_signals(self, variable, ids, snippet_idx, clear=False):
+    def _get_all_signals(self, variable, ids, snippet_idx,
+                         *,
+                         clear=False,
+                         device: str = "madc"):
         times = []
         values = []
         recording = self._simulator.state.recordings[snippet_idx]
@@ -317,16 +324,20 @@ class Recorder(pyNN.recording.Recorder):
                                    f"'{variable}' was requested "
                                    f"(population: {self.population.label}, "
                                    f"recording_site: {id}).")
-            if grenade_id not in recording.data.madc:
+            if not hasattr(recording.data, device):
+                raise RuntimeError(f"No data for device '{device}'.")
+            recording_data = getattr(recording.data, device)
+            if grenade_id not in recording_data:
                 # no samples have been recorded yet
                 continue
 
-            madc_recording = recording.data.madc[grenade_id]
-            times.append(madc_recording.times)
-            values.append(madc_recording.values)
+            data = recording_data[grenade_id]
+            times.append(data.times)
+            values.append(data.values)
             if clear:
-                recording.data.remove(recording_site=grenade_id,
-                                      recording_type=RecordingType.MADC)
+                recording.data.remove(
+                    recording_site=grenade_id,
+                    recording_type=RecordingType[device.upper()])
 
         return np.array(values, dtype=object), np.array(times, dtype=object)
 
