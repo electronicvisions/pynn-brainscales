@@ -7,6 +7,7 @@ from dlens_vx_v3 import hal, halco
 
 
 class RecordingType(Enum):
+    CADC = auto()
     MADC = auto()
     PAD = auto()
     SPIKES = auto()
@@ -58,6 +59,7 @@ class RecordingData:
     This class saves data which was recorded during an experiment run.
     """
     def __init__(self) -> None:
+        self.cadc: Dict[GrenadeRecId, ADCData] = {}
         self.madc: Dict[GrenadeRecId, ADCData] = {}
         self.spikes: Dict[GrenadeRecId, List[float]] = {}
 
@@ -69,7 +71,9 @@ class RecordingData:
 
     def remove(self, recording_site: Optional[GrenadeRecId] = None,
                recording_type: Optional[RecordingType] = None):
-        recording_types = [RecordingType.MADC, RecordingType.SPIKES]
+        recording_types = [RecordingType.CADC,
+                           RecordingType.MADC,
+                           RecordingType.SPIKES]
         if recording_type is not None:
             recording_types = [recording_type]
         for data_type in recording_types:
@@ -88,8 +92,6 @@ class RecordingConfig:
     """
     Save which observables are recorded with which "device".
 
-    Currently we only support MADC recordings but in future we want to support
-    readout via the pads and via the CADC.
     This class saves which observables are recorded for which recording site
     (recording site = neuron + compartment) and which device is used, where a
     device is the method of readout, i.e. MADC.
@@ -105,8 +107,35 @@ class RecordingConfig:
     def __init__(self) -> None:
         self.analog_observables: Dict[GrenadeRecId,
                                       hal.NeuronConfig.ReadoutSource] = {}
+        self.cadc: List[GrenadeRecId] = []
         self.madc: List[GrenadeRecId] = []
         self.pads: Dict[halco.PadOnDLS, PadConfig] = {}
+
+    def add_cadc_recording(self, variables: Set[str],
+                           recording_sites: Set[GrenadeRecId]):
+        if len(variables) == 0 or len(recording_sites) == 0:
+            return
+        if len(variables) > 1:
+            raise ValueError("Can only set 1 analog record type per neuron.")
+
+        variable = next(iter(variables))
+        if variable not in self.analog_observable_names:
+            raise RuntimeError(f"Can not record variable '{variable}' with "
+                               "the CADC.")
+        readout_source = self.str_to_source_map[variable]
+
+        # check if variable already recorded for given sites.
+        # Perform check before other loop in order to add all or none sites.
+        for recording_site in recording_sites:
+            if recording_site in self.analog_observables and \
+                    self.analog_observables[recording_site] != readout_source:
+                raise ValueError("Only one source can be recorded per neuron.")
+
+        for recording_site in recording_sites:
+            if recording_site in self.cadc:
+                continue
+            self.cadc.append(recording_site)
+            self.analog_observables[recording_site] = readout_source
 
     def add_madc_recording(self, variables: Set[str],
                            recording_sites: Set[GrenadeRecId]):
@@ -205,6 +234,24 @@ class RecordingConfig:
             madc_recording = grenade.network.MADCRecording(
                 madc_recording_neurons)
             network_builder.add(madc_recording)
+
+        if len(self.cadc) > 0:
+            cadc_recording_neurons = []
+            for rec_site in self.cadc:
+                source = self.analog_observables[rec_site]
+                neuron = grenade.network.CADCRecording.Neuron()
+                neuron.coordinate.population = grenade.network\
+                    .PopulationOnNetwork(rec_site.population)
+                neuron.source = source
+                neuron.coordinate.neuron_on_population \
+                    = rec_site.neuron_on_population
+                neuron.coordinate.compartment_on_neuron \
+                    = rec_site.compartment_on_neuron
+                neuron.coordinate.atomic_neuron_on_compartment = 0
+                cadc_recording_neurons.append(neuron)
+            cadc_recording = grenade.network.CADCRecording(
+                cadc_recording_neurons)
+            network_builder.add(cadc_recording)
 
         if len(self.pads) > 0:
             recordings = {}

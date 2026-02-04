@@ -70,6 +70,11 @@ class Recorder(pyNN.recording.Recorder):
                 set(variable_list).intersection(
                     RecordingConfig.analog_observable_names),
                 grenade_ids)
+        elif device == "cadc":
+            self._simulator.state.recordings[-1].config.add_cadc_recording(
+                set(variable_list).intersection(
+                    RecordingConfig.analog_observable_names),
+                grenade_ids)
         elif 'pad' in device:
             pad, buffered = self._device_name_to_pad_config(device)
             self._simulator.state.recordings[-1].config.add_pad_readout(
@@ -297,6 +302,10 @@ class Recorder(pyNN.recording.Recorder):
                     self.add_recording(segment, snippet_idx,
                                        variable=variable,
                                        device="madc",
+                                       filter_ids=filter_ids, clear=clear)
+                    self.add_recording(segment, snippet_idx,
+                                       variable=variable,
+                                       device="cadc",
                                        filter_ids=filter_ids, clear=clear)
         return segment
 

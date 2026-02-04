@@ -376,6 +376,99 @@ class TestMADCRecording(unittest.TestCase):
         self.assertTrue(samples[2].size > 0)
 
 
+class TestCADCRecording(unittest.TestCase):
+    """
+    Tests to ensure the correct recording of analog traces via the CADC.
+    """
+
+    def setUp(self):
+        # calibration needed for CADC
+        pynn.setup(initial_config=pynn.helper.chip_from_nightly())
+
+    def tearDown(self):
+        pynn.end()
+
+    def test_recording(self):
+        """
+        Here we test that an analog trace is recorded for (and only for) the
+        indicated neuron.
+        NOTE: We do not test the correctness of the hardware configuration.
+        """
+
+        pop = pynn.Population(4, pynn.cells.HXNeuron())
+        pop[0:3].record(["v"], device='cadc')
+
+        pynn.run(0.1)
+
+        # check that analog samples were recorded for the target neuron
+        samples = pop[0:3].get_data("v").segments[-1]\
+            .irregularlysampledsignals
+        self.assertTrue(len(samples) == 3)
+        for sample in samples:
+            self.assertTrue(sample.size > 0)
+
+        # check that samples are different for different neurons
+        self.assertFalse(np.all(samples[0].magnitude == samples[1].magnitude))
+
+        # check that the recorded samples are assigned only to the selected
+        # neuron (and not the other one)
+        with self.assertRaises(IndexError):
+            samples = pop[3:4].get_data("v").segments[-1]\
+                .irregularlysampledsignals[0]
+
+
+class TestMADCCADCRecording(unittest.TestCase):
+    """
+    Tests to ensure the correct recording of analog traces via the CADC
+        and the MADC at the same time.
+    """
+
+    def setUp(self):
+        # calibration needed for CADC
+        pynn.setup(initial_config=pynn.helper.chip_from_nightly())
+
+    def tearDown(self):
+        pynn.end()
+
+    def test_recording(self):
+        """
+        Here we test that an analog trace is recorded for (and only for) the
+        indicated neuron.
+        NOTE: We do not test the correctness of the hardware configuration.
+        """
+
+        pop = pynn.Population(5, pynn.cells.HXNeuron())
+        cadc_neurons = pop[0:3]
+        cadc_neurons.record(["v"], device='cadc')
+        madc_neurons = pop[3:4]
+        madc_neurons.record(["v"], device='madc')
+
+        pynn.run(0.1)
+
+        # check CADC
+        cadc_samples = cadc_neurons.get_data("v").segments[-1]\
+            .irregularlysampledsignals
+        self.assertTrue(len(cadc_samples) == 3)
+        for sample in cadc_samples:
+            self.assertTrue(sample.size > 0)
+
+        # check MADC
+        madc_samples = madc_neurons.get_data("v").segments[-1]\
+            .irregularlysampledsignals
+        self.assertTrue(len(madc_samples) == 1)
+        self.assertTrue(madc_samples[0].size > 0)
+
+        # MADC has higher temporal resolution -> make sure correct device is
+        # assigned to correct neurons
+        self.assertGreater(len(madc_samples[0]), len(cadc_samples[0]))
+
+        # check that the recorded samples are assigned only to the selected
+        # neuron (and not the other one)
+        with self.assertRaises(IndexError):
+            _ = pop[4:5].get_data("v").segments[-1]\
+                .irregularlysampledsignals[0]
+
+
 class TestClearBehavior(unittest.TestCase):
     """
     Test clear behavior.

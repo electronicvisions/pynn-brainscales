@@ -385,6 +385,26 @@ class State(BaseState):
 
     # Note for return type: Any should be recording.GrenadeRecId.
     # We do not annotate the correct type due to cyclic imports.
+    def _get_cadc_samples(self,
+                          network_graph: grenade.network.NetworkGraph,
+                          outputs: grenade.signal_flow.OutputDataSnippet,
+                          recording: Recording
+                          ) -> Dict[Any, ADCRecording]:
+        """
+        Get CADC samples with times in ms.
+        :param network_graph: Network graph to use for lookup of
+                              CADC output vertex descriptor
+        :param outputs: All outputs of a single execution to extract
+                        samples from
+        :return: Dictionary with a cadc recording site as key and a
+            ADCRecording as value.
+        """
+        samples = grenade.network.extract_cadc_samples(
+            outputs, network_graph)
+        return self._filter_samples(samples, recording.config.cadc)
+
+    # Note for return type: Any should be recording.GrenadeRecId.
+    # We do not annotate the correct type due to cyclic imports.
     @staticmethod
     def _filter_samples(samples: Sequence,
                         recording_sites: List[Any]):
@@ -905,6 +925,10 @@ class State(BaseState):
             self.recordings[i].data.spikes = spikes[0] if spikes else {}
 
             self.recordings[i].data.madc = self._get_madc_samples(
+                self.network_graphs[i], outputs.snippets[i],
+                self.recordings[i])
+
+            self.recordings[i].data.cadc = self._get_cadc_samples(
                 self.network_graphs[i], outputs.snippets[i],
                 self.recordings[i])
 
