@@ -366,7 +366,7 @@ class State(BaseState):
                network_graph: grenade.network.NetworkGraph,
                outputs: grenade.signal_flow.OutputDataSnippet,
                recording: Recording
-               # Note: Any should be recording.MADCRecordingSite. We do not
+               # Note: Any should be recording.GrenadeRecId. We do not
                # annotate the correct type due to cyclic imports.
                ) -> Dict[Any, MADCRecording]:
         """
