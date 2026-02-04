@@ -350,12 +350,22 @@ class Recorder(pyNN.recording.Recorder):
         return np.array(values, dtype=object), np.array(times, dtype=object)
 
     def _local_count(self, variable, filter_ids):
-        counts = {}
-        if variable == "spikes":
-            for filter_id in self.filter_recorded(variable, filter_ids):
-                counts[int(filter_id)] = len(simulator.state.spikes)
-        else:
+        """
+        Count number of spikes for the given filter_ids.
+        """
+        if variable != "spikes":
             raise ValueError("Only implemented for spikes")
+        counts = {}
+        for filter_id in filter_ids:
+            count = 0
+            for recording_site in self.filter_recorded(variable,
+                                                       filter_ids):
+                for snippet_idx in \
+                        range(len(self._simulator.state.recordings) - 1):
+                    spikes = self._get_spiketimes(recording_site,
+                                                  snippet_idx, clear=False)
+                    count += len(spikes)
+            counts[int(filter_id)] = len(count)
         return counts
 
     # TODO: align handling of varibales to PyNN 0.12
