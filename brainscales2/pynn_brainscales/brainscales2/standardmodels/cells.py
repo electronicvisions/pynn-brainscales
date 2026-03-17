@@ -9,10 +9,15 @@ from pyNN.parameters import ArrayParameter, ParameterSpace
 from pyNN.standardmodels import cells, build_translations
 from pyNN.common import Population
 from pynn_brainscales.brainscales2 import simulator, plasticity_rules
-from pynn_brainscales.brainscales2.helper import get_values_of_atomic_neuron, \
-    decompose_in_member_names
-from pynn_brainscales.brainscales2.standardmodels.cells_base import \
-    StandardCellType, NeuronCellType
+from pynn_brainscales.brainscales2.helper import (
+    get_values_of_atomic_neuron,
+    decompose_in_member_names,
+)
+from pynn_brainscales.brainscales2.standardmodels.cells_base import (
+    StandardCellType,
+    NeuronCellType,
+    ExternalNeuron,
+)
 from dlens_vx_v3 import lola, hal, halco, sta, hxcomm
 import pygrenade_vx.network as grenade
 from quantities.quantity import Quantity
@@ -886,7 +891,7 @@ SpikeSourcePoissonOnChip.background_source_clock_freq = \
 # pylint: enable=no-member,unsubscriptable-object
 
 
-class SpikeSourcePoisson(StandardCellType, cells.SpikeSourcePoisson):
+class SpikeSourcePoisson(ExternalNeuron, cells.SpikeSourcePoisson):
     """
     Spike source, generating spikes according to a Poisson process.
     """
@@ -1001,7 +1006,7 @@ class SpikeSourcePoisson(StandardCellType, cells.SpikeSourcePoisson):
         builder.add(filtered_spiketimes, descriptor)
 
 
-class SpikeSourceArray(StandardCellType, cells.SpikeSourceArray):
+class SpikeSourceArray(ExternalNeuron, cells.SpikeSourceArray):
     """
     Spike source generating spikes at the times [ms] given in the spike_times
     array.
@@ -1056,7 +1061,7 @@ class SpikeSourceArray(StandardCellType, cells.SpikeSourceArray):
         builder.add(filtered_spiketimes, descriptor)
 
 
-class SpikeIOCell(StandardCellType):
+class SpikeIOCell(ExternalNeuron, StandardCellType):
     """
     Base class for OffChipSource and in the future OffChipSink
     """

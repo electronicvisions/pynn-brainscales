@@ -101,3 +101,10 @@ class NeuronCellType(StandardCellType, plasticity_rules.PlasticityRuleHandle):
             for i in range(len(readout_source))
         ]
         return handle
+
+
+class ExternalNeuron(StandardCellType):
+    """
+    class used to identify external neurons
+    external neurons should inherit from this class
+    """
