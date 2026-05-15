@@ -918,27 +918,27 @@ class State(BaseState):
                        f"{(time.time() - time_after_preparations):.3f}s")
         time_after_hw_run = time.time()
 
-        for i in range(self.realtime_snippet_count):
+        for i, output_snippet in enumerate(outputs.snippets):
             spikes = grenade.network.\
                 extract_neuron_spikes(
-                    outputs.snippets[i], self.network_graphs[i])
+                    output_snippet, self.network_graphs[i])
             self.recordings[i].data.spikes = spikes[0] if spikes else {}
 
             self.recordings[i].data.madc = self._get_madc_samples(
-                self.network_graphs[i], outputs.snippets[i],
+                self.network_graphs[i], output_snippet,
                 self.recordings[i])
 
             self.recordings[i].data.cadc = self._get_cadc_samples(
-                self.network_graphs[i], outputs.snippets[i],
+                self.network_graphs[i], output_snippet,
                 self.recordings[i])
 
             self.synaptic_observables.append(self._get_synaptic_observables(
-                self.network_graphs[i], outputs.snippets[i]))
+                self.network_graphs[i], output_snippet))
             self.array_observables.append(self._get_array_observables(
-                self.network_graphs[i], outputs.snippets[i]))
+                self.network_graphs[i], output_snippet))
 
             self.neuronal_observables.append(self._get_neuronal_observables(
-                self.network_graphs[i], outputs.snippets[i]))
+                self.network_graphs[i], output_snippet))
 
         self.pre_realtime_read = self._get_pre_realtime_read()
         self.post_realtime_read = self._get_post_realtime_read()
