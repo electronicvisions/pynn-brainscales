@@ -43,8 +43,9 @@ class Recorder(pyNN.recording.Recorder):
             try:
                 comp_ids = celltype.get_compartment_ids(locations)
             except AttributeError as err:
-                raise RuntimeError('Can not extract recording locations for '
-                                   f'celltype "{celltype.__name__}".') from err
+                raise RuntimeError(
+                    'Can not extract recording locations for celltype '
+                    f'"{celltype.__class__.__name__}".') from err
 
         return {RecordingSite(n_id, c_id) for n_id, c_id in
                 product(neuron_ids, comp_ids)}
