@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from copy import deepcopy
 import numbers
-from typing import List, Final, Dict, Any, Sequence
+from typing import List, Final, Dict, Any, Sequence, Optional
 
 import numpy as np
 
@@ -10,7 +10,11 @@ from pyNN.common import Population
 from pyNN.standardmodels import build_translations
 
 from dlens_vx_v3 import lola, halco, hal
+
+import pygrenade_vx.network.abstract as grenade_abstract
 import pygrenade_vx.network as grenade
+from pygrenade_vx.network.abstract.multicompartment.neuron import\
+    Neuron as NeuronBase
 import pygrenade_common as grenade_common
 
 from pynn_brainscales.brainscales2 import simulator
@@ -20,6 +24,7 @@ from pynn_brainscales.brainscales2.helper import decompose_in_member_names, \
     get_values_of_atomic_neuron
 from pynn_brainscales.brainscales2.morphology.parameters import \
     McCircuitParameters
+from pynn_brainscales.brainscales2.recording_data import ObservableType
 
 
 def _expand_to_size(value: Any, size: int) -> Iterable:
@@ -578,3 +583,271 @@ class McNeuronManualBase(CommonBase):
 
 
 McNeuronManualBase.translations = McNeuronManualBase._create_translation()  # pylint: disable=protected-access
+
+
+class McNeuronAutomaticBase(CommonBase, NeuronBase):
+    '''
+    Base class for neurons which use the automatic mapping.
+
+    These neurons support automated calibration. Cell parameters correspond
+    to calibration targets in calix.
+    '''
+    # DimensionUnit of how output sites are defined in grenade for this
+    # cell type
+    recording_site_dimension_unit = \
+        grenade_abstract.MechanismOnCompartmentDimensionUnit()
+
+    spike_port: int = -1
+    analog_obs_port: int = -1
+
+    # depends on added mechanisms
+    conductance_based: Final[Optional[bool]] = None
+    injectable: Final[bool] = True
+
+    # The following members are set in __init_subclass__
+    analog_obs_port: int
+    spike_port: int
+    recordable: List
+    units: List
+    receptor_types: Dict
+
+    def __init_subclass__(cls, **kwargs):
+        """
+        Check that members are correctly implemented, create grenade neuron
+        and define members needed by pyNN such as recordables and units.
+        """
+        super().__init_subclass__(**kwargs)
+
+        n_comp = len(cls.compartments)
+        if n_comp == 0:
+            raise RuntimeError(
+                'A multi-compartment neuron class has to have at least one '
+                'compartment. Did you implement `cls.compartments`?')
+
+        # determine which output was set and in which order to determine
+        # the order of output ports.
+        for comp_id in cls.grenade_neuron.compartments():
+            comp = cls.grenade_neuron.get(comp_id)
+            for n_mech in range(comp.mechanisms.size()):
+                mech = comp.mechanisms.get(
+                    grenade_abstract.MechanismOnCompartment(n_mech))
+                if (issubclass(mech.__class__,
+                               grenade_abstract.MechanismWithAnalogReadout)
+                        and cls.analog_obs_port < 0):
+                    cls.analog_obs_port = 0 if cls.spike_port < 0 else 1
+                if (issubclass(mech.__class__,
+                               grenade_abstract.MechanismFire)
+                        and cls.spike_port < 0):
+                    cls.spike_port = 0 if cls.analog_obs_port < 0 else 1
+
+        cls.recordable = cls._get_recordables()
+        cls.units = cls._get_units()
+        cls.receptor_types = cls._get_receptor_types()
+        cls.translations = build_translations(
+            *[(name, name, 1) for name in cls.default_parameters])
+
+    @classmethod
+    def _get_recordables(cls) -> List[str]:
+        """
+        Determine which parameters are recordable for the given neuron.
+
+        The name of the recordable is the name of the mechanism which can
+        be recorded.
+        """
+        obs = []
+        for comp_label, comp_id in cls.compartment_ids_grenade.items():
+            mech_mapping = cls.mechanisms_ids_grenade[comp_label]
+            for mech_label, mech_id in mech_mapping.items():
+                mech = cls.grenade_neuron.get(comp_id).mechanisms.get(mech_id)
+                if (issubclass(mech.__class__,
+                               grenade_abstract.MechanismWithAnalogReadout)
+                        or issubclass(
+                            mech.__class__, grenade_abstract.MechanismFire)):
+                    obs.append(mech_label)
+        # mechanisms with the same label might be present in several
+        # compartments -> use set to get list with unique names.
+        return list(set(obs))
+
+    @classmethod
+    def _get_receptor_types(cls) -> List[str]:
+        """
+        Get names of receptors, i.e., name of mechanisms which accept synaptic
+        connections.
+        """
+        obs = []
+        for comp_label, comp_id in cls.compartment_ids_grenade.items():
+            mech_mapping = cls.mechanisms_ids_grenade[comp_label]
+            for mech_label, mech_id in mech_mapping.items():
+                mech = cls.grenade_neuron.get(comp_id).mechanisms.get(mech_id)
+                if issubclass(mech.__class__,
+                              grenade_abstract.MechanismSynapticInput):
+                    obs.append(mech_label)
+        # mechanisms with the same label might be present in several
+        # compartments -> use set to get list with unique names.
+        return list(set(obs))
+
+    @classmethod
+    def _get_units(cls) -> Dict[str, str]:
+        """
+        Create dictionary which gives the units of the different observables.
+        """
+        units = {}
+        for comp_label, comp_id in cls.compartment_ids_grenade.items():
+            mech_mapping = cls.mechanisms_ids_grenade[comp_label]
+            for mech_label, mech_id in mech_mapping.items():
+                mech = cls.grenade_neuron.get(comp_id).mechanisms.get(mech_id)
+                if issubclass(mech.__class__,
+                              grenade_abstract.MechanismWithAnalogReadout):
+                    units[mech_label] = "dimensionless"
+        return units
+
+    @classmethod
+    def generate_vertex(cls, population: Population) \
+            -> grenade_common.Population:
+        # we currently do not support ranges -> take current parameter value
+        # as lower and upper bound
+        lower_limits = population.celltype.parameter_space
+        upper_limits = population.celltype.parameter_space
+        param_space = cls.construct_parameter_space(lower_limits, upper_limits)
+        shape = grenade_common.CuboidMultiIndexSequence(
+            [len(population)],
+            [grenade_common.CellOnPopulationDimensionUnit()])
+        return grenade_common.Population(
+            cell=cls.grenade_neuron,
+            shape=shape,
+            parameter_space=param_space,
+            time_domain=grenade_common.TimeDomainOnTopology())
+
+    def generate_input_data(
+            self,
+            population: Population,
+            experiment: grenade.abstract.frontend.ExperimentSnippet,
+            snippet_begin_time: float,
+            snippet_end_time: float) \
+            -> Dict[int, grenade_common.PortData]:
+        n_ports = len(self.grenade_neuron.get_input_ports())
+        parameterization = self.construct_parameterization(
+            population.celltype.parameter_space)
+
+        return {n_ports - 1: parameterization}
+
+    @classmethod
+    def get_compartment_ids(cls, labels: Sequence[str]
+                            ) -> List[halco.CompartmentOnLogicalNeuron]:
+        try:
+            comp_ids = [halco.CompartmentOnLogicalNeuron(
+                cls.compartment_ids_grenade[label]) for label in labels]
+        except KeyError as err:
+            # pylint: disable=raise-missing-from
+            raise ValueError(
+                f'No compartment with label "{err}". Available compartments: '
+                f'{cls.compartment_ids_grenade.keys()}.')
+        return comp_ids
+
+    @classmethod
+    def get_labels(cls) -> List[str]:
+        return list(cls.compartment_ids_grenade.keys())
+
+    @classmethod
+    def get_label(
+            cls, compartment_id: halco.CompartmentOnLogicalNeuron) -> str:
+        inverted = {v: k for k, v in cls.compartment_ids_grenade.items()}
+        if grenade_common.CompartmentOnNeuron(compartment_id) \
+                not in inverted:
+            raise RuntimeError(f"No compartment with id {compartment_id}.")
+        return inverted[
+            grenade_common.CompartmentOnNeuron(compartment_id)]
+
+    def get_spike_output_sequence(
+        self,
+        compartment: grenade_common.CompartmentOnNeuron
+    ) -> grenade_common.MultiIndexSequence:
+        """
+        Get sequence for spike output.
+
+        :param compartment: Compartment identifier.
+        :return: MultiIndexSequence which specifies the spike output.
+        """
+        # TODO: use CompartmentOnNeuron/CompartmentOnLogicalNeuron
+        # consistently
+        compartment = grenade_common.CompartmentOnNeuron(compartment)
+
+        # get label
+        label = None
+        for comp_label, comp_id in self.compartment_ids_grenade.items():
+            if comp_id == compartment:
+                label = comp_label
+                break
+        if label is None:
+            raise ValueError(f'Compartment id "{compartment}" not found.')
+
+        for _, mech_id in self.mechanisms_ids_grenade[label].items():
+            mech = self.grenade_neuron.get(compartment).mechanisms.get(mech_id)
+            if issubclass(mech.__class__, grenade_abstract.MechanismFire):
+                return grenade_common.CuboidMultiIndexSequence(
+                    [1], grenade_common.MultiIndex([mech_id.value()]),
+                    [grenade_abstract.MechanismOnCompartmentDimensionUnit()])
+        raise RuntimeError(f'No spike output found for {compartment}.')
+
+    def get_recording_site(
+        self,
+        name: str,
+        compartment: grenade_common.CompartmentOnNeuron
+    ) -> int:
+        if name not in self.recordable:
+            raise RuntimeError(
+                f'The observable "{name}" can not be recorded. This celltype '
+                f'supports: {self.recordable}')
+
+        label = self.get_label(compartment)
+        mapping = self.mechanisms_ids_grenade[label]
+
+        if name not in mapping:
+            raise RuntimeError(f'Can not record "{name}" in compartment with '
+                               f'label "{label}".')
+        return self.mechanisms_ids_grenade[
+            self.get_label(compartment)][name].value()
+
+    @classmethod
+    def get_observable_type(cls,
+                            name: str,
+                            compartment: grenade_common.CompartmentOnNeuron
+                            ) -> ObservableType:
+        # TODO: use CompartmentOnNeuron/CompartmentOnLogicalNeuron
+        # consistently
+        compartment = grenade_common.CompartmentOnNeuron(compartment)
+        if name not in cls.recordable:
+            raise RuntimeError(
+                f'The observable "{name}" can not be recorded. This celltype '
+                f'supports: {cls.recordable}')
+
+        label = cls.get_label(compartment)
+        mapping = cls.mechanisms_ids_grenade[label]
+
+        if name not in mapping:
+            raise RuntimeError(f'Can not record "{name}" in compartment with '
+                               f'label "{label}".')
+        mech_id = cls.mechanisms_ids_grenade[cls.get_label(compartment)][name]
+        mech = cls.grenade_neuron.get(compartment).mechanisms.get(mech_id)
+        if issubclass(mech.__class__,
+                      grenade_abstract.MechanismWithAnalogReadout):
+            return ObservableType.ANALOG
+        if issubclass(mech.__class__, grenade_abstract.MechanismFire):
+            return ObservableType.EVENT
+
+        raise RuntimeError(f'Observable type not spcified for "{name}".')
+
+    def get_receptor(
+        self, name: str, compartment: grenade_common.CompartmentOnNeuron
+    ) -> grenade_common.MultiIndexSequence:
+        label = self.get_label(compartment)
+        mapping = self.mechanisms_ids_grenade[label]
+
+        if name not in mapping:
+            raise RuntimeError(f'No receptor "{name}" in compartment with '
+                               f'label "{label}".')
+        mech_id = self.mechanisms_ids_grenade[self.get_label(compartment)][
+            name]
+        return grenade_common.CuboidMultiIndexSequence(
+            [1], grenade_common.MultiIndex([mech_id.value()]),
+            [grenade_abstract.MechanismOnCompartmentDimensionUnit()])
