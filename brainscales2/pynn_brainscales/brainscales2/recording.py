@@ -13,7 +13,7 @@ from pyNN.recording import gather_blocks, filter_by_variables, \
 
 from pynn_brainscales.brainscales2 import simulator
 from pynn_brainscales.brainscales2.recording_data import RecordingSite, \
-    RecordingConfig, GrenadeRecId, RecordingType, ADCData
+    GrenadeRecId, RecordingType, ADCData, ObservableType
 from dlens_vx_v3 import halco
 import pygrenade_vx.network.abstract as grenade
 import pygrenade_vx.common as grenade_vx_common
@@ -81,25 +81,33 @@ class Recorder(pyNN.recording.Recorder, grenade.frontend.ExperimentElement):
         grenade_ids = {self._rec_site_to_grenade_index(rec_site) for rec_site
                        in recording_sites}
 
+        if len(grenade_ids) == 0:
+            return
+
         if "spikes" in variables:
             self._simulator.state.recordings[-1].config.add_spike_recording(
                 list(grenade_ids))
 
+        def is_analog_observable(name: str):
+            # all compartments should be able to record the provided variable
+            # we use the first one to test if the observable is analog
+            compartment = grenade_common.CompartmentOnNeuron(
+                next(iter(grenade_ids)).compartment_on_neuron)
+            return self.population.celltype.get_observable_type(
+                name, compartment) == ObservableType.ANALOG
+
         if device == "madc":
             self._simulator.state.recordings[-1].config.add_madc_recording(
-                set(variable_list).intersection(
-                    RecordingConfig.analog_observable_names),
+                [name for name in variable_list if is_analog_observable(name)],
                 grenade_ids)
         elif device == "cadc":
             self._simulator.state.recordings[-1].config.add_cadc_recording(
-                set(variable_list).intersection(
-                    RecordingConfig.analog_observable_names),
+                [name for name in variable_list if is_analog_observable(name)],
                 grenade_ids)
         elif 'pad' in device:
             pad, buffered = self._device_name_to_pad_config(device)
             self._simulator.state.recordings[-1].config.add_pad_readout(
-                set(variable_list).intersection(
-                    RecordingConfig.analog_observable_names),
+                [name for name in variable_list if is_analog_observable(name)],
                 grenade_ids,
                 pad=pad, buffered=buffered)
         else:
@@ -349,7 +357,7 @@ class Recorder(pyNN.recording.Recorder, grenade.frontend.ExperimentElement):
                 continue
 
             recorded_var = recording.config.analog_observables[grenade_id]
-            if recorded_var != RecordingConfig.str_to_source_map.get(variable):
+            if recorded_var != variable:
                 raise RuntimeError(f"'{recorded_var}' was recorded but "
                                    f"'{variable}' was requested "
                                    f"(population: {self.population.label}, "
@@ -483,6 +491,7 @@ class Recorder(pyNN.recording.Recorder, grenade.frontend.ExperimentElement):
     def add_to_topology(
             self,
             experiment: grenade.frontend.ExperimentSnippet):
+        celltype = self.population.celltype
         # TODO: remove sorting of PyNN IDs once grenade supports
         # non-sorted edges to recorders at all below occurrences
         spike_recording_ids = grenade_common.ListMultiIndexSequence(
@@ -496,7 +505,7 @@ class Recorder(pyNN.recording.Recorder, grenade.frontend.ExperimentElement):
             grenade.SpikeRecorder,
             self.grenade_spike_descriptor,
             spike_recording_ids,
-            0,
+            celltype.spike_port,
             experiment)
 
         def get_recording_ids(config):
@@ -504,33 +513,28 @@ class Recorder(pyNN.recording.Recorder, grenade.frontend.ExperimentElement):
             for variable, ids in self.recorded.items():
                 if variable == "spikes":
                     continue
-                for i in sorted(ids):
-                    if self._rec_site_to_grenade_index(i) \
-                            in config:
-                        recording_ids.append(grenade_common.MultiIndex(
-                            [self._rec_site_to_grenade_index(i)
-                             .neuron_on_population,
-                             self._rec_site_to_grenade_index(i)
-                             .compartment_on_neuron, 0]))
+                grenade_idx = [self._rec_site_to_grenade_index(i) for i
+                               in sorted(ids)]
+                for idx in (set(grenade_idx) & set(config)):
+                    compartment = idx.compartment_on_neuron
+                    recording_ids.append(grenade_common.MultiIndex(
+                        [idx.neuron_on_population,
+                         compartment,
+                         celltype.get_recording_site(variable, compartment)]))
             recording_ids = grenade_common.ListMultiIndexSequence(
                 recording_ids,
                 [grenade_common.CellOnPopulationDimensionUnit(),
                  grenade_common.CompartmentOnNeuronDimensionUnit(),
-                 grenade.AtomicNeuronOnCompartmentDimensionUnit()])
+                 celltype.recording_site_dimension_unit])
             return recording_ids
-
-        madc_recording_ids = get_recording_ids(
-            self._simulator.state.recordings[-1].config.madc)
 
         self._add_recorder_to_experiment(
             recorder_type=grenade.MADCRecorder,
             recorder_descriptors=self.grenade_madc_descriptor,
-            recording_ids=madc_recording_ids,
-            source_port=1,
+            recording_ids=get_recording_ids(
+                self._simulator.state.recordings[-1].config.madc),
+            source_port=celltype.analog_obs_port,
             experiment=experiment)
-
-        cadc_recording_ids = get_recording_ids(
-            self._simulator.state.recordings[-1].config.cadc)
 
         def wrapped_cadc_recorder(shape, time_domain):
             return grenade.CADCRecorder(shape, False, time_domain)
@@ -538,8 +542,9 @@ class Recorder(pyNN.recording.Recorder, grenade.frontend.ExperimentElement):
         self._add_recorder_to_experiment(
             recorder_type=wrapped_cadc_recorder,
             recorder_descriptors=self.grenade_cadc_descriptor,
-            recording_ids=cadc_recording_ids,
-            source_port=1,
+            recording_ids=get_recording_ids(
+                self._simulator.state.recordings[-1].config.cadc),
+            source_port=celltype.analog_obs_port,
             experiment=experiment)
 
         pad_recording_ids = []
@@ -571,7 +576,7 @@ class Recorder(pyNN.recording.Recorder, grenade.frontend.ExperimentElement):
             recorder_type=wrapped_pad_recorder,
             recorder_descriptors=self.grenade_pad_descriptor,
             recording_ids=pad_recording_ids,
-            source_port=1,
+            source_port=celltype.analog_obs_port,
             experiment=experiment)
 
         return True

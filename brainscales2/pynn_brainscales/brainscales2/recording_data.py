@@ -2,7 +2,7 @@ from enum import Enum, auto
 from typing import NamedTuple, Set, List, Dict, Optional
 import numpy as np
 
-from dlens_vx_v3 import hal, halco
+from dlens_vx_v3 import halco
 
 
 class RecordingType(Enum):
@@ -10,6 +10,11 @@ class RecordingType(Enum):
     MADC = auto()
     PAD = auto()
     SPIKES = auto()
+
+
+class ObservableType(Enum):
+    EVENT = auto()
+    ANALOG = auto()
 
 
 class RecordingSite(NamedTuple):
@@ -95,17 +100,8 @@ class RecordingConfig:
     (recording site = neuron + compartment) and which device is used, where a
     device is the method of readout, i.e. MADC.
     """
-
-    str_to_source_map = \
-        {"v": hal.NeuronConfig.ReadoutSource.membrane,
-         "exc_synin": hal.NeuronConfig.ReadoutSource.exc_synin,
-         "inh_synin": hal.NeuronConfig.ReadoutSource.inh_synin,
-         "adaptation": hal.NeuronConfig.ReadoutSource.adaptation}
-    analog_observable_names = list(str_to_source_map)
-
     def __init__(self) -> None:
-        self.analog_observables: Dict[GrenadeRecId,
-                                      hal.NeuronConfig.ReadoutSource] = {}
+        self.analog_observables: Dict[GrenadeRecId, str] = {}
         self.spikes: List[GrenadeRecId] = []
         self.cadc: List[GrenadeRecId] = []
         self.madc: List[GrenadeRecId] = []
@@ -119,23 +115,19 @@ class RecordingConfig:
             raise ValueError("Can only set 1 analog record type per neuron.")
 
         variable = next(iter(variables))
-        if variable not in self.analog_observable_names:
-            raise RuntimeError(f"Can not record variable '{variable}' with "
-                               "the CADC.")
-        readout_source = self.str_to_source_map[variable]
 
         # check if variable already recorded for given sites.
         # Perform check before other loop in order to add all or none sites.
         for recording_site in recording_sites:
             if recording_site in self.analog_observables and \
-                    self.analog_observables[recording_site] != readout_source:
+                    self.analog_observables[recording_site] != variable:
                 raise ValueError("Only one source can be recorded per neuron.")
 
         for recording_site in recording_sites:
             if recording_site in self.cadc:
                 continue
             self.cadc.append(recording_site)
-            self.analog_observables[recording_site] = readout_source
+            self.analog_observables[recording_site] = variable
 
     def add_spike_recording(self, recording_sites: List[GrenadeRecId]):
         self.spikes = recording_sites
@@ -148,23 +140,19 @@ class RecordingConfig:
             raise ValueError("Can only set 1 analog record type per neuron.")
 
         variable = next(iter(variables))
-        if variable not in self.analog_observable_names:
-            raise RuntimeError(f"Can not record variable '{variable}' with "
-                               "the MADC.")
-        readout_source = self.str_to_source_map[variable]
 
         # check if variable already recorded for given sites.
         # Perform check before other loop in order to add all or none sites.
         for recording_site in recording_sites:
             if recording_site in self.analog_observables and \
-                    self.analog_observables[recording_site] != readout_source:
+                    self.analog_observables[recording_site] != variable:
                 raise ValueError("Only one source can be recorded per neuron.")
 
         for recording_site in recording_sites:
             if recording_site in self.madc:
                 continue
             self.madc.append(recording_site)
-            self.analog_observables[recording_site] = readout_source
+            self.analog_observables[recording_site] = variable
 
     def add_pad_readout(self, variables: Set[str],
                         recording_sites: Set[GrenadeRecId],
@@ -180,15 +168,11 @@ class RecordingConfig:
             raise ValueError("Only pad 0 and 1 are available.")
 
         variable = next(iter(variables))
-        if variable not in self.analog_observable_names:
-            raise RuntimeError(f"Can not readout variable '{variable}' at "
-                               "the pad.")
-        readout_source = self.str_to_source_map[variable]
 
         # check if other variable is already recorded at given recording sites.
         recording_site = next(iter(recording_sites))
         if recording_site in self.analog_observables and \
-                self.analog_observables[recording_site] != readout_source:
+                self.analog_observables[recording_site] != variable:
             raise ValueError("Only one source can be recorded per neuron.")
 
         pad_coord = halco.PadOnDLS(pad)
@@ -197,7 +181,7 @@ class RecordingConfig:
             raise ValueError("Can only record one neuron and one mode "
                              "(buffered or unbuffered) per pad.")
         self.pads[pad_coord] = PadConfig(recording_site, buffered)
-        self.analog_observables[recording_site] = readout_source
+        self.analog_observables[recording_site] = variable
 
     def remove(self, recording_site: GrenadeRecId):
         if recording_site in self.analog_observables:

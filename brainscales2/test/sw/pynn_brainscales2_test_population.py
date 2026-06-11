@@ -185,7 +185,7 @@ class TestAPopulation(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.hxpop1.record(["v", "inh_synin"])
 
-        with self.assertRaises(errors.RecordingError):
+        with self.assertRaises(RuntimeError):
             self.hxpop1.record("undefined_variable")
 
         # test locations argument

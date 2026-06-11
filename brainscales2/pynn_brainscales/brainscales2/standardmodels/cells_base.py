@@ -6,7 +6,9 @@ from pyNN.standardmodels import StandardCellType \
     as UpstreamStandardCellType
 import pygrenade_common as grenade
 import pygrenade_vx as grenade_vx
+import pygrenade_vx.network.abstract as grenade_abstract
 from pynn_brainscales.brainscales2 import plasticity_rules
+from pynn_brainscales.brainscales2.recording_data import ObservableType
 from dlens_vx_v3 import lola
 
 
@@ -14,6 +16,14 @@ class StandardCellType(ABC, UpstreamStandardCellType):
     """
     Network addable standard cell type, to be used as base for all cells.
     """
+
+    # DimensionUnit of how recording sites are defined in grenade for this
+    # cell type
+    recording_site_dimension_unit = \
+        grenade_abstract.AtomicNeuronOnCompartmentDimensionUnit()
+
+    spike_port: int = 0
+    analog_obs_port: int = 1
 
     def __init__(self, **parameters):
         # only forward non None values (parameter spaces can not handle None
@@ -79,6 +89,52 @@ class StandardCellType(ABC, UpstreamStandardCellType):
         the parameter space is not valid until mapping
         for uncalibrated neurons.
         """
+
+    def get_recording_site(
+        self,
+        name: str,
+        compartment: grenade.CompartmentOnNeuron
+    ) -> int:
+        """
+        Get recording site by name.
+
+        :param name: Name of observable/mechanism which should be recorded.
+        :param compartment: Compartment identifier
+        :return: ID of the neuron circuit/mechanism which corresponds to
+            the recorded observable.
+        """
+        del compartment
+
+        if name not in self.recordable:
+            raise NotImplementedError(
+                "The given observable can not be recorded. This celltype "
+                f"supports: {self.recordable}")
+        # we always record observables in the first neuron circuit
+        return 0
+
+    @classmethod
+    def get_observable_type(cls,
+                            name: str,
+                            compartment: grenade.CompartmentOnNeuron
+                            ) -> ObservableType:
+        """
+        Get the type of the observable.
+
+        :param name: Name of variable for which to get the observable type.
+        :param compartment: Compartment identifier
+        :return: Type of observable.
+        """
+        del compartment
+
+        if name not in cls.recordable:
+            raise RuntimeError(f"Unknown variable '{name}'.")
+
+        if name in ['v', 'exc_synin', 'inh_synin', 'adaptation']:
+            return ObservableType.ANALOG
+        if name in ['spikes']:
+            return ObservableType.EVENT
+
+        raise RuntimeError(f"Observable type not spcified '{name}'.")
 
 
 class NeuronCellType(StandardCellType, plasticity_rules.PlasticityRuleHandle):
