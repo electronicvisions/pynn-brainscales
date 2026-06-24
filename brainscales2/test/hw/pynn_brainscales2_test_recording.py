@@ -210,7 +210,10 @@ class TestMADCRecording(unittest.TestCase):
     """
 
     def setUp(self):
-        pynn.setup()
+        # Calibration needed since we want to compare recorded traces
+        # to expectation, e.g. to test that the correct readout source
+        # is selected.
+        pynn.setup(initial_config=pynn.helper.chip_from_nightly())
 
     def tearDown(self):
         pynn.end()
@@ -374,6 +377,39 @@ class TestMADCRecording(unittest.TestCase):
         self.assertTrue(samples[0].size > 0)
         self.assertTrue(samples[1].size > 0)
         self.assertTrue(samples[2].size > 0)
+
+    def test_readout_source(self):
+        """
+        Test that the selection of the readout source works.
+        """
+        pop = pynn.Population(1, pynn.cells.HXNeuron())
+        in_pop = pynn.Population(5, pynn.cells.SpikeSourceArray(
+            spike_times=[0.5, 0.6]))
+
+        synapse = pynn.standardmodels.synapses.StaticSynapse(weight=63)
+        pynn.Projection(in_pop, pop, pynn.AllToAllConnector(),
+                        synapse_type=synapse)
+        pop.record("v")
+        pynn.run(1)
+        pynn.reset()
+
+        samples = pop.get_data().segments[-1]\
+            .irregularlysampledsignals[0]
+
+        # check that input spikes have an effect.
+        self.assertGreater(samples.max() - samples[:100].mean(), 20)
+
+        # test that chainging the readout source works (synaptic inputs
+        # pull the synaptic line down)
+        pop.record(None)
+        pop.record("exc_synin")
+        pynn.run(1)
+        samples = pop.get_data().segments[-1]\
+            .irregularlysampledsignals[0]
+        # also assert that the maximum is not too high. Otherwise we
+        # could still record the membrane and detect the reset.
+        self.assertLess(samples.max() - samples[:100].mean(), 10)
+        self.assertGreater(samples[:100].mean() - samples.min(), 20)
 
 
 class TestCADCRecording(unittest.TestCase):
