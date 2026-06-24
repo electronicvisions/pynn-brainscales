@@ -143,6 +143,45 @@ class TestCalibHXNeuronCuba(unittest.TestCase):
         pynn.reset()
         self.pop.set(i_synin_gm_I=500)
 
+    def test_analog_recording(self):
+        """
+        Test that analog recording works.
+
+        This tests assumes that synaptic inputs are enabled and sufficiently
+        strong.
+        """
+        # Test that recording is possible and that effect of input spikes
+        # is visible
+        in_pop = pynn.Population(5, pynn.cells.SpikeSourceArray(
+            spike_times=[0.5, 0.6]))
+
+        synapse = pynn.standardmodels.synapses.StaticSynapse(weight=63)
+        pynn.Projection(in_pop, self.pop, pynn.AllToAllConnector(),
+                        synapse_type=synapse)
+        self.pop[:1].record("v")
+        pynn.run(1)
+        pynn.reset()
+
+        samples = self.pop[:1].get_data().segments[-1]\
+            .irregularlysampledsignals[0]
+        self.assertTrue(samples.size > 0)
+
+        # check that input spikes have an effect.
+        # PSP height should be larger than 20 MADC units.
+        self.assertGreater(samples.max() - samples[:100].mean(), 20)
+
+        # test that changing the readout source works (synaptic inputs
+        # pull the synaptic line down)
+        self.pop.record(None)
+        self.pop[:1].record("exc_synin")
+        pynn.run(1)
+        samples = self.pop[:1].get_data().segments[-1]\
+            .irregularlysampledsignals[0]
+        # also assert that the maximum is not too high. Otherwise we
+        # could still record the membrane and detect the reset.
+        self.assertLess(samples.max() - samples[:100].mean(), 10)
+        self.assertGreater(samples[:100].mean() - samples.min(), 20)
+
 
 class TestCalibHXNeuronCoba(unittest.TestCase):
 
@@ -259,6 +298,46 @@ class TestCalibHXNeuronCoba(unittest.TestCase):
             pynn.run(1)
         pynn.reset()
         self.pop.set(i_synin_gm_I=500)
+
+    def test_analog_recording(self):
+        """
+        Test that analog recording works.
+
+        This tests assumes that synaptic inputs are enabled and sufficiently
+        strong.
+        """
+
+        # Test that recording is possible and that effect of input spikes
+        # is visible
+        in_pop = pynn.Population(5, pynn.cells.SpikeSourceArray(
+            spike_times=[0.5, 0.6]))
+
+        synapse = pynn.standardmodels.synapses.StaticSynapse(weight=63)
+        pynn.Projection(in_pop, self.pop, pynn.AllToAllConnector(),
+                        synapse_type=synapse)
+        self.pop[:1].record("v")
+        pynn.run(1)
+        pynn.reset()
+
+        samples = self.pop[:1].get_data().segments[-1]\
+            .irregularlysampledsignals[0]
+        self.assertTrue(samples.size > 0)
+
+        # check that input spikes have an effect.
+        # PSP height should be larger than 20 MADC units.
+        self.assertGreater(samples.max() - samples[:100].mean(), 20)
+
+        # test that changing the readout source works (synaptic inputs
+        # pull the synaptic line down)
+        self.pop.record(None)
+        self.pop[:1].record("exc_synin")
+        pynn.run(1)
+        samples = self.pop[:1].get_data().segments[-1]\
+            .irregularlysampledsignals[0]
+        # also assert that the maximum is not too high. Otherwise we
+        # could still record the membrane and detect the reset.
+        self.assertLess(samples.max() - samples[:100].mean(), 10)
+        self.assertGreater(samples[:100].mean() - samples.min(), 20)
 
 
 if __name__ == "__main__":
