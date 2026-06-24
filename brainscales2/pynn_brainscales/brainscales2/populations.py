@@ -244,6 +244,11 @@ class Population(pyNN.common.Population, grenade.ExperimentElement):
                 neurons to pads. Each of the 2 pads can be connected to one
                 neuron. For limitations see documentation.
         """
+        # we currently directly change the parameterization of the neuron
+        # circuits for the HXNeuron and the calibrated neurons to change
+        # the readout source -> we need to regenerate the input data when
+        # changing the recording
+        self.changed_input_data = True
 
         if variables is None:  # reset the list of things to record
             # note that if record(None) is called on a view of a population
