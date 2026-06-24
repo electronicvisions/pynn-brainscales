@@ -547,15 +547,15 @@ class CalibHXNeuronCuba(NeuronCellType):
                             [lola.AtomicNeuron.Readout.Source.membrane]}
                            for i in range(len(population))]
         for i in population.recorder.recorded["exc_synin"]:
-            readout_sources[population.all_cells.index(i.cell_id)[0]] = \
+            readout_sources[population.id_to_index(i.cell_id)] = \
                 {grenade_common.CompartmentOnNeuron():
                  [lola.AtomicNeuron.Readout.Source.exc_synin]}
         for i in population.recorder.recorded["inh_synin"]:
-            readout_sources[population.all_cells.index(i.cell_id)[0]] = \
+            readout_sources[population.id_to_index(i.cell_id)] = \
                 {grenade_common.CompartmentOnNeuron():
                  [lola.AtomicNeuron.Readout.Source.inh_synin]}
         for i in population.recorder.recorded["adaptation"]:
-            readout_sources[population.all_cells.index(i.cell_id)[0]] = \
+            readout_sources[population.id_to_index(i.cell_id)] = \
                 {grenade_common.CompartmentOnNeuron():
                  [lola.AtomicNeuron.Readout.Source.adaptation]}
 
@@ -903,15 +903,15 @@ class CalibHXNeuronCoba(CalibHXNeuronCuba):
                             [lola.AtomicNeuron.Readout.Source.membrane]}
                            for i in range(len(population))]
         for i in population.recorder.recorded["exc_synin"]:
-            readout_sources[population.all_cells.index(i.cell_id)[0]] = \
+            readout_sources[population.id_to_index(i.cell_id)] = \
                 {grenade_common.CompartmentOnNeuron():
                  [lola.AtomicNeuron.Readout.Source.exc_synin]}
         for i in population.recorder.recorded["inh_synin"]:
-            readout_sources[population.all_cells.index(i.cell_id)[0]] = \
+            readout_sources[population.id_to_index(i.cell_id)] = \
                 {grenade_common.CompartmentOnNeuron():
                  [lola.AtomicNeuron.Readout.Source.inh_synin]}
         for i in population.recorder.recorded["adaptation"]:
-            readout_sources[population.all_cells.index(i.cell_id)[0]] = \
+            readout_sources[population.id_to_index(i.cell_id)] = \
                 {grenade_common.CompartmentOnNeuron():
                  [lola.AtomicNeuron.Readout.Source.adaptation]}
 
