@@ -10,7 +10,14 @@ import pynn_brainscales.brainscales2 as pynn
 from pynn_brainscales.brainscales2.standardmodels.synapses import StaticSynapse
 from pynn_brainscales.brainscales2.morphology import create_mc_neuron, \
     PlacedCompartment, SharedLineConnection
+from pynn_brainscales.brainscales2.morphology.builder import MorphologyBuilder
 from pynn_brainscales.brainscales2.examples.multicompartment import main
+
+from pygrenade_vx.network.abstract.multicompartment import mechanisms
+
+from pygrenade_vx.network.abstract.multicompartment.tree import Connection
+from pygrenade_vx.network.abstract.multicompartment.compartment_builder \
+    import CompartmentBuilder
 
 
 class TestMulticompartmentExample(unittest.TestCase):
@@ -229,6 +236,38 @@ class TestRecordingAndProjectionsManual(
         return create_mc_neuron(
             'McNeuron', compartments=comps,
             connections=connections, single_active_circuit=True)
+
+
+class TestRecordingAndProjectionsBuilder(
+        BaseTestCases.TestRecordingAndProjections):
+    receptor_type = "exc_synin"
+
+    def create_neuron(self):
+
+        # construct compartment
+        comp_builder = CompartmentBuilder()
+        comp_builder.add(
+            mechanisms.MembraneCapacitance(capacitance=2.2e-12), label='v')
+        comp_builder.add(
+            mechanisms.CurrentBasedSynapse(strength=500, time_constant=10e-6),
+            label='exc_synin')
+
+        comp_builder.add(
+            mechanisms.Leak(v_leak=60, tau_mem=10e-6), label='leak')
+        compartment_class = comp_builder.done("Compartment")
+
+        # Construct neuron
+        builder = MorphologyBuilder()
+        nodes = []
+        for label in self.labels:
+            nodes.append(
+                builder.add_compartment(compartment_class(), label=label))
+
+        connections = [Connection(first, second, 10e-6) for first, second in
+                       zip(nodes[:-1], nodes[1:])]
+
+        builder.connect(connections)
+        return builder.done("MyNeuron")
 
 
 if __name__ == "__main__":
