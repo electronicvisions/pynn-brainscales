@@ -377,9 +377,9 @@ class Connection(pyNN.common.Connection):
             self.pop_post_index = post_index
         if ((parameters["weight"] < 0)
                 and ((self.projection.post.conductance_based
-                      or self.projection.receptor_type != "inhibitory"))) or \
+                      or self.projection.receptor_type == "excitatory"))) or \
                 ((parameters["weight"] > 0)
-                    and (self.projection.receptor_type != "excitatory")):
+                    and (self.projection.receptor_type == "inhibitory")):
             raise pyNN.errors.ConnectionError(
                 "Weights must be positive for conductance-based and/or "
                 "excitatory synapses and negative for inhibitory synapses")
@@ -404,9 +404,9 @@ class Connection(pyNN.common.Connection):
         new_weight = round(new_weight)
         if ((new_weight < 0)
                 and ((self.projection.post.conductance_based
-                      or self.projection.receptor_type != "inhibitory"))) or \
+                      or self.projection.receptor_type == "excitatory"))) or \
                 ((new_weight > 0)
-                    and (self.projection.receptor_type != "excitatory")):
+                    and (self.projection.receptor_type == "inhibitory")):
             raise pyNN.errors.ConnectionError(
                 "Weights must be positive for conductance-based and/or "
                 "excitatory synapses and negative for inhibitory synapses")
