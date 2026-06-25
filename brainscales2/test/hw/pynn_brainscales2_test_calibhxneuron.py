@@ -44,7 +44,7 @@ class TestCalibHXNeuronCuba(unittest.TestCase):
         """
         Manually setting leak to max should lead to firing of the neuron.
         """
-        pynn.preprocess()
+        pynn.run(None, pynn.RunCommand.PREPARE)
         self.pop.actual_hwparams[0].leak.v_leak = 1022
         pynn.run(10)
 
@@ -53,8 +53,7 @@ class TestCalibHXNeuronCuba(unittest.TestCase):
 
     def test_access_calib_result(self):
         """
-        Calibration related parameters only available after run() or
-        preprocess().
+        Calibration related parameters only available after run().
         """
         with self.assertRaises(AttributeError):
             _ = self.pop.calib_target
@@ -63,7 +62,7 @@ class TestCalibHXNeuronCuba(unittest.TestCase):
         with self.assertRaises(AttributeError):
             _ = self.pop.actual_hwparams
 
-        pynn.preprocess()
+        pynn.run(None, pynn.RunCommand.PREPARE)
         _ = self.pop.calib_target
         _ = self.pop.calib_hwparams
         _ = self.pop.actual_hwparams
@@ -72,7 +71,7 @@ class TestCalibHXNeuronCuba(unittest.TestCase):
         """
         Test correct assignment/masking in population views.
         """
-        pynn.preprocess()
+        pynn.run(None, pynn.RunCommand.PREPARE)
         # modifying second entry in the population view should change the third
         # neuron in the parent population
         self.pop[1:3].actual_hwparams[1].leak.v_leak = 1022
@@ -84,7 +83,7 @@ class TestCalibHXNeuronCuba(unittest.TestCase):
         """
         Test correct assignment/masking in population views.
         """
-        pynn.preprocess()
+        pynn.run(None, pynn.RunCommand.PREPARE)
         # modifying second entry in the population view should change the third
         # neuron in the parent population
         self.pop[[1, 2]].actual_hwparams[1].leak.v_leak = 1022
@@ -96,7 +95,7 @@ class TestCalibHXNeuronCuba(unittest.TestCase):
         """
         Test correct assignment/masking in population views.
         """
-        pynn.preprocess()
+        pynn.run(None, pynn.RunCommand.PREPARE)
         # modifying second entry in the population view should change the third
         # neuron in the parent population
         self.pop[np.array([1, 2])].actual_hwparams[1].leak.v_leak = 1022
@@ -184,7 +183,7 @@ class TestCalibHXNeuronCoba(unittest.TestCase):
         """
         Manually setting leak to max should lead to firing of the neuron.
         """
-        pynn.preprocess()
+        pynn.run(None, pynn.RunCommand.PREPARE)
         self.pop.actual_hwparams[0].leak.v_leak = 1022
         pynn.run(10)
 
@@ -193,8 +192,7 @@ class TestCalibHXNeuronCoba(unittest.TestCase):
 
     def test_access_calib_result(self):
         """
-        Calibration related parameters only available after run() or
-        preprocess().
+        Calibration related parameters only available after run().
         """
         with self.assertRaises(AttributeError):
             _ = self.pop.calib_target
@@ -203,7 +201,7 @@ class TestCalibHXNeuronCoba(unittest.TestCase):
         with self.assertRaises(AttributeError):
             _ = self.pop.actual_hwparams
 
-        pynn.preprocess()
+        pynn.run(None, pynn.RunCommand.PREPARE)
         _ = self.pop.calib_target
         _ = self.pop.calib_hwparams
         _ = self.pop.actual_hwparams
@@ -212,7 +210,7 @@ class TestCalibHXNeuronCoba(unittest.TestCase):
         """
         Test correct assignment/masking in population views.
         """
-        pynn.preprocess()
+        pynn.run(None, pynn.RunCommand.PREPARE)
         # modifying second entry in the population view should change the third
         # neuron in the parent population
         self.pop[1:3].actual_hwparams[1].leak.v_leak = 1022

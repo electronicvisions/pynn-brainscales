@@ -23,10 +23,12 @@ def main():
         synapse_type=pynn.standardmodels.synapses.StaticSynapse(weight=63),
         receptor_type="excitatory")
 
-    # new pre-process call, applies map&route and calibration
-    # is needed to work on the result of the calibration, is also implicitly
-    # called upon run()
-    pynn.preprocess()
+    # The calibration needs to be executed in order to work
+    # on the calibration results. The calibration is executed
+    # upon run. If we do not want to perform an experiment,
+    # we can use the PREPARE command which just executes
+    # the calibration and map&route.
+    pynn.run(None, pynn.RunCommand.PREPARE)
 
     # get calibration result in form of list of atomic neurons indexed as the
     # population

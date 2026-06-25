@@ -591,12 +591,14 @@ class CalibHXNeuronCuba(NeuronCellType):
         Hardware parameters used for actual hardware execution, can be
         manually adjusted.
 
-        Only set after pynn.preprocess() or pynn.run() call.
+        Only set after pynn.run() call. You do not need to execute the
+        experiment but can also use `pynn.run(None, pynn.RunComand.PREPARE)`.
         """
         # cast to tuple prevents overwriting reference with new object
         if self._actual_hwparams is None:
             raise AttributeError("actual_hwparams only available after "
-                                 "pynn.preprocess() or pynn.run() call.")
+                                 "pynn.run() call. You can als use "
+                                 "pynn.run(None, pynn.RunCommand.PREPARE).")
         return tuple(self._actual_hwparams)
 
     @property
@@ -604,11 +606,13 @@ class CalibHXNeuronCuba(NeuronCellType):
         """
         Archive of resulting hardware parameters from last calibration run.
 
-        Only set after pynn.preprocess() or pynn.run() call.
+        Only set after pynn.run() call. You do not need to execute the
+        experiment but can also use `pynn.run(None, pynn.RunComand.PREPARE)`.
         """
         if self._calib_hwparams is None:
-            raise AttributeError("calib_hwparams only available after "
-                                 "pynn.preprocess() or pynn.run() call.")
+            raise AttributeError("actual_hwparams only available after "
+                                 "pynn.run() call. You can als use "
+                                 "pynn.run(None, pynn.RunCommand.PREPARE).")
         return self._calib_hwparams
 
     @property
@@ -616,11 +620,13 @@ class CalibHXNeuronCuba(NeuronCellType):
         """
         Archive of cell parameters used for last calibration run.
 
-        Only set after pynn.preprocess() or pynn.run() call.
+        Only set after pynn.run() call. You do not need to execute the
+        experiment but can also use `pynn.run(None, pynn.RunComand.PREPARE)`.
         """
         if self._calib_target is None:
-            raise AttributeError("calib_target only available after "
-                                 "pynn.preprocess() or pynn.run() call.")
+            raise AttributeError("actual_hwparams only available after "
+                                 "pynn.run() call. You can als use "
+                                 "pynn.run(None, pynn.RunCommand.PREPARE).")
         return self._calib_target
 
 
