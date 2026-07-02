@@ -108,6 +108,41 @@ class TestRecordingAndProjections(unittest.TestCase):
 
         self.assertTrue(
             np.all(np.argmax(psp_heights, axis=1) == np.arange(len(labels))))
+        pynn.end()
+
+    def test_cadc_recording(self):
+        """
+        Test that samples are recorded for all requested compartments.
+        """
+        pynn.setup(initial_config=pynn.helper.chip_from_nightly())
+
+        McNeuron, labels = self.create_chain()
+        pop = pynn.Population(1, McNeuron(threshold_enable=False))
+
+        runtime = 0.15
+        spikes = np.linspace(0.01, runtime - 0.05, len(labels))
+
+        for label, spike in zip(labels, spikes):
+            source = pynn.Population(5, pynn.cells.SpikeSourceArray(
+                spike_times=[spike]))
+            pynn.Projection(source, pop,
+                            pynn.AllToAllConnector(location_selector=label),
+                            synapse_type=StaticSynapse(weight=63))
+
+        pop.record("v", locations=labels, device='cadc')
+        pynn.run(runtime)
+
+        traces = pop.get_data("v").segments[0].irregularlysampledsignals
+
+        # One recorded trace for each compartment
+        self.assertEqual(len(traces), len(labels))
+        for trace in traces:
+            self.assertTrue(trace.size > 0)
+
+        # Check that traces differ
+        self.assertFalse(np.all(traces[0] == traces[1]))
+
+        pynn.end()
 
 
 if __name__ == "__main__":
