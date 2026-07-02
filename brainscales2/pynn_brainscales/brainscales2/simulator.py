@@ -4,7 +4,7 @@ from typing import Optional, Final, List, Dict, Union, NamedTuple
 import numpy as np
 from pyNN.common import IDMixin, Population, Projection
 from pyNN.common.control import BaseState
-from dlens_vx_v3 import hal, halco, sta, logger
+from dlens_vx_v3 import hal, halco, sta, logger, lola
 import pygrenade_vx as grenade
 import pygrenade_common as grenade_common
 
@@ -185,6 +185,17 @@ class State(BaseState):
         self.grenade_experiment.reset()
         self.recordings = [self.recordings[-1]]
         self.realtime_snippet_count = 0
+
+    def get_base_configuration(self) -> lola.Chip:
+        """
+        Get base configuration.
+
+        :return: initial configuration if supplied. Otherwise default
+            chip object.
+        """
+        if self.initial_config is not None:
+            return self.initial_config
+        return lola.Chip()
 
     def _generate_hooks(self):
         assert self.injection_pre_static_config is not None

@@ -269,7 +269,7 @@ class HXNeuron(NeuronCellType):
         # TODO: make more efficient with less duplicate entries
         parameterization.base_configs = [
             (list(range(len(population))),
-             simulator.state.initial_config)]
+             simulator.state.get_base_configuration())]
 
         for i in population.recorder.recorded["v"]:
             parameterization.configs[population.id_to_index(i.cell_id)][

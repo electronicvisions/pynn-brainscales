@@ -202,8 +202,6 @@ def setup(timestep=simulator.State.dt, min_delay=DEFAULT_MIN_DELAY,
                 "setup(): Supplied initial_config "
                 "overwritten by enable_neuron_bypass")
         initial_config = lola.Chip.default_neuron_bypass
-    if initial_config is None:
-        initial_config = lola.Chip()
     simulator.state.initial_config = initial_config
     simulator.state.prepare_static_config()
     simulator.state.grenade_experiment.calibration.cache_paths = \

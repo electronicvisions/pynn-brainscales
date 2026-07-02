@@ -195,13 +195,6 @@ class McNeuronBase(StandardCellType, ABC):
                 population.grenade_descriptor, experiment.mapped_topology)
         population.celltype.apply_config(coords)
 
-        parameter_space = population.celltype.parameter_space
-        parameter_space.shape = (population.size,)
-        # we want to iterate over parameter space -> evaluate to get rid of
-        # laziness
-        parameter_space.evaluate(
-            mask=population._mask_local, simplify=False)  # pylint: disable=protected-access
-
         configs = []
         for cell_in_pop, _ in enumerate(population.all_cells):
             logical_neuron = population.celltype.get_logical_neuron(
@@ -213,7 +206,7 @@ class McNeuronBase(StandardCellType, ABC):
         parameterization.configs = configs
         parameterization.base_configs = [(
             list(range(len(population))),
-            simulator.state.initial_config)]
+            simulator.state.get_base_configuration())]
 
         return {1: parameterization}
 
