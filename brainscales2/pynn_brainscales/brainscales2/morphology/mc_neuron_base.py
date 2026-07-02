@@ -225,6 +225,24 @@ class McNeuronBase(StandardCellType, ABC):
             list(range(len(population))),
             simulator.state.get_base_configuration())]
 
+        # set readout source
+        for i in population.recorder.recorded["v"]:
+            parameterization.configs[population.id_to_index(i.cell_id)][
+                grenade_common.CompartmentOnNeuron(i.comp_id.value())][
+                0].readout.source = lola.AtomicNeuron.Readout.Source.membrane
+        for i in population.recorder.recorded["exc_synin"]:
+            parameterization.configs[population.id_to_index(i.cell_id)][
+                grenade_common.CompartmentOnNeuron(i.comp_id.value())][
+                0].readout.source = lola.AtomicNeuron.Readout.Source.exc_synin
+        for i in population.recorder.recorded["inh_synin"]:
+            parameterization.configs[population.id_to_index(i.cell_id)][
+                grenade_common.CompartmentOnNeuron(i.comp_id.value())][
+                0].readout.source = lola.AtomicNeuron.Readout.Source.inh_synin
+        for i in population.recorder.recorded["adaptation"]:
+            parameterization.configs[population.id_to_index(i.cell_id)][
+                grenade_common.CompartmentOnNeuron(i.comp_id.value())][
+                0].readout.source = lola.AtomicNeuron.Readout.Source.adaptation
+
         return {1: parameterization}
 
     @classmethod
