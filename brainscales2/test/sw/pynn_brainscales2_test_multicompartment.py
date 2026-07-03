@@ -275,8 +275,9 @@ class TestPopulation(unittest.TestCase):
         pynn.end()
 
 
-class TestCalibration(unittest.TestCase):
-    def test_correct_default_values(self):
+class TestInitialization(unittest.TestCase):
+
+    def setUp(self):
         v_leak = [[1], [9999]]
         v_threshold = [[1], [9999]]
         comp_0 = Compartment(positions=[0], label='my_label',
@@ -288,7 +289,7 @@ class TestCalibration(unittest.TestCase):
         comp_1 = Compartment(positions=[1], label='my_label',
                              connect_conductance=[(1, 200)])
         connections = [SharedLineConnection(start=0, stop=1, row=0)]
-        McNeuron = create_mc_neuron(
+        self.neuron_class = create_mc_neuron(
             'McNeuron', compartments=[comp_0, comp_1], connections=connections)
 
         initial_config = lola.Chip()
@@ -303,22 +304,24 @@ class TestCalibration(unittest.TestCase):
 
         # values expected after initialization
         v_leak[1][0] = 1
-        v_leak = McCircuitParameters(v_leak)
+        self.v_leak = McCircuitParameters(v_leak)
         v_threshold[1][0] = 1
-        v_threshold = McCircuitParameters(v_threshold)
+        self.v_threshold = McCircuitParameters(v_threshold)
 
-        pop = pynn.Population(1, McNeuron())
+    def test_correct_default_values(self):
+
+        pop = pynn.Population(1, self.neuron_class())
         pynn.run(None, pynn.RunCommand.PREPARE)
 
         # Get single value
-        self.assertEqual(pop.get('leak_v_leak'), v_leak)
+        self.assertEqual(pop.get('leak_v_leak'), self.v_leak)
 
         # Get multiple values
         self.assertEqual(pop.get(['leak_v_leak', 'threshold_v_threshold']),
-                         [v_leak, v_threshold])
+                         [self.v_leak, self.v_threshold])
 
         # Parameters provided to neuron class
-        pop = pynn.Population(1, McNeuron(leak_v_leak=100))
+        pop = pynn.Population(1, self.neuron_class(leak_v_leak=100))
         self.assertEqual(pop.get('leak_v_leak'), 100)
 
         pynn.end()
