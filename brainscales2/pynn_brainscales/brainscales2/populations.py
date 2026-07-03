@@ -76,6 +76,7 @@ class Population(pyNN.common.Population, grenade.ExperimentElement):
 
     def _get_parameters(self, *names):
         """Return a ParameterSpace containing native parameters"""
+        self.celltype.validate_parameter_space()
         parameter_space = {}
         for name in names:
             value = self.celltype.parameter_space[name]
@@ -93,6 +94,7 @@ class Population(pyNN.common.Population, grenade.ExperimentElement):
 
     def _set_parameters(self, parameter_space):
         """parameter_space should contain native parameters"""
+        self.celltype.validate_parameter_space()
         self.changed_input_data = True
         self._description_cache.clear()
         parameter_space.evaluate(simplify=False)
@@ -317,6 +319,7 @@ class PopulationView(pyNN.common.PopulationView):
 
     def _get_parameters(self, *names):
         """Return a ParameterSpace containing native parameters"""
+        self.celltype.validate_parameter_space()
         parameter_space = {}
         for name in names:
             value = simplify(self.celltype.parameter_space[name])
@@ -332,6 +335,7 @@ class PopulationView(pyNN.common.PopulationView):
 
     def _set_parameters(self, parameter_space):
         """parameter_space should contain native parameters"""
+        self.celltype.validate_parameter_space()
         self.parent.changed_input_data = True
         parameter_space.evaluate(simplify=False)
         for name, value in parameter_space.items():

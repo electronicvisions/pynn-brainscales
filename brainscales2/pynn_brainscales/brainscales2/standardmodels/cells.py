@@ -81,6 +81,23 @@ class HXNeuron(NeuronCellType):
         super().__init__(**parameters)
         parameters.pop("plasticity_rule", None)
         self._user_provided_parameters = parameters
+        self._initial_config_applied = False
+
+    def validate_parameter_space(self):
+        """
+        Raise if the parameter space is not yet valid.
+
+        The parameter space is only valid after the initial
+        configuration has been applied. This is only the
+        case after mapping.
+        """
+        if simulator.state.initial_config is not None \
+                and not self._initial_config_applied:
+            raise RuntimeError(
+                "Initial config not yet applied. Parameters are not yet "
+                "set (and will be overwritten during mapping). Perform "
+                "`pynn.run(None, command=pynn.RunCommand.PREPARE)` to apply "
+                "the initial config or run an experiment.")
 
     @classmethod
     def get_default_values(cls) -> dict:
@@ -168,8 +185,9 @@ class HXNeuron(NeuronCellType):
         :param coords: List of coordinates to look up coco. Needs
                        same order and dimensions as parameter_space.
         """
-        if simulator.state.initial_config is None:
-            # no coco provided -> skip
+        if simulator.state.initial_config is None \
+                or self._initial_config_applied:
+            # no coco provided or already applied -> skip
             return
 
         # HXneurons consist of single compartments with single circuits
@@ -198,6 +216,7 @@ class HXNeuron(NeuronCellType):
         self.parameter_space.update(**param_dict)
         # parameters provided manually by the user have precedence -> overwrite
         self.parameter_space.update(**self._user_provided_parameters)
+        self._initial_config_applied = True
 
     @staticmethod
     def generate_vertex(population: Population) \

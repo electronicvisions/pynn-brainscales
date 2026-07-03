@@ -322,8 +322,34 @@ class TestInitialization(unittest.TestCase):
 
         # Parameters provided to neuron class
         pop = pynn.Population(1, self.neuron_class(leak_v_leak=100))
+        pynn.run(None, pynn.RunCommand.PREPARE)
         self.assertEqual(pop.get('leak_v_leak'), 100)
 
+        pynn.end()
+
+    def test_initial_config_access(self):
+        """
+        Access to values should only be available after mapping if an
+        initial config is supplied.
+        """
+        pop = pynn.Population(1, self.neuron_class())
+
+        # Access is only allowed after mapping
+        with self.assertRaises(RuntimeError):
+            pop.get("leak_v_leak")
+        with self.assertRaises(RuntimeError):
+            pop.set(leak_v_leak=300)
+
+        # performs mapping
+        pynn.run(None, pynn.RunCommand.PREPARE)
+
+        # values are available now
+        self.assertEqual(pop.get('leak_v_leak'), self.v_leak)
+
+        # check that values are not overwritten when run is executed again
+        pop.set(leak_v_leak=300)
+        pynn.run(None, pynn.RunCommand.PREPARE)
+        self.assertEqual(pop.get('leak_v_leak'), 300)
         pynn.end()
 
 

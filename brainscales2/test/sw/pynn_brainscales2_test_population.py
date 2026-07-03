@@ -2,6 +2,7 @@
 
 import unittest
 import numpy as np
+from dlens_vx_v3 import halco, lola
 import pynn_brainscales.brainscales2 as pynn
 from pynn_brainscales import errors, parameters
 from pynn_brainscales.brainscales2.morphology import create_mc_neuron, \
@@ -241,6 +242,37 @@ class TestAPopulation(unittest.TestCase):
         with self.assertRaisesRegex(KeyError, r".*doesnotexist.*"):
             # different call parameters, must not hit
             pop.describe(engine="doesnotexist")
+
+    def test_initial_config_access(self):
+        """
+        Access to values should only be available after mapping if an
+        initial config is supplied.
+        """
+        config = lola.Chip()
+        config.neuron_block.atomic_neurons[halco.AtomicNeuronOnDLS()]\
+            .leak.i_bias = 666  # pylint: disable=no-member
+        pynn.setup(initial_config=config)
+
+        pop = pynn.Population(2, pynn.cells.HXNeuron())
+
+        # Access is only allowed after mapping
+        with self.assertRaises(RuntimeError):
+            pop.get("leak_i_bias")
+        with self.assertRaises(RuntimeError):
+            pop.set(leak_i_bias=300)
+
+        # performs mapping
+        pynn.run(None, pynn.RunCommand.PREPARE)
+
+        # values are available now
+        self.assertTrue(
+            np.array_equal(pop.get("leak_i_bias"), [666, 0]))
+
+        # check that values are not overwritten when run is executed again
+        pop[1:].set(leak_i_bias=300)
+        pynn.run(None, pynn.RunCommand.PREPARE)
+        self.assertTrue(
+            np.array_equal(pop.get("leak_i_bias"), [666, 300]))
 
 
 class TestLolaNeuronConstruction(unittest.TestCase):

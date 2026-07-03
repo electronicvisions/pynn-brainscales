@@ -107,6 +107,23 @@ class McNeuronBase(StandardCellType, ABC):
     def __init__(self, **parameters):
         self._user_provided_parameters = parameters
         super().__init__(**parameters)
+        self._initial_config_applied = False
+
+    def validate_parameter_space(self):
+        """
+        Raise if the parameter space is not yet valid.
+
+        The parameter space is only valid after the initial
+        configuration has been applied. This is only the
+        case after mapping.
+        """
+        if simulator.state.initial_config is not None \
+                and not self._initial_config_applied:
+            raise RuntimeError(
+                "Initial config not yet applied. Parameters are not yet "
+                "set (and will be overwritten during mapping). Perform "
+                "`pynn.run(None, command=pynn.RunCommand.PREPARE)` to apply "
+                "the initial config or run an experiment.")
 
     # check that members are correctly implemented
     def __init_subclass__(cls, **kwargs):
@@ -418,7 +435,8 @@ class McNeuronBase(StandardCellType, ABC):
         :param coords: List of coordinates for which to look up the initial
             configuration. Needs same order and dimensions as parameter_space.
         """
-        if simulator.state.initial_config is None:
+        if simulator.state.initial_config is None \
+                or self._initial_config_applied:
             return
 
         for param_name in self.parameter_space.keys():
@@ -441,6 +459,7 @@ class McNeuronBase(StandardCellType, ABC):
 
             self._update_all_but_first('membrane_capacitance_capacitance', 0)
             self._update_all_but_first('threshold_enable', False)
+        self._initial_config_applied = True
 
     @classmethod
     def _change_all_but_first_circuit(cls, value: Any, new_value: Any

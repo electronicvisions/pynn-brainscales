@@ -71,6 +71,15 @@ class StandardCellType(ABC, UpstreamStandardCellType):
             [1], grenade.MultiIndex([receptor.value()]),
             [grenade.ReceptorOnCompartmentDimensionUnit()])
 
+    def validate_parameter_space(self):
+        """
+        Raise if the parameter space is not yet valid.
+
+        In case an initial config is supplied upon setup,
+        the parameter space is not valid until mapping
+        for uncalibrated neurons.
+        """
+
 
 class NeuronCellType(StandardCellType, plasticity_rules.PlasticityRuleHandle):
     """
