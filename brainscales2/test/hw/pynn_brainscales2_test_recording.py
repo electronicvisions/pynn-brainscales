@@ -411,6 +411,34 @@ class TestMADCRecording(unittest.TestCase):
         self.assertLess(samples.max() - samples[:100].mean(), 10)
         self.assertGreater(samples[:100].mean() - samples.min(), 20)
 
+    def test_recording_multiple_pops(self):
+        """
+        Check that we can record two different populations at the same time.
+        NOTE: We do not test the correctness of the hardware configuration.
+        """
+        pops = [pynn.Population(1, pynn.cells.HXNeuron()) for _ in range(2)]
+
+        for pop in pops:
+            pop.record(["v"], device='madc')
+
+        pynn.run(0.1)
+
+        for pop in pops:
+            samples = pop.get_data("v").segments[-1].irregularlysampledsignals
+            self.assertTrue(len(samples) == 1)
+            for sample in samples:
+                self.assertTrue(sample.size > 0)
+
+        # check that recordings differ
+        samples = [pop.get_data().segments[-1].irregularlysampledsignals[0]
+                   for pop in pops]
+        # MADC might record different number of samples for different channels.
+        # If the number of samples is different, we already know that different
+        # channels are returned
+        if len(samples[0]) == len(samples[1]):
+            self.assertFalse(
+                np.all(samples[0].magnitude == samples[1].magnitude))
+
 
 class TestCADCRecording(unittest.TestCase):
     """
@@ -451,6 +479,31 @@ class TestCADCRecording(unittest.TestCase):
         with self.assertRaises(IndexError):
             samples = pop[3:4].get_data("v").segments[-1]\
                 .irregularlysampledsignals[0]
+
+    def test_recording_multiple_pops(self):
+        """
+        Check that we can record two different populations at the same time.
+        NOTE: We do not test the correctness of the hardware configuration.
+        """
+        n_pops = 2
+        pops = [pynn.Population(1, pynn.cells.HXNeuron())
+                for _ in range(n_pops)]
+
+        for pop in pops:
+            pop.record(["v"], device='cadc')
+
+        pynn.run(0.1)
+
+        for pop in pops:
+            samples = pop.get_data().segments[-1].irregularlysampledsignals
+            self.assertTrue(len(samples) == 1)
+            for sample in samples:
+                self.assertTrue(sample.size > 0)
+
+        # check that recordings differ
+        samples = [pop.get_data().segments[-1].irregularlysampledsignals[0]
+                   for pop in pops]
+        self.assertFalse(np.all(samples[0].magnitude == samples[1].magnitude))
 
 
 class TestMADCCADCRecording(unittest.TestCase):
@@ -503,6 +556,36 @@ class TestMADCCADCRecording(unittest.TestCase):
         with self.assertRaises(IndexError):
             _ = pop[4:5].get_data("v").segments[-1]\
                 .irregularlysampledsignals[0]
+
+    def test_recording_multiple_pops(self):
+        """
+        Check that we can record two different populations at the same time.
+        NOTE: We do not test the correctness of the hardware configuration.
+        """
+
+        pop_cadc = pynn.Population(3, pynn.cells.HXNeuron())
+        pop_cadc.record(["v"], device='cadc')
+        pop_madc = pynn.Population(1, pynn.cells.HXNeuron())
+        pop_madc.record(["v"], device='madc')
+
+        pynn.run(0.1)
+
+        # check CADC
+        cadc_samples = pop_cadc.get_data("v").segments[-1]\
+            .irregularlysampledsignals
+        self.assertTrue(len(cadc_samples) == 3)
+        for sample in cadc_samples:
+            self.assertTrue(sample.size > 0)
+
+        # check MADC
+        madc_samples = pop_madc.get_data("v").segments[-1]\
+            .irregularlysampledsignals
+        self.assertTrue(len(madc_samples) == 1)
+        self.assertTrue(madc_samples[0].size > 0)
+
+        # MADC has higher temporal resolution -> make sure correct device is
+        # assigned to correct neurons
+        self.assertGreater(len(madc_samples[0]), len(cadc_samples[0]))
 
 
 class TestClearBehavior(unittest.TestCase):
