@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from typing import List
+from typing import List, Tuple
 import unittest
 
 import numpy as np
@@ -9,7 +9,7 @@ import neo
 import pynn_brainscales.brainscales2 as pynn
 from pynn_brainscales.brainscales2.standardmodels.synapses import StaticSynapse
 from pynn_brainscales.brainscales2.morphology import create_mc_neuron, \
-    Compartment, SharedLineConnection
+    Compartment, SharedLineConnection, McNeuronBase
 from pynn_brainscales.brainscales2.examples.multicompartment import main
 
 
@@ -51,9 +51,14 @@ class TestRecordingAndProjections(unittest.TestCase):
 
         return psp_heights
 
-    def test_recording_and_projections(self):
-        pynn.setup(initial_config=pynn.helper.chip_from_nightly())
+    @staticmethod
+    def create_chain() -> Tuple[McNeuronBase, List[str]]:
+        """
+        Create a neuron class which represents a chain with
+        three compartments.
 
+        :return: Neuron class and labels for different compartments.
+        """
         labels = [f'comp_{i}' for i in range(3)]
         comps = []
         comps.append(Compartment(positions=[0], label=labels[0],
@@ -70,6 +75,12 @@ class TestRecordingAndProjections(unittest.TestCase):
         McNeuron = create_mc_neuron(
             'McNeuron', compartments=comps,
             connections=connections, single_active_circuit=True)
+        return McNeuron, labels
+
+    def test_recording_and_projections(self):
+        pynn.setup(initial_config=pynn.helper.chip_from_nightly())
+
+        McNeuron, labels = self.create_chain()
         pop = pynn.Population(1, McNeuron(threshold_enable=False))
 
         isi = 0.5   # ms (hw)
