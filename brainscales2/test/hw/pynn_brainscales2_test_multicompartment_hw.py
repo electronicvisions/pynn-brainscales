@@ -144,6 +144,44 @@ class TestRecordingAndProjections(unittest.TestCase):
 
         pynn.end()
 
+    def test_readout_source(self):
+        """
+        Test that the selection of the readout source works.
+        """
+        pynn.setup(initial_config=pynn.helper.chip_from_nightly())
+
+        McNeuron, labels = self.create_chain()
+        pop = pynn.Population(1, McNeuron(threshold_enable=False))
+
+        in_pop = pynn.Population(5, pynn.cells.SpikeSourceArray(
+            spike_times=[0.5, 0.6]))
+
+        synapse = pynn.standardmodels.synapses.StaticSynapse(weight=63)
+        pynn.Projection(in_pop, pop, pynn.AllToAllConnector(),
+                        synapse_type=synapse)
+        pop.record("v", locations=[labels[0]])
+        pynn.run(1)
+        pynn.reset()
+
+        samples = pop.get_data().segments[-1].irregularlysampledsignals[0]
+
+        # check that input spikes have an effect.
+        self.assertGreater(samples.max() - samples[:100].mean(), 20)
+
+        # test that changing the readout source works (synaptic inputs
+        # pull the synaptic line down)
+        pop.record(None)
+        pop.record("exc_synin", locations=[labels[0]])
+        pynn.run(1)
+        samples = pop.get_data().segments[-1].irregularlysampledsignals[0]
+
+        # also assert that the maximum is not too high. Otherwise we
+        # could still record the membrane and detect the reset.
+        self.assertLess(samples.max() - samples[:100].mean(), 10)
+        self.assertGreater(samples[:100].mean() - samples.min(), 20)
+
+        pynn.end()
+
 
 if __name__ == "__main__":
     unittest.main()
