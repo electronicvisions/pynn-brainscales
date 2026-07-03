@@ -144,6 +144,44 @@ class TestRecordingAndProjections(unittest.TestCase):
 
         pynn.end()
 
+    def test_madc_recording(self):
+        """
+        Test that samples are recorded for all requested compartments
+        of a single.
+        """
+        pynn.setup(initial_config=pynn.helper.chip_from_nightly())
+
+        McNeuron, labels = self.create_chain()
+        pop = pynn.Population(1, McNeuron(threshold_enable=False))
+
+        runtime = 0.15
+        spikes = np.linspace(0.01, runtime - 0.05, len(labels))
+
+        for label, spike in zip(labels, spikes):
+            source = pynn.Population(5, pynn.cells.SpikeSourceArray(
+                spike_times=[spike]))
+            pynn.Projection(source, pop,
+                            pynn.AllToAllConnector(location_selector=label),
+                            synapse_type=StaticSynapse(weight=63))
+
+        labels_to_record = labels[:2]
+        pop.record("v", locations=labels_to_record, device='madc')
+        pynn.run(runtime)
+
+        traces = pop.get_data("v").segments[0].irregularlysampledsignals
+
+        # One recorded trace for each compartment
+        self.assertEqual(len(labels_to_record), len(traces))
+        for trace in traces:
+            self.assertTrue(trace.size > 0)
+
+        # MADC might record different number of samples for different channels.
+        # If the number of samples is different, we already know that different
+        # channels are returned
+        if len(traces[0]) == len(traces[1]):
+            self.assertFalse(np.all(traces[0] == traces[1]))
+        pynn.end()
+
     def test_readout_source(self):
         """
         Test that the selection of the readout source works.
