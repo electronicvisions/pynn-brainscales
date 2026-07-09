@@ -81,6 +81,7 @@ def build(bld):
         use = ['pynn_brainscales2'],
         pylint_config = join(get_toplevel_path(), "code-format", "pylintrc"),
         pycodestyle_config = join(get_toplevel_path(), "code-format", "pycodestyle"),
+        test_timeout = 60,
     )
 
     if bld.env.DOXYGEN:
