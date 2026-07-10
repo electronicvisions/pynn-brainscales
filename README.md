@@ -62,8 +62,8 @@ export LD_LIBRARY_PATH=`pwd`/lib:$LD_LIBRARY_PATH
 export PYTHONPATH=`pwd`/lib/python3.11/site-packages:$PYTHONPATH
 export PATH=`pwd`/bin:$PATH
 
-# 9) You can now run any program, e.g. plain unit tests
-c pynn_brainscales2_test_population.py
+# 9) You can ensure a successful installation by importing pynn-brainscales:
+c python -c "import pynn_brainscales.brainscales2 as pynn"
 ```
 
 ### On the Electronic Vision(s) Cluster
