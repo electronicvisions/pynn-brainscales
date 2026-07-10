@@ -17,8 +17,15 @@ try {
 		// upstream PyNN depends on h5py...
 		container              : [app: "dls"],
 		configureInstallOptions: "--build-profile=ci",
-		testSlurmResource: getHxTestResource(3),
-		preTestHook: { configureHxCubeBitfile() },
+		testRunners: [
+				"sw"  : onSlurmResource.&call.curry("cpus-per-task": 8),
+				"cube": { Closure testExec ->
+					onSlurmResource(getHxTestResource(3)) {
+						configureHxCubeBitfile()
+						testExec()
+					}
+				},
+		],
 		testOptions: "--test-execall -j1"
 	] << commonPipelineOptions
 
