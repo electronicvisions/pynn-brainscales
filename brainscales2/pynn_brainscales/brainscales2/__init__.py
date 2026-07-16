@@ -283,6 +283,10 @@ def run(runtime: Optional[float],
                 "To only perform map and route operations on the current "
                 "network configuration use `command=pyNN.RunCommand.PREPARE`")
         simulator.state.run()
+
+        # reset clear flag since new data was recorded
+        for recorder in simulator.state.recorders:
+            recorder.clear_flag = False
     else:
         raise ValueError("Passed command is invalid.")
 

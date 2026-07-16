@@ -658,5 +658,94 @@ class TestClearBehavior(unittest.TestCase):
         self.assertEqual(len(spikes_1), self.n_spikes)
 
 
+class TestMultipleRuns(unittest.TestCase):
+    """
+    Test recording when several runs are executed.
+    """
+    runtime = 2
+
+    def setUp(self) -> None:
+        '''
+        Perform experiment and record spikes
+        '''
+        pynn.setup(enable_neuron_bypass=True)
+
+        self.pop = pynn.Population(1, pynn.cells.HXNeuron())
+        self.pop.record('spikes')
+
+        self.input_pop = pynn.Population(1, pynn.cells.SpikeSourceArray())
+        pynn.Projection(self.input_pop, self.pop, pynn.AllToAllConnector(),
+                        synapse_type=StaticSynapse(weight=63))
+        self.input_pop.record("spikes")
+
+    def tearDown(self) -> None:
+        pynn.end()
+
+    def test_raise_without_reset(self):
+        pynn.run(self.runtime)
+
+        with self.assertRaises(RuntimeError):
+            pynn.run(self.runtime)
+
+    def test_changes(self):
+        n_runs = 4
+
+        for n_run in range(n_runs):
+            spikes = np.linspace(0.1, 0.9 * self.runtime, n_run)
+            self.input_pop.set(spike_times=spikes)
+            pynn.run(self.runtime)
+            pynn.reset()
+
+        self.assertEqual(len(self.pop.get_data().segments), n_runs)
+        self.assertEqual(len(self.input_pop.get_data().segments), n_runs)
+
+        for n_run, seg in enumerate(self.pop.get_data().segments):
+            self.assertEqual(len(seg.spiketrains[0]), n_run)
+
+        for n_run, seg in enumerate(self.input_pop.get_data().segments):
+            self.assertEqual(len(seg.spiketrains[0]), n_run)
+
+    def test_clear(self):
+        n_runs = 4
+
+        for n_run in range(n_runs):
+            spikes = np.linspace(0.1, 0.9 * self.runtime, n_run)
+            self.input_pop.set(spike_times=spikes)
+
+            pynn.run(self.runtime)
+            pynn.reset()
+            segments = self.pop.get_data(clear=True).segments
+            segments_in = self.input_pop.get_data(clear=True).segments
+
+            self.assertEqual(len(segments), 1)
+            self.assertEqual(len(segments_in), 1)
+
+            self.assertEqual(len(segments[-1].spiketrains[0]), n_run)
+            self.assertEqual(len(segments_in[-1].spiketrains[0]), n_run)
+
+    def test_with_repetitions(self):
+        n_runs = 4
+        n_reps = 2
+
+        for n_run in range(n_runs):
+            spikes = np.linspace(0.1, 0.9 * self.runtime, n_run)
+            self.input_pop.set(spike_times=spikes)
+
+            for _ in range(n_reps):
+                pynn.run(self.runtime)
+                pynn.reset()
+            segments = self.pop.get_data(clear=True).segments
+            segments_in = self.input_pop.get_data(clear=True).segments
+
+            self.assertEqual(len(segments), n_reps)
+            self.assertEqual(len(segments_in), n_reps)
+
+            for seg in segments:
+                self.assertEqual(len(seg.spiketrains[0]), n_run)
+
+            for seg in segments_in:
+                self.assertEqual(len(seg.spiketrains[0]), n_run)
+
+
 if __name__ == "__main__":
     unittest.main()
