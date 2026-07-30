@@ -22,6 +22,7 @@ from dlens_vx_v3 import lola, hal, halco, sta, hxcomm
 import pygrenade_vx.network.abstract as grenade
 import pygrenade_vx.network as grenade_network
 import pygrenade_vx.common as grenade_vx_common
+import pygrenade_vx as grenade_vx
 import pygrenade_common as grenade_common
 
 
@@ -484,8 +485,18 @@ class CalibHXNeuronCuba(NeuronCellType):
             [len(population)],
             [grenade_common.CellOnPopulationDimensionUnit()])
 
+        calibration_targets = CalibHXNeuronCuba.generate_calibration_targets(
+            population)
+
+        membrane_capacitances = []
+        for parameters in population.celltype.parameter_space:
+            membrane_capacitances.append({
+                grenade_common.CompartmentOnNeuron():
+                grenade_vx.ideal_capacitance_per_neuron * parameters["cm"]
+                / hal.NeuronConfig.MembraneCapacitorSize.max})
+
         parameter_space = grenade.CalibratedNeuron.ParameterSpace(
-            CalibHXNeuronCuba.generate_calibration_targets(population))
+            calibration_targets, membrane_capacitances)
 
         return grenade_common.Population(
             cell=cell,
@@ -511,8 +522,9 @@ class CalibHXNeuronCuba(NeuronCellType):
                 grenade.CalibratedNeuron.ParameterSpace\
                 .CalibrationTarget.CubaSynapticInput()
 
-            calibration_target.membrane_capacitance = lola.AtomicNeuron\
-                .MembraneCapacitance.CapacitorSize(parameters["cm"])
+            calibration_target.membrane_capacitance_during_calibration = \
+                grenade_vx.ideal_capacitance_per_neuron * parameters["cm"] / \
+                hal.NeuronConfig.MembraneCapacitorSize.max
             calibration_target.v_leak = int(parameters["v_rest"])
             calibration_target.tau_membrane = float(parameters["tau_m"]) * 1e-6
 
@@ -578,9 +590,20 @@ class CalibHXNeuronCuba(NeuronCellType):
                 {grenade_common.CompartmentOnNeuron():
                  [lola.AtomicNeuron.Readout.Source.adaptation]}
 
+        calibration_targets = CalibHXNeuronCuba.generate_calibration_targets(
+            population)
+
+        membrane_capacitances = []
+        for parameters in population.celltype.parameter_space:
+            membrane_capacitances.append({
+                grenade_common.CompartmentOnNeuron():
+                grenade_vx.ideal_capacitance_per_neuron * parameters["cm"]
+                / hal.NeuronConfig.MembraneCapacitorSize.max})
+
         return {1: grenade.CalibratedNeuron.ParameterSpace
                 .Parameterization(
-                    CalibHXNeuronCuba.generate_calibration_targets(population),
+                    calibration_targets,
+                    membrane_capacitances,
                     readout_sources)}
 
     # map between pynn and hardware parameter names. Cannot utilize pyNN
@@ -840,8 +863,18 @@ class CalibHXNeuronCoba(CalibHXNeuronCuba):
             [len(population)],
             [grenade_common.CellOnPopulationDimensionUnit()])
 
+        calibration_targets = CalibHXNeuronCoba.generate_calibration_targets(
+            population)
+
+        membrane_capacitances = []
+        for parameters in population.celltype.parameter_space:
+            membrane_capacitances.append({
+                grenade_common.CompartmentOnNeuron():
+                grenade_vx.ideal_capacitance_per_neuron * parameters["cm"]
+                / hal.NeuronConfig.MembraneCapacitorSize.max})
+
         parameter_space = grenade.CalibratedNeuron.ParameterSpace(
-            CalibHXNeuronCoba.generate_calibration_targets(population))
+            calibration_targets, membrane_capacitances)
 
         return grenade_common.Population(
             cell=cell,
@@ -868,8 +901,9 @@ class CalibHXNeuronCoba(CalibHXNeuronCuba):
                 grenade.CalibratedNeuron.ParameterSpace\
                 .CalibrationTarget.CobaSynapticInput()
 
-            calibration_target.membrane_capacitance = lola.AtomicNeuron\
-                .MembraneCapacitance.CapacitorSize(parameters["cm"])
+            calibration_target.membrane_capacitance_during_calibration = \
+                grenade_vx.ideal_capacitance_per_neuron * parameters["cm"] / \
+                hal.NeuronConfig.MembraneCapacitorSize.max
             calibration_target.v_leak = int(parameters["v_rest"])
             calibration_target.tau_membrane = float(parameters["tau_m"]) * 1e-6
 
@@ -940,9 +974,20 @@ class CalibHXNeuronCoba(CalibHXNeuronCuba):
                 {grenade_common.CompartmentOnNeuron():
                  [lola.AtomicNeuron.Readout.Source.adaptation]}
 
+        calibration_targets = CalibHXNeuronCoba.generate_calibration_targets(
+            population)
+
+        membrane_capacitances = []
+        for parameters in population.celltype.parameter_space:
+            membrane_capacitances.append({
+                grenade_common.CompartmentOnNeuron():
+                grenade_vx.ideal_capacitance_per_neuron * parameters["cm"]
+                / hal.NeuronConfig.MembraneCapacitorSize.max})
+
         return {1: grenade.CalibratedNeuron.ParameterSpace
                 .Parameterization(
-                    CalibHXNeuronCoba.generate_calibration_targets(population),
+                    calibration_targets,
+                    membrane_capacitances,
                     readout_sources)}
 
 
