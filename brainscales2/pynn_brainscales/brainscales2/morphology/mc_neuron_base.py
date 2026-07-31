@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from copy import deepcopy
 import numbers
@@ -48,17 +48,57 @@ def _expand_to_size(value: Any, size: int) -> Iterable:
     return value
 
 
-class McNeuronBase(StandardCellType, ABC):
+class CommonBase(StandardCellType, ABC):
     '''
-    Base class for multi-compartmental neuron models.
+    Common base class for multi-compartment neurons.
+    '''
+    # the following class members have to be implemented by a subclass
+    compartments: Dict = {}
+    logical_neuron: lola.LogicalNeuron = lola.LogicalNeuron()
+    logical_compartments: halco.LogicalNeuronCompartments = \
+        halco.LogicalNeuronCompartments()
 
-    Contains the core functionality for multi-compartment neurons.
-    It flattens the hierarchy of a `lola.AtomicNeuron`, for example
-    `lola.AtomicNeuron.multicompartment.i_bias_nmda` is expressed as the
-    parameter `multicompartment_i_bias_nmda`.
-    Parameters related to the event routing, configuration of morphology and
-    readout are not exposed since they are determined by other settings in
-    PyNN.
+    @classmethod
+    @abstractmethod
+    def get_compartment_ids(cls, labels: Sequence[str]
+                            ) -> List[halco.CompartmentOnLogicalNeuron]:
+        '''
+        Get compartment Ids of compartments with the specified labels.
+
+        :param labels: Labels for which to extract the compartment IDs.
+        :return: IDs of compartments for which the given labels match.
+            Note that a single label can match one or more compartment IDS.
+        :raises ValueError: If no compartment can be matched to one of the
+            given labels.
+        '''
+
+    @classmethod
+    def get_labels(cls) -> List[str]:
+        '''
+        Retrieve list of all used labels.
+
+        :return: List of all used labels.
+        '''
+
+    @classmethod
+    def get_label(cls, compartment_id: halco.CompartmentOnLogicalNeuron
+                  ) -> str:
+        '''
+        Retrieve label of a single compartment.
+
+        :param compartment_id: ID of compartment for which to retrieve the
+            label.
+        :return: Label of selected compartment.
+        '''
+
+
+class McNeuronBase(CommonBase):
+    '''
+    Base class for manually constructed multi-compartmental neuron models.
+
+    Used when compartments are manually assigned to neuron circuits and
+    connections are manually set. Furthermore, parameters are in the
+    hardware domain (and are not calibrated).
 
     A subclass is expected to set the following member variables:
         - compartments: Dictionary of Compartment Ids and Compartments.
