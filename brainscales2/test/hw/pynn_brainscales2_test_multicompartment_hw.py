@@ -93,7 +93,6 @@ class BaseTestCases:
             self.assertTrue(
                 np.all(np.argmax(psp_heights, axis=1) == np.arange(
                     len(self.labels))))
-            pynn.end()
 
         def test_cadc_recording(self):
             """
@@ -128,8 +127,6 @@ class BaseTestCases:
 
             # Check that traces differ
             self.assertFalse(np.all(traces[0] == traces[1]))
-
-            pynn.end()
 
         def test_madc_recording(self):
             """
@@ -169,7 +166,6 @@ class BaseTestCases:
             # know that different channels are returned
             if len(traces[0]) == len(traces[1]):
                 self.assertFalse(np.all(traces[0] == traces[1]))
-            pynn.end()
 
         def test_readout_source(self):
             """
@@ -208,6 +204,7 @@ class BaseTestCases:
             self.assertLess(samples.max() - samples[:100].mean(), 10)
             self.assertGreater(samples[:100].mean() - samples.min(), 20)
 
+        def tearDown(self):
             pynn.end()
 
 
