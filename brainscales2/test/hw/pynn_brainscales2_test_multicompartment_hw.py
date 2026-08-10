@@ -11,7 +11,10 @@ from pynn_brainscales.brainscales2.standardmodels.synapses import StaticSynapse
 from pynn_brainscales.brainscales2.morphology import create_mc_neuron, \
     PlacedCompartment, SharedLineConnection
 from pynn_brainscales.brainscales2.morphology.builder import MorphologyBuilder
-from pynn_brainscales.brainscales2.examples.multicompartment import main
+from pynn_brainscales.brainscales2.examples.manual_morphology_builder import \
+    main as manual_main
+from pynn_brainscales.brainscales2.examples.morphology_builder import \
+    main as automatic_main
 
 from pygrenade_vx.network.abstract.multicompartment import mechanisms
 
@@ -20,11 +23,17 @@ from pygrenade_vx.network.abstract.multicompartment.compartment_builder \
     import CompartmentBuilder
 
 
-class TestMulticompartmentExample(unittest.TestCase):
+class TestMulticompartmentExamples(unittest.TestCase):
+    """
+    Test that examples are executable.
+    """
     @staticmethod
-    def test_main():
-        # Simply tests if program runs
-        main()
+    def test_manual_builder():
+        manual_main()
+
+    @staticmethod
+    def test_automatic_builder():
+        automatic_main()
 
 
 class BaseTestCases:

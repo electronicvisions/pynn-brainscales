@@ -1,5 +1,18 @@
 #!/usr/bin/env python
 
+"""
+In this example, we show how neuron circuits on BrainScales-2 can be connected
+to form multi-compartmental neuron models.
+
+We explicitly define the location of the different neuron circuits and how
+they are connected. This gives us full control over the configuration of the
+circuits but can be tedious for larger models.
+
+In the example 'morphology_builder.py' we show how you can define an abstract
+graph of your multi-compartmental neuron model and use the automatic
+mapping algorithm to map it to BrainScaleS-2.
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -102,7 +115,7 @@ def main(length: int = 3,
     axs[int(length / 2)].set_ylabel("Membrane Potential [LSB]")
     axs[-1].set_xlabel("Time [ms]")
 
-    fig.savefig("multicompartment_example.png")
+    fig.savefig("manual_morphology_builder.png")
 
 
 if __name__ == "__main__":
