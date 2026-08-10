@@ -4,6 +4,11 @@ import numpy as np
 
 from dlens_vx_v3 import lola, halco
 
+from pygrenade_vx.network.abstract.multicompartment.tree import Connection
+from pygrenade_vx.network.abstract.multicompartment.compartment_builder \
+    import CompartmentBuilder
+
+from pynn_brainscales.brainscales2.morphology.builder import MorphologyBuilder
 from pynn_brainscales.brainscales2.morphology.parts import PlacedCompartment, \
     SharedLineConnection
 from pynn_brainscales.brainscales2.morphology.mc_neuron_base import \
