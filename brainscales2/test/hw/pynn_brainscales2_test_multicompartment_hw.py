@@ -46,7 +46,12 @@ class BaseTestCases:
         labels = [f'comp_{i}' for i in range(3)]
         receptor_type = "excitatory"
 
-        def create_neuron(self):
+        def create_neuron(self, threshold_enable: bool = False):
+            """
+            Create neuron class which is tested.
+
+            :param threshold_enable: Enable threshold in first compartment.
+            """
             raise NotImplementedError()
 
         @staticmethod
@@ -220,17 +225,42 @@ class BaseTestCases:
             self.assertLess(samples.max() - samples[:100].mean(), 10)
             self.assertGreater(samples[:100].mean() - samples.min(), 20)
 
+        def test_spike_recording(self):
+            """
+            Test spike recording.
+            """
+            pynn.setup(initial_config=pynn.helper.chip_from_nightly())
+
+            neuron_class = self.create_neuron(threshold_enable=True)
+            pop = pynn.Population(1, neuron_class())
+
+            in_pop = pynn.Population(1, pynn.cells.SpikeSourceArray(
+                spike_times=np.linspace(0.1, 0.11, 10)))
+
+            synapse = pynn.standardmodels.synapses.StaticSynapse(weight=63)
+            pynn.Projection(in_pop, pop, pynn.AllToAllConnector(),
+                            synapse_type=synapse,
+                            receptor_type=self.receptor_type)
+            pop.record("spikes", locations=[self.labels[0]])
+
+            pynn.run(1)
+
+            spiketrains = pop.get_data().segments[-1].spiketrains
+
+            self.assertGreater(len(spiketrains), 0)
+            self.assertGreater(len(spiketrains[0]), 0)
+
         def tearDown(self):
             pynn.end()
 
 
 class TestRecordingAndProjectionsManual(
         BaseTestCases.TestRecordingAndProjections):
-    def create_neuron(self):
+    def create_neuron(self, threshold_enable: bool = False):
         comps = []
         comps.append(PlacedCompartment(positions=[0], label=self.labels[0],
                                        connect_shared_line=[0],
-                                       threshold_enable=False))
+                                       threshold_enable=threshold_enable))
         comps.append(PlacedCompartment(positions=[1, 2], label=self.labels[1],
                                        connect_conductance=[(1, 1000)],
                                        connect_shared_line=[2],
@@ -251,26 +281,43 @@ class TestRecordingAndProjectionsBuilder(
         BaseTestCases.TestRecordingAndProjections):
     receptor_type = "exc_synin"
 
-    def create_neuron(self):
+    def create_neuron(self, threshold_enable: bool = False):
+
+        def add_passive_mechanisms(c_builder):
+            c_builder.add(
+                mechanisms.MembraneCapacitance(capacitance=2.2e-12),
+                label='v')
+            c_builder.add(
+                mechanisms.CurrentBasedSynapse(strength=500,
+                                               time_constant=10e-6),
+                label='exc_synin')
+            c_builder.add(
+                mechanisms.Leak(v_leak=60, tau_mem=10e-6), label='leak')
 
         # construct compartment
         comp_builder = CompartmentBuilder()
-        comp_builder.add(
-            mechanisms.MembraneCapacitance(capacitance=2.2e-12), label='v')
-        comp_builder.add(
-            mechanisms.CurrentBasedSynapse(strength=500, time_constant=10e-6),
-            label='exc_synin')
+        add_passive_mechanisms(comp_builder)
+        passive_comp = comp_builder.done("PassiveCompartment")
 
+        comp_builder = CompartmentBuilder()
+        add_passive_mechanisms(comp_builder)
         comp_builder.add(
-            mechanisms.Leak(v_leak=60, tau_mem=10e-6), label='leak')
-        compartment_class = comp_builder.done("Compartment")
+            mechanisms.Fire(v_threshold=125,
+                            v_reset=60,
+                            tau_ref=10e-6,
+                            holdoff_time=10e-6),
+            label='spikes')
+        active_comp = comp_builder.done("ActiveCompartment")
 
         # Construct neuron
         builder = MorphologyBuilder()
         nodes = []
-        for label in self.labels:
+        first_comp = active_comp if threshold_enable else passive_comp
+        nodes.append(builder.add_compartment(first_comp(),
+                                             label=self.labels[0]))
+        for label in self.labels[1:]:
             nodes.append(
-                builder.add_compartment(compartment_class(), label=label))
+                builder.add_compartment(passive_comp(), label=label))
 
         connections = [Connection(first, second, 10e-6) for first, second in
                        zip(nodes[:-1], nodes[1:])]
