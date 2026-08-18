@@ -249,12 +249,21 @@ class Projection(
             self.grenade_descriptor = experiment.topology.add_vertex(vertex)
 
         # add in-edge
+        pre_compartment_on_neuron = grenade_common.CuboidMultiIndexSequence(
+            [1],
+            grenade_common.MultiIndex([int(self.pre_compartment)]),
+            [grenade_common.CompartmentOnNeuronDimensionUnit()])
+
+        spike_on_compartment = pre.celltype.get_spike_output_sequence(
+            self.pre_compartment)
+
         in_edge = grenade_common.Edge(
-            input_sequence.cartesian_product(
-                grenade_common.ListMultiIndexSequence([
-                    grenade_common.MultiIndex([int(self.pre_compartment)])],
-                    [grenade_common.CompartmentOnNeuronDimensionUnit()])),
             input_sequence
+            .cartesian_product(pre_compartment_on_neuron)
+            .cartesian_product(spike_on_compartment),
+            input_sequence,
+            port_on_source=pre.celltype.spike_port,
+            port_on_target=0
         )
         experiment.topology.add_edge(
             pre.grenade_descriptor,

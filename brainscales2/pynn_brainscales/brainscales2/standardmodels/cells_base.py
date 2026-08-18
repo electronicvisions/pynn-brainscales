@@ -90,6 +90,22 @@ class StandardCellType(ABC, UpstreamStandardCellType):
         for uncalibrated neurons.
         """
 
+    def get_spike_output_sequence(
+        self,
+        compartment: grenade.CompartmentOnNeuron
+    ) -> grenade.MultiIndexSequence:
+        """
+        Get sequence for spike output.
+
+        :param compartment: Compartment identifier.
+        :return: MultiIndexSequence which specifies the spike output.
+        """
+        del compartment
+
+        # for point neurons, spike output is handled by the spike master.
+        # We do not need to specify it here.
+        return grenade.CuboidMultiIndexSequence()
+
     def get_recording_site(
         self,
         name: str,

@@ -64,6 +64,31 @@ class Recorder(pyNN.recording.Recorder, grenade.frontend.ExperimentElement):
         return {RecordingSite(n_id, c_id) for n_id, c_id in
                 product(neuron_ids, comp_ids)}
 
+    def is_spike_observable(self,
+                            recording_sites: List[RecordingSite],
+                            name: str) -> bool:
+        """
+        Test if the given variable is of spiking type.
+
+        The observable has to have the same type in all compartments
+        otherwise, an error is raised.
+
+        :param recording_sites: Locations where the variable should be
+            recorded.
+        :param name: Name of the variable.
+        :returns: If the variable is of type spike.
+        :raises RuntimeError: If the type is not the same at all
+            locations.
+        """
+        is_spiking = [self.population.celltype.get_observable_type(
+            name, site.comp_id) == ObservableType.EVENT
+            for site in recording_sites]
+
+        if len(np.unique(is_spiking)) > 1:
+            raise RuntimeError(f'Recording type of observable "{name}" '
+                               'differs in compartments.')
+        return all(is_spiking)
+
     def record(self, variables, ids, sampling_interval=None,
                locations=None, *, device="madc"):
         self.changed_topology = True
@@ -84,7 +109,8 @@ class Recorder(pyNN.recording.Recorder, grenade.frontend.ExperimentElement):
         if len(grenade_ids) == 0:
             return
 
-        if "spikes" in variables:
+        if any(self.is_spike_observable(recording_sites, variable)
+                for variable in variable_list):
             self._simulator.state.recordings[-1].config.add_spike_recording(
                 list(grenade_ids))
 
@@ -211,9 +237,10 @@ class Recorder(pyNN.recording.Recorder, grenade.frontend.ExperimentElement):
     def add_spike_trains(self,
                          segment: neo.Segment,
                          snippet_idx: int,
+                         ids: List[RecordingSite],
                          *,
-                         filter_ids=None,
                          clear: bool = True,
+                         variable: str = "spikes"
                          ) -> None:
         """
         Add the recorded spike trains to the segment.
@@ -221,12 +248,11 @@ class Recorder(pyNN.recording.Recorder, grenade.frontend.ExperimentElement):
         :param segment: Segment to which to add the spike trains.
         :param snippet_idx: Snipped for from which to get the
             spike trains.
-        :param filter_ids: Ids of cells for which to get the spike
-            trains. If None, the spike trains of all cells are retrieved.
+        :param ids: Ids for which to get data.
         :param clear: Clear recorded data.
+        :param variable: Name of mechanism that was recorded.
         """
-        sids = sorted(self.filter_recorded('spikes', filter_ids))
-        data = self._get_spiketimes(sids, snippet_idx, clear=clear)
+        data = self._get_spiketimes(ids, snippet_idx, clear=clear)
 
         t_start = sum(self._simulator.state.runtimes[0:snippet_idx]) * pq.ms
         t_stop = t_start + self._simulator.state.runtimes[snippet_idx] * pq.ms
@@ -247,22 +273,23 @@ class Recorder(pyNN.recording.Recorder, grenade.frontend.ExperimentElement):
                 source_id=int(cell.cell_id),
                 source_location=location,
                 source_compartment=int(cell.comp_id),
-                source_index=self.population.id_to_index(int(cell.cell_id)))
+                source_index=self.population.id_to_index(int(cell.cell_id)),
+                name=variable)
             segment.spiketrains.append(spike_train)
             for train in segment.spiketrains:
                 train.segment = segment
 
-    def add_recording(self,
-                      segment: neo.Segment,
-                      snippet_idx: int,
-                      variable: str,
-                      device: str = "madc",
-                      *,
-                      filter_ids=None,
-                      clear: bool = True,
-                      ) -> None:
+    def add_analog_recording(self,
+                             segment: neo.Segment,
+                             snippet_idx: int,
+                             variable: str,
+                             ids: List[RecordingSite],
+                             *,
+                             device: str = "madc",
+                             clear: bool = True,
+                             ) -> None:
         """
-        Add the recorded samples to the segment.
+        Add the analog samples to the segment.
 
         :param segment: Segment to which add the data.
         :param snippet_idx: Snipped for from which to get the
@@ -270,13 +297,11 @@ class Recorder(pyNN.recording.Recorder, grenade.frontend.ExperimentElement):
         :param variable: Name of variable for which to get the data.
         :param device: Device for which get the samples. I.e. CADC or
             MADC.
-        :param filter_ids: Ids of cells for which to get the data.
-            If None, the samples of all cells are retrieved.
+        :param ids: Ids for which to get data.
         :param clear: Clear recorded data.
         """
         t_start = sum(self._simulator.state.runtimes[0:snippet_idx]) * pq.ms
 
-        ids = sorted(self.filter_recorded(variable, filter_ids))
         signal_array, times_array = self._get_all_signals(
             variable, ids, snippet_idx, device=device, clear=clear)
         times_array += t_start
@@ -324,19 +349,52 @@ class Recorder(pyNN.recording.Recorder, grenade.frontend.ExperimentElement):
                 variables_to_include.intersection(set(variables))
         for snippet_idx in range(len(self._simulator.state.recordings) - 1):
             for variable in sorted(variables_to_include):
-                if variable == 'spikes':
-                    self.add_spike_trains(segment, snippet_idx,
-                                          filter_ids=filter_ids, clear=clear)
-                else:
-                    self.add_recording(segment, snippet_idx,
-                                       variable=variable,
-                                       device="madc",
-                                       filter_ids=filter_ids, clear=clear)
-                    self.add_recording(segment, snippet_idx,
-                                       variable=variable,
-                                       device="cadc",
-                                       filter_ids=filter_ids, clear=clear)
+                self.add_recording(segment,
+                                   snippet_idx,
+                                   variable=variable,
+                                   filter_ids=filter_ids,
+                                   clear=clear)
         return segment
+
+    def add_recording(self,
+                      segment: neo.Segment,
+                      snippet_idx: int,
+                      variable: str,
+                      *,
+                      filter_ids=None,
+                      clear: bool = True,
+                      ) -> None:
+        """
+        Add the recorded samples to the segment.
+
+        :param segment: Segment to which add the data.
+        :param snippet_idx: Snipped for from which to get the
+            samples.
+        :param variable: Name of variable for which to get the data.
+        :param filter_ids: Ids of cells for which to get the data.
+            If None, the samples of all cells are retrieved.
+        :param clear: Clear recorded data.
+        """
+        ids = sorted(self.filter_recorded(variable, filter_ids))
+        if self.is_spike_observable(ids, variable):
+            self.add_spike_trains(segment,
+                                  snippet_idx,
+                                  variable=variable,
+                                  ids=ids,
+                                  clear=clear)
+        else:
+            self.add_analog_recording(segment,
+                                      snippet_idx,
+                                      variable=variable,
+                                      ids=ids,
+                                      device="madc",
+                                      clear=clear)
+            self.add_analog_recording(segment,
+                                      snippet_idx,
+                                      variable=variable,
+                                      ids=ids,
+                                      device="cadc",
+                                      clear=clear)
 
     def _get_all_signals(self, variable, ids, snippet_idx,
                          *,
@@ -488,23 +546,43 @@ class Recorder(pyNN.recording.Recorder, grenade.frontend.ExperimentElement):
                 edge=edge)
         recorder_descriptors.update({snippet_index: recorder_descriptor})
 
+    def _get_spike_recording_ids(self):
+        # TODO: remove sorting of PyNN IDs once grenade supports
+        # non-sorted edges to recorders at all below occurrences
+        spike_ids = []
+        spike_dimension = []
+        for variable, ids in self.recorded.items():
+            if not self.is_spike_observable(ids, variable):
+                continue
+            for idx in [self._rec_site_to_grenade_index(i)
+                        for i in sorted(ids)]:
+                comp = idx.compartment_on_neuron
+                spike_sequence = \
+                    self.population.celltype.get_spike_output_sequence(comp)
+                full_index = [idx.neuron_on_population, comp]
+                spiking_elements = spike_sequence.get_elements()
+                if len(spiking_elements) > 0:
+                    assert len(spiking_elements) == 1
+                    full_index += spiking_elements[0].value
+                spike_dimension = spike_sequence.get_dimension_units()
+                spike_ids.append(grenade_common.MultiIndex(full_index))
+
+        dimensions = [grenade_common.CellOnPopulationDimensionUnit(),
+                      grenade_common.CompartmentOnNeuronDimensionUnit()] \
+            + spike_dimension
+
+        return grenade_common.ListMultiIndexSequence(spike_ids, dimensions)
+
     def add_to_topology(
             self,
             experiment: grenade.frontend.ExperimentSnippet):
         celltype = self.population.celltype
         # TODO: remove sorting of PyNN IDs once grenade supports
         # non-sorted edges to recorders at all below occurrences
-        spike_recording_ids = grenade_common.ListMultiIndexSequence(
-            [grenade_common.MultiIndex(
-             [self._rec_site_to_grenade_index(i).neuron_on_population,
-              self._rec_site_to_grenade_index(i).compartment_on_neuron])
-             for i in sorted(self.recorded["spikes"])],
-            [grenade_common.CellOnPopulationDimensionUnit(),
-             grenade_common.CompartmentOnNeuronDimensionUnit()])
         self._add_recorder_to_experiment(
             grenade.SpikeRecorder,
             self.grenade_spike_descriptor,
-            spike_recording_ids,
+            self._get_spike_recording_ids(),
             celltype.spike_port,
             experiment)
 
