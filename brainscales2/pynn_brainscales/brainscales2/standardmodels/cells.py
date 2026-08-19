@@ -308,6 +308,19 @@ class HXNeuron(NeuronCellType):
                 grenade_common.CompartmentOnNeuron()][
                 0].readout.source = lola.AtomicNeuron.Readout.Source.adaptation
 
+        # manage the settings for user-defined plasticity readout source
+        for i in range(len(population)):
+            if population.celltype.parameter_space[
+                    "plasticity_rule_enable_readout_source"][i]:
+                readout_source_value = population.celltype.parameter_space[
+                    "plasticity_rule_readout_source"][i]
+                # convert to int to cast back to an enum
+                readout_source = hal.NeuronConfig.ReadoutSource(
+                    int(readout_source_value))
+                parameterization.configs[i][
+                    grenade_common.CompartmentOnNeuron()][
+                    0].readout.source = readout_source
+
         return {1: parameterization}
 
 
@@ -599,6 +612,15 @@ class CalibHXNeuronCuba(NeuronCellType):
                 grenade_common.CompartmentOnNeuron():
                 grenade_vx.ideal_capacitance_per_neuron * parameters["cm"]
                 / hal.NeuronConfig.MembraneCapacitorSize.max})
+
+        # manage the settings for user-defined plasticity readout source
+        for i in range(len(population)):
+            if population.celltype.parameter_space[
+                    "plasticity_rule_enable_readout_source"][i]:
+                readout_source_value = population.celltype.parameter_space[
+                    "plasticity_rule_readout_source"][i]
+                readout_sources[i] = hal.NeuronConfig.ReadoutSource(
+                    int(readout_source_value))
 
         return {1: grenade.CalibratedNeuron.ParameterSpace
                 .Parameterization(
@@ -983,6 +1005,15 @@ class CalibHXNeuronCoba(CalibHXNeuronCuba):
                 grenade_common.CompartmentOnNeuron():
                 grenade_vx.ideal_capacitance_per_neuron * parameters["cm"]
                 / hal.NeuronConfig.MembraneCapacitorSize.max})
+
+        # manage the settings for user-defined plasticity readout source
+        for i in range(len(population)):
+            if population.celltype.parameter_space[
+                    "plasticity_rule_enable_readout_source"][i]:
+                readout_source_value = population.celltype.parameter_space[
+                    "plasticity_rule_readout_source"][i]
+                readout_sources[i] = hal.NeuronConfig.ReadoutSource(
+                    int(readout_source_value))
 
         return {1: grenade.CalibratedNeuron.ParameterSpace
                 .Parameterization(
