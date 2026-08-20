@@ -414,6 +414,13 @@ class McNeuronBase(CommonBase):
                     val = type(getattr(atomic_member, member_name))(sing_val)
                     setattr(atomic_member, member_name, val)
 
+        for comp_id, circuits in config.morphology.items():  # pylint: disable=no-member
+            # analog output is needed for spiking -> enable globally
+            # TODO: move to reasonable place
+            for circuit_id, circuit in enumerate(circuits):
+                circuit.event_routing.analog_output = \
+                    lola.AtomicNeuron.EventRouting.AnalogOutputMode.normal
+
         return config
 
     def _add_morphology_params_to_ps(self) -> None:
