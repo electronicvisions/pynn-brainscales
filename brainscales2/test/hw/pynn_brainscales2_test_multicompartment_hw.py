@@ -281,26 +281,26 @@ class TestRecordingAndProjectionsBuilder(
         BaseTestCases.TestRecordingAndProjections):
     receptor_type = "exc_synin"
 
+    @staticmethod
+    def _add_passive_mechanisms(c_builder):
+        c_builder.add(
+            mechanisms.MembraneCapacitance(capacitance=2.2e-12),
+            label='v')
+        c_builder.add(
+            mechanisms.CurrentBasedSynapse(strength=500,
+                                           time_constant=10e-6),
+            label='exc_synin')
+        c_builder.add(
+            mechanisms.Leak(v_leak=60, tau_mem=10e-6), label='leak')
+
     def create_neuron(self, threshold_enable: bool = False):
-
-        def add_passive_mechanisms(c_builder):
-            c_builder.add(
-                mechanisms.MembraneCapacitance(capacitance=2.2e-12),
-                label='v')
-            c_builder.add(
-                mechanisms.CurrentBasedSynapse(strength=500,
-                                               time_constant=10e-6),
-                label='exc_synin')
-            c_builder.add(
-                mechanisms.Leak(v_leak=60, tau_mem=10e-6), label='leak')
-
         # construct compartment
         comp_builder = CompartmentBuilder()
-        add_passive_mechanisms(comp_builder)
+        self._add_passive_mechanisms(comp_builder)
         passive_comp = comp_builder.done("PassiveCompartment")
 
         comp_builder = CompartmentBuilder()
-        add_passive_mechanisms(comp_builder)
+        self._add_passive_mechanisms(comp_builder)
         comp_builder.add(
             mechanisms.Fire(v_threshold=125,
                             v_reset=60,
@@ -324,6 +324,60 @@ class TestRecordingAndProjectionsBuilder(
 
         builder.connect(connections)
         return builder.done("MyNeuron")
+
+    def test_different_name(self):
+        """
+        Test that spiking mechanism can be recorded when not named "spikes".
+        """
+        # construct compartment
+        comp_builder = CompartmentBuilder()
+        self._add_passive_mechanisms(comp_builder)
+        passive_comp = comp_builder.done("PassiveCompartment")
+
+        comp_builder = CompartmentBuilder()
+        self._add_passive_mechanisms(comp_builder)
+        comp_builder.add(
+            mechanisms.Fire(v_threshold=125,
+                            v_reset=60,
+                            tau_ref=10e-6,
+                            holdoff_time=10e-6),
+            label='fire')
+        active_comp = comp_builder.done("ActiveCompartment")
+
+        # Construct neuron
+        builder = MorphologyBuilder()
+        nodes = []
+        nodes.append(builder.add_compartment(active_comp(),
+                                             label=self.labels[0]))
+        for label in self.labels[1:]:
+            nodes.append(
+                builder.add_compartment(passive_comp(), label=label))
+
+        connections = [Connection(first, second, 10e-6) for first, second in
+                       zip(nodes[:-1], nodes[1:])]
+
+        builder.connect(connections)
+        neuron_class = builder.done("MyNeuron")
+
+        pynn.setup(initial_config=pynn.helper.chip_from_nightly())
+
+        pop = pynn.Population(1, neuron_class())
+
+        in_pop = pynn.Population(1, pynn.cells.SpikeSourceArray(
+            spike_times=np.linspace(0.1, 0.11, 10)))
+
+        synapse = pynn.standardmodels.synapses.StaticSynapse(weight=63)
+        pynn.Projection(in_pop, pop, pynn.AllToAllConnector(),
+                        synapse_type=synapse,
+                        receptor_type=self.receptor_type)
+        pop.record(["fire"], locations=[self.labels[0]])
+
+        pynn.run(1)
+
+        spiketrains = pop.get_data().segments[-1].spiketrains
+
+        self.assertGreater(len(spiketrains), 0)
+        self.assertGreater(len(spiketrains[0]), 0)
 
 
 if __name__ == "__main__":
