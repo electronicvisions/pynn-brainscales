@@ -674,7 +674,12 @@ class TestMultipleRuns(unittest.TestCase):
         '''
         pynn.setup(enable_neuron_bypass=True)
 
-        self.pop = pynn.Population(1, pynn.cells.HXNeuron())
+        # a input spike might elicit several spikes in the bypass mode
+        # if the refactory period is not set. We want to prevent this
+        # in these tests. With a clock scalar of 0 (default) a refractory
+        # clock value of 255 corresponds to approx. 2 us.
+        self.pop = pynn.Population(1, pynn.cells.HXNeuron(
+            refractory_period_refractory_time=255))
         self.pop.record('spikes')
 
         self.input_pop = pynn.Population(1, pynn.cells.SpikeSourceArray())
